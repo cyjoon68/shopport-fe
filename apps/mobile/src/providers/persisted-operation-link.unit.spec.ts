@@ -73,7 +73,9 @@ describe('persisted operation documents', () => {
         throw new Error(`Manifest entry is missing for ${hash}`);
       }
       expect(
-        `sha256:${createHash('sha256').update(stripIgnoredCharacters(normalizedDocument)).digest('hex')}`,
+        createHash('sha256')
+          .update(stripIgnoredCharacters(normalizedDocument))
+          .digest('hex'),
       ).toBe(hash);
     }
   });
@@ -120,7 +122,7 @@ describe('persisted operation documents', () => {
       throw new Error(`Manifest entry is missing for ${operationHash}`);
     }
     expect(normalizedRequest).toBe(stripIgnoredCharacters(manifestDocument));
-    expect(`sha256:${createHash('sha256').update(normalizedRequest).digest('hex')}`).toBe(
+    expect(createHash('sha256').update(normalizedRequest).digest('hex')).toBe(
       operationHash,
     );
   });

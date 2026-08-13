@@ -22,14 +22,15 @@ import type { AuthProviderName, TokenPair } from './auth-http';
 import { setAccessToken } from './auth-token';
 import { appleIdentity, kakaoIdentity } from './native-auth';
 import { resetRevenueCat } from '@/features/subscription/revenuecat';
-
-type SessionStatus = 'booting' | 'authenticated' | 'guest';
+import { SessionBoundaryContext } from './session-boundary';
+import type { SessionStatus } from './session-boundary';
 
 type SessionContextValue = Readonly<{
   error: string | null;
   login: (provider: AuthProviderName) => Promise<void>;
   loginDemo: () => Promise<void>;
   logout: () => Promise<void>;
+  sessionVersion: number;
   status: SessionStatus;
 }>;
 
@@ -42,6 +43,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
   const [status, setStatus] = useState<SessionStatus>('booting');
   const [error, setError] = useState<string | null>(null);
   const [expiry, setExpiry] = useState<number | null>(null);
+  const [sessionVersion, setSessionVersion] = useState(0);
 
   const install = useCallback(async (tokens: TokenPair): Promise<void> => {
     await writeRefreshToken(tokens.refreshToken);
@@ -101,6 +103,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
             identity.displayName,
           ),
         );
+        setSessionVersion((current) => current + 1);
       } catch (loginError) {
         setError(messageFrom(loginError));
       }
@@ -113,6 +116,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
     setError(null);
     try {
       await install(await authenticate('kakao', 'demo', Crypto.randomUUID()));
+      setSessionVersion((current) => current + 1);
     } catch (loginError) {
       setError(messageFrom(loginError));
     }
@@ -131,10 +135,16 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
   }, [clear]);
 
   const value = useMemo(
-    () => ({ error, login, loginDemo, logout, status }),
-    [error, login, loginDemo, logout, status],
+    () => ({ error, login, loginDemo, logout, sessionVersion, status }),
+    [error, login, loginDemo, logout, sessionVersion, status],
   );
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>
+      <SessionBoundaryContext.Provider value={{ sessionVersion, status }}>
+        {children}
+      </SessionBoundaryContext.Provider>
+    </SessionContext.Provider>
+  );
 };
 
 export const useSession = (): SessionContextValue => {

@@ -3,7 +3,7 @@ import persistedDocuments from '@/graphql/generated/persisted-documents.json';
 import type { ASTNode, DocumentNode } from 'graphql';
 
 const operationIdHeader = 'x-shopport-operation-id';
-const sha256HashPattern = /^sha256:[a-f0-9]{64}$/u;
+const sha256HashPattern = /^[a-f0-9]{64}$/u;
 const persistedManifest: Record<string, string> = persistedDocuments;
 
 type DocumentWithMeta = DocumentNode & {

@@ -40,6 +40,15 @@ export const ChatComposer = ({
   const online = useOnline();
   const assetRef = useRef<Attachment | null>(null);
   const verificationRef = useRef<string | null>(null);
+  const conversationIdRef = useRef(conversationId);
+  const conversationVersionRef = useRef(0);
+  const draftReadyRef = useRef<string | null>(null);
+
+  const isCurrentConversation = useCallback(
+    (id: string, version: number): boolean =>
+      conversationIdRef.current === id && conversationVersionRef.current === version,
+    [],
+  );
 
   useEffect(() => {
     assetRef.current = asset;
@@ -71,42 +80,79 @@ export const ChatComposer = ({
 
   const verifyAsset = useCallback(
     async (target: Attachment): Promise<void> => {
+      const expectedConversationId = conversationId;
+      const expectedVersion = conversationVersionRef.current;
+      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
       if (verificationRef.current === target.id) return;
       verificationRef.current = target.id;
       setAsset((current) =>
         current?.id === target.id ? { ...current, state: 'checking' } : current,
       );
       try {
-        applyProcessingResult(target.id, await pollAssetUntilSettled(target.id));
+        const result = await pollAssetUntilSettled(target.id);
+        if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+          applyProcessingResult(target.id, result);
+        }
       } catch (error) {
-        setAsset((current) =>
-          current?.id === target.id ? { ...current, state: 'timeout' } : current,
-        );
-        Alert.alert(
-          '이미지 상태 확인 실패',
-          error instanceof Error ? error.message : '연결을 확인하고 다시 시도해 주세요.',
-        );
+        if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+          setAsset((current) =>
+            current?.id === target.id ? { ...current, state: 'timeout' } : current,
+          );
+          Alert.alert(
+            '이미지 상태 확인 실패',
+            error instanceof Error
+              ? error.message
+              : '연결을 확인하고 다시 시도해 주세요.',
+          );
+        }
       } finally {
-        if (verificationRef.current === target.id) verificationRef.current = null;
+        if (
+          isCurrentConversation(expectedConversationId, expectedVersion) &&
+          verificationRef.current === target.id
+        ) {
+          verificationRef.current = null;
+        }
       }
     },
-    [applyProcessingResult],
+    [applyProcessingResult, conversationId, isCurrentConversation],
   );
 
   useEffect(() => {
+    conversationVersionRef.current += 1;
+    const expectedVersion = conversationVersionRef.current;
+    conversationIdRef.current = conversationId;
+    draftReadyRef.current = null;
+    verificationRef.current = null;
+    assetRef.current = null;
+    setText('');
+    setAsset(null);
+    setUploading(false);
+    let active = true;
     void readDraft(conversationId).then((draft) => {
-      setText(draft.text);
+      if (!active || !isCurrentConversation(conversationId, expectedVersion)) return;
       const restored: Attachment | null =
         draft.assetId && draft.assetUri
           ? { id: draft.assetId, uri: draft.assetUri, state: 'timeout' }
           : null;
+      draftReadyRef.current = conversationId;
       assetRef.current = restored;
+      setText(draft.text);
       setAsset(restored);
     });
-  }, [conversationId]);
+    return () => {
+      active = false;
+    };
+  }, [conversationId, isCurrentConversation]);
 
   useEffect(() => {
+    if (draftReadyRef.current !== conversationId) return undefined;
+    const expectedVersion = conversationVersionRef.current;
     const timeout = setTimeout(() => {
+      if (
+        !isCurrentConversation(conversationId, expectedVersion) ||
+        draftReadyRef.current !== conversationId
+      )
+        return;
       void saveDraft(conversationId, {
         text,
         assetId: asset?.id ?? null,
@@ -114,7 +160,7 @@ export const ChatComposer = ({
       });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [asset, conversationId, text]);
+  }, [asset, conversationId, isCurrentConversation, text]);
 
   useEffect(() => {
     const current = assetRef.current;
@@ -131,6 +177,8 @@ export const ChatComposer = ({
   }, [online, verifyAsset]);
 
   const attach = async (): Promise<void> => {
+    const expectedConversationId = conversationId;
+    const expectedVersion = conversationVersionRef.current;
     if (!online) {
       Alert.alert('오프라인', '이미지 업로드는 온라인에서만 가능합니다.');
       return;
@@ -139,56 +187,73 @@ export const ChatComposer = ({
     try {
       const uploaded = await selectAndUploadAsset(conversationId);
       if (!uploaded) return;
-      if (asset) await removeUploadedAsset(asset.id);
+      if (!isCurrentConversation(expectedConversationId, expectedVersion)) {
+        await removeUploadedAsset(uploaded.id);
+        return;
+      }
+      const previous = assetRef.current;
+      if (previous) await removeUploadedAsset(previous.id);
       const next: Attachment = { ...uploaded, state: 'processing' };
       assetRef.current = next;
       setAsset(next);
       await Haptics.selectionAsync();
     } catch (error) {
-      Alert.alert(
-        '이미지 첨부 실패',
-        error instanceof Error ? error.message : '다시 시도해 주세요.',
-      );
+      if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+        Alert.alert(
+          '이미지 첨부 실패',
+          error instanceof Error ? error.message : '다시 시도해 주세요.',
+        );
+      }
     } finally {
-      setUploading(false);
+      if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+        setUploading(false);
+      }
     }
   };
 
   const remove = async (): Promise<void> => {
-    if (!asset) return;
+    const current = assetRef.current;
+    if (!current) return;
     if (!online) {
       Alert.alert('오프라인', '온라인에서 첨부 이미지를 삭제할 수 있습니다.');
       return;
     }
-    await removeUploadedAsset(asset.id);
+    await removeUploadedAsset(current.id);
     assetRef.current = null;
     setAsset(null);
   };
 
   const send = async (): Promise<void> => {
-    const trimmed = text.trim();
+    const expectedConversationId = conversationId;
+    const expectedVersion = conversationVersionRef.current;
+    const currentText = draftReadyRef.current === conversationId ? text : '';
+    const currentAsset = draftReadyRef.current === conversationId ? asset : null;
+    const trimmed = currentText.trim();
     if (
-      (!trimmed && !asset) ||
+      (!trimmed && !currentAsset) ||
       !online ||
       loading ||
       uploading ||
-      (asset && asset.state !== 'ready')
+      (currentAsset && currentAsset.state !== 'ready')
     )
       return;
     try {
-      if (asset) {
-        const status = await readAssetStatus(asset.id);
+      if (currentAsset) {
+        const status = await readAssetStatus(currentAsset.id);
+        if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
         if (status !== 'READY') {
-          if (status === 'REJECTED') applyProcessingResult(asset.id, 'REJECTED');
-          else void verifyAsset(asset);
+          if (status === 'REJECTED') applyProcessingResult(currentAsset.id, 'REJECTED');
+          else void verifyAsset(currentAsset);
           return;
         }
       }
+      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await onSend(trimmed, asset?.id ?? null);
+      await onSend(trimmed, currentAsset?.id ?? null);
+      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
       setText('');
       setAsset(null);
-      await deleteDraft(conversationId);
+      await deleteDraft(expectedConversationId);
     } catch (error) {
       Alert.alert(
         '메시지 전송 실패',
@@ -197,6 +262,9 @@ export const ChatComposer = ({
     }
   };
 
+  const visibleAsset = draftReadyRef.current === conversationId ? asset : null;
+  const visibleText = draftReadyRef.current === conversationId ? text : '';
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {!online ? (
@@ -204,12 +272,12 @@ export const ChatComposer = ({
           오프라인 · 초안은 이 기기에 저장됩니다
         </Text>
       ) : null}
-      {asset ? (
+      {visibleAsset ? (
         <View style={styles.attachment}>
           <Image
             accessibilityLabel="첨부한 상품 사진"
             contentFit="cover"
-            source={asset.uri}
+            source={visibleAsset.uri}
             style={styles.thumbnail}
           />
           <Pressable
@@ -221,21 +289,21 @@ export const ChatComposer = ({
               이미지 제거
             </Text>
           </Pressable>
-          {asset.state !== 'ready' ? (
+          {visibleAsset.state !== 'ready' ? (
             <View style={styles.assetStatus}>
               <Text
                 accessibilityLiveRegion="polite"
                 allowFontScaling
                 style={styles.statusLabel}
               >
-                {asset.state === 'timeout'
+                {visibleAsset.state === 'timeout'
                   ? '처리 확인 시간이 초과되었습니다'
                   : '이미지 처리 중'}
               </Text>
-              {asset.state === 'timeout' ? (
+              {visibleAsset.state === 'timeout' ? (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => void verifyAsset(asset)}
+                  onPress={() => void verifyAsset(visibleAsset)}
                   style={styles.retryButton}
                 >
                   <Text allowFontScaling style={styles.retryLabel}>
@@ -268,7 +336,7 @@ export const ChatComposer = ({
           placeholder="원하는 상품과 조건을 알려주세요"
           placeholderTextColor={styles.placeholder.color}
           style={styles.input}
-          value={text}
+          value={visibleText}
         />
         <Pressable
           accessibilityLabel={loading ? '응답 중지' : '메시지 보내기'}
@@ -277,12 +345,12 @@ export const ChatComposer = ({
             disabled:
               !online ||
               uploading ||
-              (!loading && Boolean(asset && asset.state !== 'ready')),
+              (!loading && Boolean(visibleAsset && visibleAsset.state !== 'ready')),
           }}
           disabled={
             !online ||
             uploading ||
-            (!loading && Boolean(asset && asset.state !== 'ready'))
+            (!loading && Boolean(visibleAsset && visibleAsset.state !== 'ready'))
           }
           onPress={() => void (loading ? onStop() : send())}
           style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}

@@ -1,5 +1,14 @@
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useSessionBoundary } from '@/features/auth/session-boundary';
 import type { CachedProduct } from '@/shared/storage/database';
 
 type AddResult = 'added' | 'duplicate' | 'full';
@@ -15,6 +24,24 @@ const CompareContext = createContext<CompareContextValue | null>(null);
 
 export const CompareProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
   const [products, setProducts] = useState<Array<CachedProduct>>([]);
+  const { sessionVersion, status } = useSessionBoundary();
+  const previousSession = useRef<{
+    sessionVersion: number;
+    status: typeof status;
+  } | null>(null);
+
+  useEffect(() => {
+    const previous = previousSession.current;
+    const shouldClear =
+      status === 'guest' ||
+      (status === 'authenticated' &&
+        previous !== null &&
+        (previous.status !== 'authenticated' ||
+          previous.sessionVersion !== sessionVersion));
+    previousSession.current = { sessionVersion, status };
+    if (shouldClear) setProducts([]);
+  }, [sessionVersion, status]);
+
   const add = useCallback(
     (product: CachedProduct): AddResult => {
       if (products.some(({ id }) => id === product.id)) return 'duplicate';

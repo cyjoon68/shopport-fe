@@ -520,9 +520,7 @@ export const ConversationSummaryFragmentDoc = {
   ],
 } as unknown as DocumentNode<ConversationSummaryFragment, unknown>;
 export const CreateAssetUploadDocument = {
-  __meta__: {
-    hash: 'sha256:7241e3bebd67ed252a5c9f43ffe58701e900e504fff18eb60d74f909c268ffcc',
-  },
+  __meta__: { hash: '7241e3bebd67ed252a5c9f43ffe58701e900e504fff18eb60d74f909c268ffcc' },
   kind: 'Document',
   definitions: [
     {
@@ -627,9 +625,7 @@ export const CreateAssetUploadDocument = {
   CreateAssetUploadMutationVariables
 >;
 export const AssetDocument = {
-  __meta__: {
-    hash: 'sha256:b750d22f5cc29cf5a003b5dc4a80e1504d3c9b6ef99415c35708841779b9647d',
-  },
+  __meta__: { hash: 'b750d22f5cc29cf5a003b5dc4a80e1504d3c9b6ef99415c35708841779b9647d' },
   kind: 'Document',
   definitions: [
     {
@@ -676,9 +672,7 @@ export const AssetDocument = {
   ],
 } as unknown as DocumentNode<AssetQuery, AssetQueryVariables>;
 export const DeleteAssetDocument = {
-  __meta__: {
-    hash: 'sha256:908e3d72c99fc4159ea308e03c07a65c844974e8cbf33bbab13c900eb943eff6',
-  },
+  __meta__: { hash: '908e3d72c99fc4159ea308e03c07a65c844974e8cbf33bbab13c900eb943eff6' },
   kind: 'Document',
   definitions: [
     {
@@ -739,9 +733,7 @@ export const DeleteAssetDocument = {
   ],
 } as unknown as DocumentNode<DeleteAssetMutation, DeleteAssetMutationVariables>;
 export const SearchProductsDocument = {
-  __meta__: {
-    hash: 'sha256:f4f6469083c5fe0e294229875ce6da554af5f64ee4fefbeea4fc89c4cc224aff',
-  },
+  __meta__: { hash: 'f4f6469083c5fe0e294229875ce6da554af5f64ee4fefbeea4fc89c4cc224aff' },
   kind: 'Document',
   definitions: [
     {
@@ -930,9 +922,7 @@ export const SearchProductsDocument = {
   ],
 } as unknown as DocumentNode<SearchProductsQuery, SearchProductsQueryVariables>;
 export const ProductDocument = {
-  __meta__: {
-    hash: 'sha256:04b82f110066e77230fca4c0d42f3c993ff27ce804c74e424c502472396beb1a',
-  },
+  __meta__: { hash: '04b82f110066e77230fca4c0d42f3c993ff27ce804c74e424c502472396beb1a' },
   kind: 'Document',
   definitions: [
     {
@@ -1056,9 +1046,7 @@ export const ProductDocument = {
   ],
 } as unknown as DocumentNode<ProductQuery, ProductQueryVariables>;
 export const SavedProductsDocument = {
-  __meta__: {
-    hash: 'sha256:bf57c797b4648170197cfea2a3603e97894cf05bc6e06e0102ed2ef420d41b32',
-  },
+  __meta__: { hash: 'bf57c797b4648170197cfea2a3603e97894cf05bc6e06e0102ed2ef420d41b32' },
   kind: 'Document',
   definitions: [
     {
@@ -1231,9 +1219,7 @@ export const SavedProductsDocument = {
   ],
 } as unknown as DocumentNode<SavedProductsQuery, SavedProductsQueryVariables>;
 export const SaveProductDocument = {
-  __meta__: {
-    hash: 'sha256:c4dbff567b493b3f63e298e3e6ba0109707689eed4e0c9c5ff2850dc4b1f42bc',
-  },
+  __meta__: { hash: 'c4dbff567b493b3f63e298e3e6ba0109707689eed4e0c9c5ff2850dc4b1f42bc' },
   kind: 'Document',
   definitions: [
     {
@@ -1386,9 +1372,7 @@ export const SaveProductDocument = {
   ],
 } as unknown as DocumentNode<SaveProductMutation, SaveProductMutationVariables>;
 export const UnsaveProductDocument = {
-  __meta__: {
-    hash: 'sha256:940b259c57100b1d07a93b02817ffcc88d60671d93078e40d153596767ef7809',
-  },
+  __meta__: { hash: '940b259c57100b1d07a93b02817ffcc88d60671d93078e40d153596767ef7809' },
   kind: 'Document',
   definitions: [
     {
@@ -1541,9 +1525,7 @@ export const UnsaveProductDocument = {
   ],
 } as unknown as DocumentNode<UnsaveProductMutation, UnsaveProductMutationVariables>;
 export const ConversationsDocument = {
-  __meta__: {
-    hash: 'sha256:aea313be0a5c7afd3c63a46552e9cab21faea5eae0a2c091756b4dc3799478ed',
-  },
+  __meta__: { hash: 'aea313be0a5c7afd3c63a46552e9cab21faea5eae0a2c091756b4dc3799478ed' },
   kind: 'Document',
   definitions: [
     {
@@ -1652,9 +1634,7 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
-  __meta__: {
-    hash: 'sha256:1a3087ec736590bb039f90e51a0b28aef3b7eb305d66507f2e782c53a627c7a7',
-  },
+  __meta__: { hash: '1a3087ec736590bb039f90e51a0b28aef3b7eb305d66507f2e782c53a627c7a7' },
   kind: 'Document',
   definitions: [
     {
@@ -1948,9 +1928,7 @@ export const ConversationDocument = {
   ],
 } as unknown as DocumentNode<ConversationQuery, ConversationQueryVariables>;
 export const CreateConversationDocument = {
-  __meta__: {
-    hash: 'sha256:6db9a01d2f27e9b2124a718b19cc71dbecdd35cf1e40ddc9dea61c327eb780aa',
-  },
+  __meta__: { hash: '6db9a01d2f27e9b2124a718b19cc71dbecdd35cf1e40ddc9dea61c327eb780aa' },
   kind: 'Document',
   definitions: [
     {
@@ -2042,9 +2020,7 @@ export const CreateConversationDocument = {
   CreateConversationMutationVariables
 >;
 export const RenameConversationDocument = {
-  __meta__: {
-    hash: 'sha256:1ad41dd2a2a1ab3f6cf2879c5e676ff2eea45cc1466a55f63ede1ed32b72ad37',
-  },
+  __meta__: { hash: '1ad41dd2a2a1ab3f6cf2879c5e676ff2eea45cc1466a55f63ede1ed32b72ad37' },
   kind: 'Document',
   definitions: [
     {
@@ -2136,9 +2112,7 @@ export const RenameConversationDocument = {
   RenameConversationMutationVariables
 >;
 export const DeleteConversationDocument = {
-  __meta__: {
-    hash: 'sha256:74b4b50db65d29a9221f9eed833e2725bdc378349b6c20b3802a559fd7ba7b64',
-  },
+  __meta__: { hash: '74b4b50db65d29a9221f9eed833e2725bdc378349b6c20b3802a559fd7ba7b64' },
   kind: 'Document',
   definitions: [
     {
@@ -2202,9 +2176,7 @@ export const DeleteConversationDocument = {
   DeleteConversationMutationVariables
 >;
 export const DeleteViewerAccountDocument = {
-  __meta__: {
-    hash: 'sha256:c8fa15afa194d3e2f9ce9fefb86de127ce7c37fd03afe484216944980d659f50',
-  },
+  __meta__: { hash: 'c8fa15afa194d3e2f9ce9fefb86de127ce7c37fd03afe484216944980d659f50' },
   kind: 'Document',
   definitions: [
     {
@@ -2248,9 +2220,7 @@ export const DeleteViewerAccountDocument = {
   DeleteViewerAccountMutationVariables
 >;
 export const ViewerDocument = {
-  __meta__: {
-    hash: 'sha256:04019bff4059c8cbcaefa660f6376ba8ed7911ae533b89627679cfb355e7b98f',
-  },
+  __meta__: { hash: '04019bff4059c8cbcaefa660f6376ba8ed7911ae533b89627679cfb355e7b98f' },
   kind: 'Document',
   definitions: [
     {

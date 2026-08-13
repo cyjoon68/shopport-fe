@@ -11,44 +11,68 @@ import { formatMoney, productFromFragment } from './product-model';
 import { useOnline } from '@/providers/network-provider';
 import { cacheProducts, readCachedProduct } from '@/shared/storage/database';
 import type { CachedProduct } from '@/shared/storage/database';
+import { productForRoute } from './product-route';
+
+export { productForRoute } from './product-route';
 
 export const ProductDetailScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { status } = useSession();
   const online = useOnline();
   const [cached, setCached] = useState<CachedProduct | null>(null);
+  const [cachedRouteId, setCachedRouteId] = useState<string | null>(null);
   const [cacheLoading, setCacheLoading] = useState(true);
   const { data, loading } = useQuery(ProductDocument, {
     variables: { id },
     fetchPolicy: 'cache-and-network',
     skip: !id || !online,
   });
-  const remoteProduct = useMemo(
-    () => (data?.product ? productFromFragment(data.product) : null),
-    [data?.product],
-  );
+  const remoteProduct = useMemo(() => {
+    if (!data?.product) return null;
+    const product = productFromFragment(data.product);
+    return product.id === id ? product : null;
+  }, [data?.product, id]);
 
   useEffect(() => {
-    if (!id) return;
+    let active = true;
+    setCached(null);
+    setCachedRouteId(null);
+    setCacheLoading(Boolean(id));
+    if (!id)
+      return () => {
+        active = false;
+      };
     if (remoteProduct) {
       setCached(remoteProduct);
+      setCachedRouteId(id);
       setCacheLoading(false);
       void cacheProducts([remoteProduct]);
-      return;
+      return () => {
+        active = false;
+      };
     }
     void readCachedProduct(id).then((product) => {
+      if (!active) return;
       setCached(product);
+      setCachedRouteId(id);
       setCacheLoading(false);
     });
+    return () => {
+      active = false;
+    };
   }, [id, remoteProduct]);
 
   if (status === 'guest') return <Redirect href="/auth" />;
   if (!id) return <Redirect href="/" />;
-  const product = remoteProduct ?? cached;
+  const product = productForRoute(
+    id,
+    remoteProduct,
+    cachedRouteId === id ? cached : null,
+  );
   if (!product) {
     return (
       <Screen>
-        {loading || cacheLoading ? (
+        {loading || cacheLoading || cachedRouteId !== id ? (
           <Text style={styles.status}>상품을 불러오는 중입니다</Text>
         ) : (
           <EmptyState

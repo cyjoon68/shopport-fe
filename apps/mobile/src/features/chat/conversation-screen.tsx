@@ -113,6 +113,7 @@ export const ConversationScreen = () => {
           </Text>
         ) : null}
         <ChatComposer
+          key={id}
           conversationId={id}
           loading={chat.isLoading}
           onSend={send}

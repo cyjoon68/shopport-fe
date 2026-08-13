@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { stripIgnoredCharacters } from 'graphql';
 
 const hashPersistedDocument = (document: string): string =>
-  `sha256:${createHash('sha256').update(stripIgnoredCharacters(document)).digest('hex')}`;
+  createHash('sha256').update(stripIgnoredCharacters(document)).digest('hex');
 
 const config: CodegenConfig = {
   hooks: {

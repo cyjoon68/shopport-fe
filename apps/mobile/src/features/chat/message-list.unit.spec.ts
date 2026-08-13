@@ -1,7 +1,12 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
 import { fromHistoricalMessage, mergeMessages } from './message-list';
-import { isStableChatMessageId, messageIdentity } from './message-id';
+import {
+  createStableChatMessageId,
+  createUuidV7,
+  isStableChatMessageId,
+  messageIdentity,
+} from './message-id';
 
 const product = {
   id: 'product-1',
@@ -78,8 +83,21 @@ describe('historical message parts', () => {
 
   it('requires canonical UUIDs for cross-source identity and isolates legacy IDs', () => {
     expect(isStableChatMessageId('0198a122-0c00-7000-8000-000000000001')).toBe(true);
+    expect(isStableChatMessageId('0198a122-0c00-4000-8000-000000000001')).toBe(false);
     expect(isStableChatMessageId('msg-legacy')).toBe(false);
     expect(messageIdentity('server', 'msg-legacy')).toBe('server:msg-legacy');
     expect(messageIdentity('live', 'msg-legacy')).toBe('live:msg-legacy');
+  });
+
+  it('creates UUIDv7 IDs with RFC variants and only deduplicates canonical IDs', () => {
+    const id = createUuidV7(0x0198a1220c00, () => new Uint8Array(16).fill(0));
+    expect(id).toBe('0198a122-0c00-7000-8000-000000000000');
+    expect(isStableChatMessageId(id)).toBe(true);
+    expect(isStableChatMessageId(createStableChatMessageId())).toBe(true);
+    const v4 = '0198a122-0c00-4000-8000-000000000001';
+    expect(messageIdentity('server', v4)).toBe(`server:${v4}`);
+    expect(messageIdentity('live', v4)).toBe(`live:${v4}`);
+    expect(messageIdentity('server', id)).toBe(id);
+    expect(messageIdentity('live', id)).toBe(id);
   });
 });
