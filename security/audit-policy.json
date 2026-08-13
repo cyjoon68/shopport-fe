@@ -1,0 +1,27 @@
+{
+  "reviewedOn": "2026-08-13",
+  "exceptions": [
+    {
+      "advisory": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "severity": ["high", "critical"],
+      "pathPattern": "^apps__mobile>.*>metro>image-size$",
+      "version": "1.2.1",
+      "firstPatchedVersion": null,
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; untrusted runtime image bytes are not passed to Metro.",
+      "upstreamUrl": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency."
+    },
+    {
+      "advisory": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "severity": ["high", "critical"],
+      "pathPattern": "^apps__mobile>.*>metro>image-size$",
+      "version": "1.2.1",
+      "firstPatchedVersion": null,
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; untrusted runtime image bytes are not passed to Metro.",
+      "upstreamUrl": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "removeWhen": "Remove when image-size publishes a patched release or an Expos SDK update replaces the affected Metro dependency."
+    }
+  ]
+}

@@ -28,7 +28,15 @@ jobs:
       - run: pnpm codegen
       - run: git diff --exit-code
       - run: pnpm build
-      - run: pnpm audit --audit-level=high --ignore-unfixable
+      - run: |
+          set +e
+          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/pnpm-audit.json"
+          audit_status=$?
+          set -e
+          node scripts/audit-policy.mjs "$RUNNER_TEMP/pnpm-audit.json"
+          if [ "$audit_status" -gt 1 ]; then
+            exit "$audit_status"
+          fi
       - run: pnpm run doctor
       - run: pnpm --filter @shopport/mobile exec expo install --check
 
