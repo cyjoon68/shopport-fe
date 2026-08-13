@@ -11,7 +11,7 @@ cp .env.example .env.local
 pnpm start
 ```
 
-Apple·Kakao·RevenueCat을 포함하므로 Expo Go가 아닌 development build가 필요하다. 로컬 API 기본 주소는 `http://127.0.0.1:3000`이다. Android emulator에서는 `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000`을 사용한다.
+Apple·Kakao·RevenueCat을 포함하므로 Expo Go가 아닌 development build가 필요하다. 로컬 API 기본 주소는 `http://127.0.0.1:4000`이다. Android emulator에서는 `EXPO_PUBLIC_API_URL=http://10.0.2.2:4000`을 사용한다.
 
 ```bash
 cd apps/mobile
@@ -28,6 +28,8 @@ pnpm exec eas build --profile development --platform android
 - `apps/mobile/schema.graphql`: backend canonical schema의 pinned snapshot
 
 앱 루트는 `expo-router/drawer`다. 768px 미만은 `front`, 이상은 `permanent` drawer를 사용하며 chat, product, compare는 중첩 native Stack이다.
+
+채팅 메시지 ID 계약은 GraphQL `Message.id`와 live/SQLite `UIMessage.id`가 동일한 canonical UUID를 사용하는 것이다. 새 사용자 메시지는 클라이언트 UUID를 전송하고, 서버는 client/stream UUID를 DB와 replay에 그대로 보존해야 한다. 앱은 canonical UUID만 server/live merge 키로 사용하며 legacy 로컬 ID는 source별로 격리한다.
 
 ## 검사
 

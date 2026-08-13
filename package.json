@@ -16,7 +16,7 @@
     "lint": "eslint . --max-warnings=0",
     "start": "pnpm --filter @shopport/mobile start",
     "storybook": "pnpm --filter @shopport/mobile run storybook:start",
-    "test": "pnpm --filter @shopport/mobile test",
+    "test": "pnpm --filter @shopport/mobile test && node --test scripts/audit-policy.test.mjs",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {

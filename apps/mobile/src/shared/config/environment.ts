@@ -13,7 +13,7 @@ const environmentValue = (name: string): string | undefined => {
 
 export const environment = {
   apiUrl: absoluteUrl(
-    environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:3000',
+    environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:4000',
     'API URL',
   ),
   appleAndroidClientId: environmentValue('EXPO_PUBLIC_APPLE_ANDROID_CLIENT_ID') ?? '',

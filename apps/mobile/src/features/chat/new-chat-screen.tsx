@@ -10,6 +10,7 @@ import { ConversationSummaryFragmentDoc } from '@/graphql/generated/graphql';
 import { readFragment } from '@/graphql/generated';
 import { saveDraft } from '@/shared/storage/database';
 import { useSession } from '@/features/auth/session-provider';
+import { useOnline } from '@/providers/network-provider';
 
 const suggestions = [
   '출퇴근용 가벼운 텀블러 찾아줘',
@@ -19,11 +20,16 @@ const suggestions = [
 
 export const NewChatScreen = () => {
   const { status } = useSession();
+  const online = useOnline();
   const [createConversation] = useMutation(CreateConversationDocument);
   const [loading, setLoading] = useState(false);
   if (status === 'guest') return <Redirect href="/auth" />;
 
   const create = async (draft = ''): Promise<void> => {
+    if (!online) {
+      Alert.alert('오프라인', '새 대화는 온라인에서 시작할 수 있습니다.');
+      return;
+    }
     setLoading(true);
     try {
       const result = await createConversation({ variables: { input: {} } });
@@ -61,7 +67,7 @@ export const NewChatScreen = () => {
           {suggestions.map((suggestion) => (
             <Pressable
               accessibilityRole="button"
-              disabled={loading}
+              disabled={loading || !online}
               key={suggestion}
               onPress={() => void create(suggestion)}
               style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
@@ -72,7 +78,7 @@ export const NewChatScreen = () => {
             </Pressable>
           ))}
         </View>
-        <ActionButton disabled={loading} onPress={() => void create()}>
+        <ActionButton disabled={loading || !online} onPress={() => void create()}>
           {loading ? '대화 준비 중' : '새 대화 시작'}
         </ActionButton>
         {loading ? <ActivityIndicator accessibilityLabel="대화 준비 중" /> : null}

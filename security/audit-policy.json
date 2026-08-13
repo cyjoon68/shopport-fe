@@ -1,0 +1,40 @@
+{
+  "reviewedOn": "2026-08-13",
+  "operationalConstraints": {
+    "runtimeUserUploads": "Runtime and user-supplied uploads must not be passed to Metro.",
+    "publicForkAssets": "Malicious public-fork assets may reach pull-request build inputs and cause CI availability DoS.",
+    "verifyTrigger": "pull_request",
+    "verifyTimeoutMinutes": 20,
+    "verifyContentsPermission": "read",
+    "prCiCredentials": "PR CI has no secrets or static provider credentials.",
+    "easSigningDeployment": "EAS preview, signing, and deployment credentials are not run in PR CI."
+  },
+  "exceptions": [
+    {
+      "advisory": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "severity": "high",
+      "pathPattern": "^apps__mobile>.*>metro>image-size$",
+      "version": "1.2.1",
+      "firstPatchedVersion": null,
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; runtime and user-supplied uploads do not reach Metro. A malicious public-fork asset may still cause CI availability DoS.",
+      "upstreamUrl": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency.",
+      "expiresOn": "2026-09-13",
+      "operationalConstraint": "Runtime and user-supplied uploads do not reach Metro; public-fork assets are processed only by the read-only, 20-minute pull_request verify job with no secrets or static credentials, and EAS/sign/deploy credentials are not run in PR CI."
+    },
+    {
+      "advisory": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "severity": "high",
+      "pathPattern": "^apps__mobile>.*>metro>image-size$",
+      "version": "1.2.1",
+      "firstPatchedVersion": null,
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; runtime and user-supplied uploads do not reach Metro. A malicious public-fork asset may still cause CI availability DoS.",
+      "upstreamUrl": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency.",
+      "expiresOn": "2026-09-13",
+      "operationalConstraint": "Runtime and user-supplied uploads do not reach Metro; public-fork assets are processed only by the read-only, 20-minute pull_request verify job with no secrets or static credentials, and EAS/sign/deploy credentials are not run in PR CI."
+    }
+  ]
+}

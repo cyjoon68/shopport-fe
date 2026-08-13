@@ -9,17 +9,21 @@ import { ActionButton, Screen, SectionTitle } from '@shopport/ui';
 import { ViewerDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { configureRevenueCat } from './revenuecat';
+import { syncViewerEntitlement } from './subscription-sync';
+import { useOnline } from '@/providers/network-provider';
 
 const productIds = new Set(['shopport_pro_monthly', 'shopport_pro_annual']);
 
 export const SubscriptionScreen = () => {
   const { status } = useSession();
+  const online = useOnline();
   const { data, refetch } = useQuery(ViewerDocument, {
     skip: status !== 'authenticated',
   });
   const [packages, setPackages] = useState<Array<PurchasesPackage>>([]);
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     const userId = data?.viewer.id;
@@ -42,12 +46,34 @@ export const SubscriptionScreen = () => {
   }, [data?.viewer.id]);
 
   if (status === 'guest') return <Redirect href="/auth" />;
+
+  const sync = async (expectedPro: boolean): Promise<'SYNCED' | 'TIMEOUT'> => {
+    setSyncing(true);
+    try {
+      const result = await syncViewerEntitlement(refetch, expectedPro);
+      if (result === 'TIMEOUT') {
+        Alert.alert(
+          '구독 동기화 지연',
+          '스토어 결제는 완료되었지만 계정 반영이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.',
+        );
+      }
+      return result;
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const purchase = async (item: PurchasesPackage): Promise<void> => {
+    if (!online) {
+      Alert.alert('오프라인', '구독 구매는 온라인에서 할 수 있습니다.');
+      return;
+    }
     try {
       const result = await Purchases.purchasePackage(item);
       if (result.customerInfo.entitlements.active.pro) {
-        Alert.alert('구독 완료', 'Shopport Pro가 활성화되었습니다.');
-        await refetch();
+        if ((await sync(true)) === 'SYNCED') {
+          Alert.alert('구독 완료', 'Shopport Pro가 활성화되었습니다.');
+        }
       }
     } catch (error) {
       if (error instanceof Error && /cancel/iu.test(error.message)) return;
@@ -56,10 +82,16 @@ export const SubscriptionScreen = () => {
   };
 
   const restore = async (): Promise<void> => {
+    if (!online) {
+      Alert.alert('오프라인', '구매 복원은 온라인에서 할 수 있습니다.');
+      return;
+    }
     try {
       const info = await Purchases.restorePurchases();
-      Alert.alert(info.entitlements.active.pro ? '복원 완료' : '복원할 구매 없음');
-      await refetch();
+      const restored = Boolean(info.entitlements.active.pro);
+      if ((await sync(restored)) === 'SYNCED') {
+        Alert.alert(restored ? '복원 완료' : '복원할 구매 없음');
+      }
     } catch {
       Alert.alert('복원 실패', '스토어 연결을 확인하고 다시 시도해 주세요.');
     }
@@ -87,8 +119,13 @@ export const SubscriptionScreen = () => {
             </Text>
           ) : null}
         </View>
-        {loading ? (
+        {loading || syncing ? (
           <ActivityIndicator accessibilityLabel="구독 상품 불러오는 중" />
+        ) : null}
+        {syncing ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            스토어 결제를 계정에 반영하는 중입니다
+          </Text>
         ) : null}
         {!configured ? (
           <Text accessibilityLiveRegion="polite" style={styles.notice}>
@@ -101,6 +138,7 @@ export const SubscriptionScreen = () => {
             <Pressable
               accessibilityLabel={`${item.product.title}, ${item.product.priceString}`}
               accessibilityRole="button"
+              disabled={syncing || !online}
               key={item.identifier}
               onPress={() => void purchase(item)}
               style={({ pressed }) => [styles.package, pressed && styles.pressed]}
@@ -115,11 +153,17 @@ export const SubscriptionScreen = () => {
           ))}
         </View>
         {configured ? (
-          <ActionButton onPress={() => void restore()} variant="secondary">
+          <ActionButton
+            disabled={syncing || !online}
+            onPress={() => void restore()}
+            variant="secondary"
+          >
             구매 복원
           </ActionButton>
         ) : null}
-        {viewer?.entitlement.isActive && configured ? (
+        {viewer?.entitlement.key === 'pro' &&
+        viewer.entitlement.isActive &&
+        configured ? (
           <ActionButton onPress={() => void manage()} variant="secondary">
             구독 관리·해지
           </ActionButton>

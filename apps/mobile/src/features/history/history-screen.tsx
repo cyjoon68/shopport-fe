@@ -27,7 +27,7 @@ export const HistoryScreen = () => {
   const { data, fetchMore, refetch } = useQuery(ConversationsDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
-    skip: status !== 'authenticated',
+    skip: status !== 'authenticated' || !online,
   });
   const [deleteConversation] = useMutation(DeleteConversationDocument);
   const conversations = data?.conversations.edges.map(({ node }) => {
@@ -50,6 +50,10 @@ export const HistoryScreen = () => {
 
   if (status === 'guest') return <Redirect href="/auth" />;
   const remove = (conversation: CachedConversation): void => {
+    if (!online) {
+      Alert.alert('오프라인', '대화 삭제는 온라인에서 할 수 있습니다.');
+      return;
+    }
     Alert.alert('대화를 삭제할까요?', '메시지와 첨부 이미지도 함께 삭제됩니다.', [
       { text: '취소', style: 'cancel' },
       {

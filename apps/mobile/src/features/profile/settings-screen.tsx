@@ -5,14 +5,20 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { ActionButton, Screen, SectionTitle } from '@shopport/ui';
 import { DeleteViewerAccountDocument, ViewerDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
+import { useOnline } from '@/providers/network-provider';
 
 export const SettingsScreen = () => {
   const { logout, status } = useSession();
+  const online = useOnline();
   const { data } = useQuery(ViewerDocument, { skip: status !== 'authenticated' });
   const [deleteAccount] = useMutation(DeleteViewerAccountDocument);
   if (status === 'guest') return <Redirect href="/auth" />;
 
   const confirmDelete = (): void => {
+    if (!online) {
+      Alert.alert('오프라인', '계정 삭제는 온라인에서 할 수 있습니다.');
+      return;
+    }
     Alert.alert(
       '계정을 삭제할까요?',
       '접근은 즉시 차단됩니다. 대화, 찜, 이미지, 검색 문서는 비동기로 삭제되며 백업은 최대 35일 뒤 만료됩니다.',

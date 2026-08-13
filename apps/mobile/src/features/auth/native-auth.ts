@@ -5,7 +5,11 @@ import { Platform } from 'react-native';
 import { login as kakaoLogin } from '@react-native-kakao/user';
 import { environment } from '@/shared/config/environment';
 
-type IdentityCredential = Readonly<{ identityToken: string; nonce: string }>;
+export type IdentityCredential = Readonly<{
+  identityToken: string;
+  nonce: string;
+  displayName?: string;
+}>;
 
 const noncePair = async (): Promise<Readonly<{ raw: string; digest: string }>> => {
   const raw = Crypto.randomUUID();
@@ -20,7 +24,14 @@ const appleOnIos = async (): Promise<IdentityCredential> => {
     requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME],
   });
   if (!credential.identityToken) throw new Error('Apple ID 토큰을 받지 못했습니다.');
-  return { identityToken: credential.identityToken, nonce: nonce.raw };
+  const displayName = credential.fullName
+    ? AppleAuthentication.formatFullName(credential.fullName).trim()
+    : '';
+  return {
+    identityToken: credential.identityToken,
+    nonce: nonce.raw,
+    ...(displayName ? { displayName } : {}),
+  };
 };
 
 const appleOnAndroid = async (): Promise<IdentityCredential> => {

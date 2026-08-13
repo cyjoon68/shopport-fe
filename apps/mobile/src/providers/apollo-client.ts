@@ -2,6 +2,10 @@ import { ApolloClient, ApolloLink, HttpLink, InMemoryCache } from '@apollo/clien
 import { relayStylePagination } from '@apollo/client/utilities';
 import { getAccessToken } from '@/features/auth/auth-token';
 import { environment } from '@/shared/config/environment';
+import {
+  persistedOperationLink,
+  persistedOperationPrinter,
+} from './persisted-operation-link';
 
 const authLink = new ApolloLink((operation, forward) => {
   const token = getAccessToken();
@@ -28,7 +32,11 @@ export const apolloClient = new ApolloClient({
   }),
   dataMasking: true,
   link: ApolloLink.from([
+    persistedOperationLink,
     authLink,
-    new HttpLink({ uri: `${environment.apiUrl}/graphql` }),
+    new HttpLink({
+      print: persistedOperationPrinter,
+      uri: `${environment.apiUrl}/graphql`,
+    }),
   ]),
 });
