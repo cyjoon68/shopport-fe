@@ -1,0 +1,10 @@
+{
+  "extends": "@shopport/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "target": "ES2024"
+  },
+  "include": ["src"]
+}

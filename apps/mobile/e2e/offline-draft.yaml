@@ -1,0 +1,13 @@
+appId: com.cyjoon68.shopport
+---
+- launchApp:
+    clearState: true
+- tapOn: '로컬 데모로 시작'
+- tapOn: '새 대화 시작'
+- assertVisible: '원하는 상품과 조건을 알려주세요'
+- setAirplaneMode: enabled
+- assertVisible: '오프라인 · 초안은 이 기기에 저장됩니다'
+- tapOn: '쇼핑 질문'
+- inputText: '연결되면 보낼 초안'
+- assertVisible: '연결되면 보낼 초안'
+- setAirplaneMode: disabled

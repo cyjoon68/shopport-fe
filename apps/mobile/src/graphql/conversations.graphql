@@ -1,0 +1,96 @@
+fragment ConversationSummary on Conversation {
+  id
+  title
+  createdAt
+  updatedAt
+}
+
+query Conversations($first: Int!, $after: String) {
+  conversations(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        ...ConversationSummary
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query Conversation($id: UUID!) {
+  conversation(id: $id) {
+    ...ConversationSummary
+    messages {
+      id
+      role
+      status
+      createdAt
+      parts {
+        __typename
+        ... on TextMessagePart {
+          id
+          text
+        }
+        ... on ImageMessagePart {
+          id
+          asset {
+            id
+            status
+            url
+          }
+        }
+        ... on ProductReferenceMessagePart {
+          id
+          product {
+            ...ProductCard
+          }
+        }
+        ... on ToolStatusMessagePart {
+          id
+          toolName
+          status
+        }
+      }
+    }
+  }
+}
+
+mutation CreateConversation($input: CreateConversationInput!) {
+  createConversation(input: $input) {
+    conversation {
+      ...ConversationSummary
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
+
+mutation RenameConversation($input: RenameConversationInput!) {
+  renameConversation(input: $input) {
+    conversation {
+      ...ConversationSummary
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
+
+mutation DeleteConversation($input: DeleteConversationInput!) {
+  deleteConversation(input: $input) {
+    success
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}

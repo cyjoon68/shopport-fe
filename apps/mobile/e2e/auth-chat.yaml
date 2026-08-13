@@ -1,0 +1,13 @@
+appId: com.cyjoon68.shopport
+---
+- launchApp:
+    clearState: true
+- assertVisible: '무엇을 살지, 대화로 찾으세요'
+- tapOn: '로컬 데모로 시작'
+- assertVisible: '오늘은 무엇을 찾을까요?'
+- tapOn: '출퇴근용 가벼운 텀블러 찾아줘'
+- assertVisible: '원하는 상품과 조건을 알려주세요'
+- tapOn: '원하는 상품과 조건을 알려주세요'
+- inputText: '텀블러 추천해줘'
+- tapOn: '메시지 보내기'
+- assertVisible: '오래 쓰는 스테인리스 텀블러 600ml'

@@ -1,0 +1,15 @@
+query Viewer {
+  viewer {
+    id
+    displayName
+    profileImageUrl
+    trialStartedAt
+    trialEndsAt
+    entitlement {
+      key
+      isActive
+      productId
+      expiresAt
+    }
+  }
+}

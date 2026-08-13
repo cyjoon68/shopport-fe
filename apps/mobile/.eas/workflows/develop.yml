@@ -1,0 +1,60 @@
+name: Development deploy
+
+on:
+  push:
+    branches: [develop]
+
+defaults:
+  image: sdk-57
+  tools:
+    node: 22.13.0
+
+jobs:
+  fingerprint:
+    type: fingerprint
+    environment: development
+
+  ios_build_lookup:
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: ios
+      profile: development
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+
+  android_build_lookup:
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: android
+      profile: development
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+
+  update:
+    needs: [ios_build_lookup, android_build_lookup]
+    if: ${{ needs.ios_build_lookup.outputs.build_id && needs.android_build_lookup.outputs.build_id }}
+    type: update
+    environment: development
+    params:
+      branch: development
+      message: ${{ github.event.head_commit.message }}
+      platform: all
+      upload_sentry_sourcemaps: true
+
+  build_ios:
+    needs: [ios_build_lookup]
+    if: ${{ !needs.ios_build_lookup.outputs.build_id }}
+    type: build
+    environment: development
+    params:
+      platform: ios
+      profile: development
+
+  build_android:
+    needs: [android_build_lookup]
+    if: ${{ !needs.android_build_lookup.outputs.build_id }}
+    type: build
+    environment: development
+    params:
+      platform: android
+      profile: development

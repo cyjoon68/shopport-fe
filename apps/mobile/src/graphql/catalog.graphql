@@ -1,0 +1,92 @@
+fragment ProductCard on Product {
+  id
+  title
+  imageUrl
+  isAffiliate
+  isSaved
+  provider {
+    providerId
+    displayName
+  }
+  offer {
+    id
+    isInStock
+    deliveryExpectedAt
+    observedAt
+    outboundUrl
+    price {
+      amountMinor
+      currency
+    }
+    shipping {
+      amountMinor
+      currency
+    }
+    total {
+      amountMinor
+      currency
+    }
+  }
+}
+
+query SearchProducts($input: SearchProductsInput!, $first: Int!, $after: String) {
+  searchProducts(input: $input, first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        ...ProductCard
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query Product($id: UUID!) {
+  product(id: $id) {
+    ...ProductCard
+  }
+}
+
+query SavedProducts($first: Int!, $after: String) {
+  savedProducts(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        ...ProductCard
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+mutation SaveProduct($input: ProductSelectionInput!) {
+  saveProduct(input: $input) {
+    product {
+      ...ProductCard
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
+
+mutation UnsaveProduct($input: ProductSelectionInput!) {
+  unsaveProduct(input: $input) {
+    product {
+      ...ProductCard
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}

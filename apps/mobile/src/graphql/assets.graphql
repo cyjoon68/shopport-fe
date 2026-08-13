@@ -1,0 +1,32 @@
+mutation CreateAssetUpload($input: CreateAssetUploadInput!) {
+  createAssetUpload(input: $input) {
+    upload {
+      asset {
+        id
+        status
+        createdAt
+      }
+      uploadUrl
+      headers {
+        name
+        value
+      }
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
+
+mutation DeleteAsset($input: DeleteAssetInput!) {
+  deleteAsset(input: $input) {
+    success
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}

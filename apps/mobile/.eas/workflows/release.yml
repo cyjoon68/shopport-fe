@@ -1,0 +1,46 @@
+name: Release candidate
+
+on:
+  push:
+    branches: ['release/*']
+
+defaults:
+  image: sdk-57
+  tools:
+    node: 22.13.0
+
+jobs:
+  build_android:
+    name: Android preview
+    type: build
+    environment: preview
+    params:
+      platform: android
+      profile: preview-android-emulator
+
+  build_ios:
+    name: iOS preview
+    type: build
+    environment: preview
+    params:
+      platform: ios
+      profile: preview-ios-simulator
+
+  maestro_android:
+    needs: [build_android]
+    type: maestro
+    runs_on: linux-medium-nested-virtualization
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+      flow_path: e2e
+      retries: 1
+      record_screen: true
+
+  maestro_ios:
+    needs: [build_ios]
+    type: maestro
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      flow_path: e2e
+      retries: 1
+      record_screen: true
