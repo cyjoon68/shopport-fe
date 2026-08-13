@@ -28,6 +28,14 @@ type ChatComposerProps = Readonly<{
   onStop: () => Promise<void>;
 }>;
 
+const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
+  try {
+    await removeUploadedAsset(id);
+  } catch {
+    return;
+  }
+};
+
 export const ChatComposer = ({
   conversationId,
   loading,
@@ -268,7 +276,7 @@ export const ChatComposer = ({
           expectedGeneration,
         )
       ) {
-        await removeUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id);
         uploadedId = null;
         return;
       }
@@ -284,7 +292,7 @@ export const ChatComposer = ({
           ) ||
           assetRef.current?.id !== previousId
         ) {
-          await removeUploadedAsset(uploaded.id);
+          await bestEffortRemoveUploadedAsset(uploaded.id);
           uploadedId = null;
           return;
         }
@@ -296,7 +304,7 @@ export const ChatComposer = ({
           expectedGeneration,
         )
       ) {
-        await removeUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id);
         uploadedId = null;
         return;
       }
@@ -309,7 +317,7 @@ export const ChatComposer = ({
           expectedGeneration,
         )
       ) {
-        await removeUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id);
         uploadedId = null;
         return;
       }
@@ -317,7 +325,7 @@ export const ChatComposer = ({
       setAsset(next);
       uploadedId = null;
     } catch (error) {
-      if (uploadedId) await removeUploadedAsset(uploadedId);
+      if (uploadedId) await bestEffortRemoveUploadedAsset(uploadedId);
       if (
         isCurrentConversation(expectedConversationId, expectedVersion, expectedGeneration)
       ) {
@@ -345,7 +353,24 @@ export const ChatComposer = ({
       Alert.alert('오프라인', '온라인에서 첨부 이미지를 삭제할 수 있습니다.');
       return;
     }
-    await removeUploadedAsset(current.id);
+    try {
+      await removeUploadedAsset(current.id);
+    } catch (error) {
+      if (
+        isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        ) &&
+        assetRef.current?.id === current.id
+      ) {
+        Alert.alert(
+          '이미지 제거 실패',
+          error instanceof Error && error.message ? error.message : '다시 시도해 주세요.',
+        );
+      }
+      return;
+    }
     if (
       !isCurrentConversation(
         expectedConversationId,

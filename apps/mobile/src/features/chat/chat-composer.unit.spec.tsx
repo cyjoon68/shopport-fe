@@ -59,10 +59,12 @@ const mockedImpactAsync = Haptics.impactAsync as jest.MockedFunction<
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((nextResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
+    reject = nextReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 const composer = (conversationId: string) => (
@@ -184,8 +186,10 @@ describe('chat composer conversation draft isolation', () => {
   it('invalidates deferred upload and verification completions after unmount', async () => {
     const upload = deferred<{ id: string; uri: string } | null>();
     mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+    mockedRemoveUploadedAsset.mockRejectedValue(new Error('cleanup failed'));
     const verification = deferred<Awaited<ReturnType<typeof pollAssetUntilSettled>>>();
     mockedPollAssetUntilSettled.mockReturnValue(verification.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockedReadDraft.mockImplementation((id) =>
       id === 'A'
         ? Promise.resolve({ text: '', assetId: 'asset-a', assetUri: 'file://a' })
@@ -210,6 +214,8 @@ describe('chat composer conversation draft isolation', () => {
     expect(inputValue(next)).toBe('');
     expect(mockedRemoveUploadedAsset).toHaveBeenCalledWith('orphan-upload');
     expect(mockedRemoveUploadedAsset).not.toHaveBeenCalledWith('asset-a');
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 
   it('keeps B attachment when A removal or replacement is still awaiting', async () => {
@@ -279,6 +285,54 @@ describe('chat composer conversation draft isolation', () => {
     rejectSend(new Error('stale failure'));
     await act(flushPromises);
     expect(alertSpy).not.toHaveBeenCalledWith('메시지 전송 실패', 'stale failure');
+    alertSpy.mockRestore();
+  });
+
+  it('shows a removal error while preserving the current attachment', async () => {
+    mockedRemoveUploadedAsset.mockRejectedValue(new Error('삭제할 수 없습니다.'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockedReadDraft.mockResolvedValue({
+      text: 'A',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    const screen = render(composer('A'));
+    await act(flushPromises);
+    fireEvent.press(screen.getByText('이미지 제거'));
+    await act(flushPromises);
+    expect(alertSpy).toHaveBeenCalledWith('이미지 제거 실패', '삭제할 수 없습니다.');
+    expect(screen.getByText('이미지 제거')).toBeTruthy();
+    expect(inputValue(screen)).toBe('A');
+    alertSpy.mockRestore();
+  });
+
+  it('does not alert or mutate B when A removal rejects after route unmount', async () => {
+    const removal = deferred<void>();
+    mockedRemoveUploadedAsset.mockImplementation((id) =>
+      id === 'asset-a' ? removal.promise : Promise.resolve(),
+    );
+    mockedReadDraft.mockImplementation((id) =>
+      id === 'A'
+        ? Promise.resolve({ text: 'A', assetId: 'asset-a', assetUri: 'file://a' })
+        : Promise.resolve({ text: 'B', assetId: 'asset-b', assetUri: 'file://b' }),
+    );
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(composer('A'));
+    await act(flushPromises);
+    fireEvent.press(screen.getByText('이미지 제거'));
+    screen.unmount();
+    const next = render(composer('B'));
+    await act(flushPromises);
+    await act(async () => {
+      removal.reject(new Error('stale removal failure'));
+      await flushPromises();
+    });
+    expect(alertSpy).not.toHaveBeenCalledWith(
+      '이미지 제거 실패',
+      'stale removal failure',
+    );
+    expect(next.getByText('이미지 제거')).toBeTruthy();
+    expect(inputValue(next)).toBe('B');
     alertSpy.mockRestore();
   });
 

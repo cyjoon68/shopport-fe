@@ -70,8 +70,12 @@ export const selectAndUploadAsset = async (
 };
 
 export const removeUploadedAsset = async (id: string): Promise<void> => {
-  await apolloClient.mutate({
+  const response = await apolloClient.mutate({
     mutation: DeleteAssetDocument,
     variables: { input: { id } },
   });
+  const payload = response.data?.deleteAsset;
+  if (!payload || payload.success !== true) {
+    throw new Error(payload?.userErrors?.[0]?.message || '이미지를 삭제하지 못했습니다.');
+  }
 };
