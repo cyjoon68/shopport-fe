@@ -1,69 +1,91 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-
 import { evaluateAudit, loadAuditPolicy } from './audit-policy.mjs';
 
 const policy = loadAuditPolicy();
-const allowedPath =
-    'apps__mobile>@react-native-community/netinfo>react-native>@react-native/community-cli-plugin>metro>image-size';
+const fixturesDirectory = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const fixture = (name) =>
+  JSON.parse(readFileSync(resolve(fixturesDirectory, `${name}.json`), 'utf8'));
 
-const advisory = (id, overrides = {}) => ({
-  github_advisory_id: id,
-  module_name: 'image-size',
-  severity: 'high',
-  findings: [{ version: '1.2.1', paths: [allowedPath] }],
-  ...overrides,
-});
-
-test('allows only the two reviewed image-size Metro advisories', () => {
-  const result = evaluateAudit(
-    {
-      advisories: {
-        first: advisory('GHSA-w3rx-r6r6-pgpr'),
-        second: advisory('GHSA-5p2g-fcmc-qvqq'),
-      },
-    },
-    policy,
-  );
+test('allows only the two reviewed high image-size Metro advisories', () => {
+  const result = evaluateAudit(fixture('audit-known'), policy);
 
   assert.deepEqual(result, { allowedCount: 2, violations: [] });
 });
 
-test('fails closed for an unknown high advisory', () => {
-  const result = evaluateAudit(
-    {
-      advisories: { unknown: advisory('GHSA-unknown-unknown-unknown') },
-    },
-    policy,
+test('rejects a reviewed advisory if its severity is critical', () => {
+  const result = evaluateAudit(fixture('audit-critical'), policy);
+
+  assert.equal(result.allowedCount, 0);
+  assert.equal(
+    result.violations.some((violation) => violation.severity === 'critical'),
+    true,
   );
+});
+
+test('fails closed for an unknown high advisory', () => {
+  const result = evaluateAudit(fixture('audit-unknown-high'), policy);
 
   assert.equal(result.allowedCount, 0);
   assert.equal(result.violations.length, 1);
 });
 
 test('fails closed for a reviewed advisory outside the Metro build path', () => {
-  const result = evaluateAudit(
-    {
-      advisories: {
-        wrongPath: advisory('GHSA-w3rx-r6r6-pgpr', {
-          severity: 'critical',
-          findings: [{ version: '1.2.1', paths: ['apps__mobile>image-size'] }],
-        }),
-      },
-    },
-    policy,
-  );
+  const audit = fixture('audit-known');
+  audit.advisories.first.findings[0].paths = ['apps__mobile>image-size'];
+  audit.metadata.vulnerabilities.high = 1;
+  delete audit.advisories.second;
+  const result = evaluateAudit(audit, policy);
 
   assert.equal(result.allowedCount, 0);
   assert.equal(result.violations.length, 1);
 });
 
-test('fails closed when audit metadata reports high severity without details', () => {
-  const result = evaluateAudit(
-    { advisories: {}, metadata: { vulnerabilities: { high: 1, critical: 0 } } },
+test('fails closed for malformed or missing audit schema', () => {
+  const malformedCases = [
+    fixture('audit-malformed'),
+    { advisories: [], metadata: { vulnerabilities: { high: 0, critical: 0 } } },
+    { advisories: {}, metadata: { vulnerabilities: { high: Number.NaN, critical: 0 } } },
+    { advisories: {}, metadata: { vulnerabilities: { high: 0, critical: '0' } } },
+    {
+      advisories: { broken: { severity: 'high' } },
+      metadata: { vulnerabilities: { high: 1, critical: 0 } },
+    },
+  ];
+
+  for (const audit of malformedCases) {
+    const result = evaluateAudit(audit, policy);
+    assert.equal(result.allowedCount, 0);
+    assert.ok(result.violations.length > 0);
+  }
+});
+
+test('fails closed when metadata high and critical counts do not match advisories', () => {
+  const result = evaluateAudit(fixture('audit-metadata-mismatch'), policy);
+
+  assert.equal(result.allowedCount, 1);
+  assert.equal(
+    result.violations.some((violation) => violation.advisory === 'audit-metadata'),
+    true,
+  );
+});
+
+test('expires exceptions using an injected clock', () => {
+  const active = evaluateAudit(
+    fixture('audit-known'),
     policy,
+    new Date('2026-09-12T23:59:59.999Z'),
+  );
+  const expired = evaluateAudit(
+    fixture('audit-known'),
+    policy,
+    new Date('2026-09-13T00:00:00.000Z'),
   );
 
-  assert.equal(result.allowedCount, 0);
-  assert.equal(result.violations.length, 1);
+  assert.deepEqual(active, { allowedCount: 2, violations: [] });
+  assert.equal(expired.allowedCount, 0);
+  assert.equal(expired.violations.length, 2);
 });

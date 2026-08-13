@@ -4,24 +4,28 @@
     {
       "advisory": "GHSA-w3rx-r6r6-pgpr",
       "package": "image-size",
-      "severity": ["high", "critical"],
+      "severity": "high",
       "pathPattern": "^apps__mobile>.*>metro>image-size$",
       "version": "1.2.1",
       "firstPatchedVersion": null,
-      "reason": "Metro's image-size parser is reachable only in build-time tooling; untrusted runtime image bytes are not passed to Metro.",
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; runtime and build inputs are restricted to trusted repository assets, and external or user-supplied asset bytes must not be passed to Metro.",
       "upstreamUrl": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
-      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency."
+      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency.",
+      "expiresOn": "2026-09-13",
+      "operationalConstraint": "Metro build inputs may come only from trusted repository assets; external and user-supplied assets must not be passed to Metro."
     },
     {
       "advisory": "GHSA-5p2g-fcmc-qvqq",
       "package": "image-size",
-      "severity": ["high", "critical"],
+      "severity": "high",
       "pathPattern": "^apps__mobile>.*>metro>image-size$",
       "version": "1.2.1",
       "firstPatchedVersion": null,
-      "reason": "Metro's image-size parser is reachable only in build-time tooling; untrusted runtime image bytes are not passed to Metro.",
+      "reason": "Metro's image-size parser is reachable only in build-time tooling; runtime and build inputs are restricted to trusted repository assets, and external or user-supplied asset bytes must not be passed to Metro.",
       "upstreamUrl": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
-      "removeWhen": "Remove when image-size publishes a patched release or an Expos SDK update replaces the affected Metro dependency."
+      "removeWhen": "Remove when image-size publishes a patched release or an Expo SDK update replaces the affected Metro dependency.",
+      "expiresOn": "2026-09-13",
+      "operationalConstraint": "Metro build inputs may come only from trusted repository assets; external and user-supplied assets must not be passed to Metro."
     }
   ]
 }
