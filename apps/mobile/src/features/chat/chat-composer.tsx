@@ -37,18 +37,38 @@ export const ChatComposer = ({
   const [text, setText] = useState('');
   const [asset, setAsset] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [draftReadyFor, setDraftReadyFor] = useState<string | null>(null);
   const online = useOnline();
   const assetRef = useRef<Attachment | null>(null);
   const verificationRef = useRef<string | null>(null);
   const conversationIdRef = useRef(conversationId);
   const conversationVersionRef = useRef(0);
   const draftReadyRef = useRef<string | null>(null);
+  const mountedRef = useRef(false);
+  const lifecycleGenerationRef = useRef(0);
 
   const isCurrentConversation = useCallback(
-    (id: string, version: number): boolean =>
-      conversationIdRef.current === id && conversationVersionRef.current === version,
+    (id: string, version: number, generation = lifecycleGenerationRef.current): boolean =>
+      mountedRef.current &&
+      lifecycleGenerationRef.current === generation &&
+      conversationIdRef.current === id &&
+      conversationVersionRef.current === version,
     [],
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    lifecycleGenerationRef.current += 1;
+    return () => {
+      mountedRef.current = false;
+      lifecycleGenerationRef.current += 1;
+      conversationVersionRef.current += 1;
+      conversationIdRef.current = '';
+      draftReadyRef.current = null;
+      verificationRef.current = null;
+      assetRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     assetRef.current = asset;
@@ -82,7 +102,15 @@ export const ChatComposer = ({
     async (target: Attachment): Promise<void> => {
       const expectedConversationId = conversationId;
       const expectedVersion = conversationVersionRef.current;
-      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
+      const expectedGeneration = lifecycleGenerationRef.current;
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      )
+        return;
       if (verificationRef.current === target.id) return;
       verificationRef.current = target.id;
       setAsset((current) =>
@@ -90,11 +118,23 @@ export const ChatComposer = ({
       );
       try {
         const result = await pollAssetUntilSettled(target.id);
-        if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+        if (
+          isCurrentConversation(
+            expectedConversationId,
+            expectedVersion,
+            expectedGeneration,
+          )
+        ) {
           applyProcessingResult(target.id, result);
         }
       } catch (error) {
-        if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+        if (
+          isCurrentConversation(
+            expectedConversationId,
+            expectedVersion,
+            expectedGeneration,
+          )
+        ) {
           setAsset((current) =>
             current?.id === target.id ? { ...current, state: 'timeout' } : current,
           );
@@ -107,7 +147,11 @@ export const ChatComposer = ({
         }
       } finally {
         if (
-          isCurrentConversation(expectedConversationId, expectedVersion) &&
+          isCurrentConversation(
+            expectedConversationId,
+            expectedVersion,
+            expectedGeneration,
+          ) &&
           verificationRef.current === target.id
         ) {
           verificationRef.current = null;
@@ -120,6 +164,7 @@ export const ChatComposer = ({
   useEffect(() => {
     conversationVersionRef.current += 1;
     const expectedVersion = conversationVersionRef.current;
+    const expectedGeneration = lifecycleGenerationRef.current;
     conversationIdRef.current = conversationId;
     draftReadyRef.current = null;
     verificationRef.current = null;
@@ -127,29 +172,54 @@ export const ChatComposer = ({
     setText('');
     setAsset(null);
     setUploading(false);
+    setDraftReadyFor(null);
     let active = true;
-    void readDraft(conversationId).then((draft) => {
-      if (!active || !isCurrentConversation(conversationId, expectedVersion)) return;
-      const restored: Attachment | null =
-        draft.assetId && draft.assetUri
-          ? { id: draft.assetId, uri: draft.assetUri, state: 'timeout' }
-          : null;
-      draftReadyRef.current = conversationId;
-      assetRef.current = restored;
-      setText(draft.text);
-      setAsset(restored);
-    });
+    void readDraft(conversationId)
+      .then((draft) => {
+        if (
+          !active ||
+          !isCurrentConversation(conversationId, expectedVersion, expectedGeneration)
+        )
+          return;
+        const restored: Attachment | null =
+          draft.assetId && draft.assetUri
+            ? { id: draft.assetId, uri: draft.assetUri, state: 'timeout' }
+            : null;
+        draftReadyRef.current = conversationId;
+        assetRef.current = restored;
+        setDraftReadyFor(conversationId);
+        setText(draft.text);
+        setAsset(restored);
+      })
+      .catch(() => {
+        if (
+          active &&
+          isCurrentConversation(conversationId, expectedVersion, expectedGeneration)
+        ) {
+          draftReadyRef.current = conversationId;
+          setDraftReadyFor(conversationId);
+        }
+      });
     return () => {
       active = false;
+      if (mountedRef.current && lifecycleGenerationRef.current === expectedGeneration) {
+        conversationVersionRef.current += 1;
+        conversationIdRef.current = '';
+        draftReadyRef.current = null;
+        verificationRef.current = null;
+        assetRef.current = null;
+      }
     };
   }, [conversationId, isCurrentConversation]);
 
   useEffect(() => {
-    if (draftReadyRef.current !== conversationId) return undefined;
+    if (draftReadyFor !== conversationId || draftReadyRef.current !== conversationId)
+      return undefined;
     const expectedVersion = conversationVersionRef.current;
+    const expectedGeneration = lifecycleGenerationRef.current;
     const timeout = setTimeout(() => {
       if (
-        !isCurrentConversation(conversationId, expectedVersion) ||
+        !isCurrentConversation(conversationId, expectedVersion, expectedGeneration) ||
         draftReadyRef.current !== conversationId
       )
         return;
@@ -160,7 +230,7 @@ export const ChatComposer = ({
       });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [asset, conversationId, isCurrentConversation, text]);
+  }, [asset, conversationId, draftReadyFor, isCurrentConversation, text]);
 
   useEffect(() => {
     const current = assetRef.current;
@@ -179,33 +249,87 @@ export const ChatComposer = ({
   const attach = async (): Promise<void> => {
     const expectedConversationId = conversationId;
     const expectedVersion = conversationVersionRef.current;
+    const expectedGeneration = lifecycleGenerationRef.current;
+    if (draftReadyFor !== conversationId) return;
     if (!online) {
       Alert.alert('오프라인', '이미지 업로드는 온라인에서만 가능합니다.');
       return;
     }
     setUploading(true);
+    let uploadedId: string | null = null;
     try {
       const uploaded = await selectAndUploadAsset(conversationId);
       if (!uploaded) return;
-      if (!isCurrentConversation(expectedConversationId, expectedVersion)) {
+      uploadedId = uploaded.id;
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      ) {
         await removeUploadedAsset(uploaded.id);
+        uploadedId = null;
         return;
       }
       const previous = assetRef.current;
-      if (previous) await removeUploadedAsset(previous.id);
+      const previousId = previous?.id ?? null;
+      if (previous) {
+        await removeUploadedAsset(previous.id);
+        if (
+          !isCurrentConversation(
+            expectedConversationId,
+            expectedVersion,
+            expectedGeneration,
+          ) ||
+          assetRef.current?.id !== previousId
+        ) {
+          await removeUploadedAsset(uploaded.id);
+          uploadedId = null;
+          return;
+        }
+      }
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      ) {
+        await removeUploadedAsset(uploaded.id);
+        uploadedId = null;
+        return;
+      }
       const next: Attachment = { ...uploaded, state: 'processing' };
+      await Haptics.selectionAsync();
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      ) {
+        await removeUploadedAsset(uploaded.id);
+        uploadedId = null;
+        return;
+      }
       assetRef.current = next;
       setAsset(next);
-      await Haptics.selectionAsync();
+      uploadedId = null;
     } catch (error) {
-      if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+      if (uploadedId) await removeUploadedAsset(uploadedId);
+      if (
+        isCurrentConversation(expectedConversationId, expectedVersion, expectedGeneration)
+      ) {
         Alert.alert(
           '이미지 첨부 실패',
           error instanceof Error ? error.message : '다시 시도해 주세요.',
         );
       }
     } finally {
-      if (isCurrentConversation(expectedConversationId, expectedVersion)) {
+      if (
+        isCurrentConversation(expectedConversationId, expectedVersion, expectedGeneration)
+      ) {
         setUploading(false);
       }
     }
@@ -213,12 +337,24 @@ export const ChatComposer = ({
 
   const remove = async (): Promise<void> => {
     const current = assetRef.current;
+    const expectedConversationId = conversationId;
+    const expectedVersion = conversationVersionRef.current;
+    const expectedGeneration = lifecycleGenerationRef.current;
     if (!current) return;
     if (!online) {
       Alert.alert('오프라인', '온라인에서 첨부 이미지를 삭제할 수 있습니다.');
       return;
     }
     await removeUploadedAsset(current.id);
+    if (
+      !isCurrentConversation(
+        expectedConversationId,
+        expectedVersion,
+        expectedGeneration,
+      ) ||
+      assetRef.current?.id !== current.id
+    )
+      return;
     assetRef.current = null;
     setAsset(null);
   };
@@ -226,8 +362,10 @@ export const ChatComposer = ({
   const send = async (): Promise<void> => {
     const expectedConversationId = conversationId;
     const expectedVersion = conversationVersionRef.current;
-    const currentText = draftReadyRef.current === conversationId ? text : '';
-    const currentAsset = draftReadyRef.current === conversationId ? asset : null;
+    const expectedGeneration = lifecycleGenerationRef.current;
+    if (draftReadyFor !== conversationId) return;
+    const currentText = draftReadyFor === conversationId ? text : '';
+    const currentAsset = draftReadyFor === conversationId ? asset : null;
     const trimmed = currentText.trim();
     if (
       (!trimmed && !currentAsset) ||
@@ -240,36 +378,71 @@ export const ChatComposer = ({
     try {
       if (currentAsset) {
         const status = await readAssetStatus(currentAsset.id);
-        if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
+        if (
+          !isCurrentConversation(
+            expectedConversationId,
+            expectedVersion,
+            expectedGeneration,
+          )
+        )
+          return;
         if (status !== 'READY') {
           if (status === 'REJECTED') applyProcessingResult(currentAsset.id, 'REJECTED');
           else void verifyAsset(currentAsset);
           return;
         }
       }
-      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      )
+        return;
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await onSend(trimmed, currentAsset?.id ?? null);
-      if (!isCurrentConversation(expectedConversationId, expectedVersion)) return;
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      )
+        return;
       setText('');
       setAsset(null);
       await deleteDraft(expectedConversationId);
     } catch (error) {
-      Alert.alert(
-        '메시지 전송 실패',
-        error instanceof Error ? error.message : '다시 시도해 주세요.',
-      );
+      if (
+        isCurrentConversation(expectedConversationId, expectedVersion, expectedGeneration)
+      ) {
+        Alert.alert(
+          '메시지 전송 실패',
+          error instanceof Error ? error.message : '다시 시도해 주세요.',
+        );
+      }
     }
   };
 
-  const visibleAsset = draftReadyRef.current === conversationId ? asset : null;
-  const visibleText = draftReadyRef.current === conversationId ? text : '';
+  const draftReady = draftReadyFor === conversationId;
+  const visibleAsset = draftReady ? asset : null;
+  const visibleText = draftReady ? text : '';
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {!online ? (
         <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.offline}>
           오프라인 · 초안은 이 기기에 저장됩니다
+        </Text>
+      ) : null}
+      {!draftReady ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          allowFontScaling
+          style={styles.draftStatus}
+        >
+          초안을 불러오는 중입니다
         </Text>
       ) : null}
       {visibleAsset ? (
@@ -319,7 +492,7 @@ export const ChatComposer = ({
         <Pressable
           accessibilityLabel="이미지 첨부"
           accessibilityRole="button"
-          disabled={loading || uploading}
+          disabled={loading || uploading || !draftReady}
           onPress={() => void attach()}
           style={styles.iconButton}
         >
@@ -329,7 +502,7 @@ export const ChatComposer = ({
         </Pressable>
         <TextInput
           accessibilityLabel="쇼핑 질문"
-          editable={!loading}
+          editable={!loading && draftReady}
           maxLength={2_000}
           multiline
           onChangeText={setText}
@@ -345,12 +518,14 @@ export const ChatComposer = ({
             disabled:
               !online ||
               uploading ||
-              (!loading && Boolean(visibleAsset && visibleAsset.state !== 'ready')),
+              (!loading &&
+                (!draftReady || Boolean(visibleAsset && visibleAsset.state !== 'ready'))),
           }}
           disabled={
             !online ||
             uploading ||
-            (!loading && Boolean(visibleAsset && visibleAsset.state !== 'ready'))
+            (!loading &&
+              (!draftReady || Boolean(visibleAsset && visibleAsset.state !== 'ready')))
           }
           onPress={() => void (loading ? onStop() : send())}
           style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
@@ -414,6 +589,12 @@ const styles = StyleSheet.create((theme, runtime) => ({
   pressed: { opacity: 0.72 },
   offline: {
     backgroundColor: theme.colors.surfaceMuted,
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    padding: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  draftStatus: {
     color: theme.colors.textMuted,
     fontSize: 13,
     padding: theme.spacing.sm,

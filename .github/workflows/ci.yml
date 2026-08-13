@@ -27,5 +27,21 @@ jobs:
       - run: pnpm test
       - run: pnpm codegen
       - run: git diff --exit-code
+      - run: pnpm build
+      - run: pnpm audit --audit-level=high --ignore-unfixable
       - run: pnpm run doctor
       - run: pnpm --filter @shopport/mobile exec expo install --check
+
+  secret-scan:
+    name: Full-history secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

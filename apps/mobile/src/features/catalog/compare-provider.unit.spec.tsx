@@ -30,8 +30,11 @@ const product: CachedProduct = {
   isSaved: false,
 };
 
+let observedProducts: Array<string> = [];
+
 const Harness = () => {
   const { add, products } = useCompare();
+  observedProducts.push(products.map(({ id }) => id).join(','));
   return (
     <>
       <Pressable testID="add" onPress={() => add(product)}>
@@ -50,6 +53,7 @@ describe('compare session isolation', () => {
 
   beforeEach(() => {
     snapshot = { status: 'authenticated', sessionVersion: 1 };
+    observedProducts = [];
     mockedUseSessionBoundary.mockImplementation(() => snapshot);
   });
 
@@ -64,6 +68,7 @@ describe('compare session isolation', () => {
     expect(screen.getByTestId('products').props.children).toBe('product-1');
 
     snapshot = { status: 'guest', sessionVersion: 1 };
+    const beforeLogoutRender = observedProducts.length;
     act(() =>
       screen.rerender(
         <CompareProvider>
@@ -71,9 +76,11 @@ describe('compare session isolation', () => {
         </CompareProvider>,
       ),
     );
+    expect(observedProducts[beforeLogoutRender]).toBe('');
     expect(screen.getByTestId('products').props.children).toBe('');
 
     snapshot = { status: 'authenticated', sessionVersion: 2 };
+    const beforeAccountSwitchRender = observedProducts.length;
     act(() =>
       screen.rerender(
         <CompareProvider>
@@ -81,10 +88,12 @@ describe('compare session isolation', () => {
         </CompareProvider>,
       ),
     );
+    expect(observedProducts[beforeAccountSwitchRender]).toBe('');
     act(() => fireEvent.press(screen.getByTestId('add')));
     expect(screen.getByTestId('products').props.children).toBe('product-1');
 
     snapshot = { status: 'authenticated', sessionVersion: 3 };
+    const beforeSecondAccountSwitchRender = observedProducts.length;
     act(() =>
       screen.rerender(
         <CompareProvider>
@@ -92,6 +101,7 @@ describe('compare session isolation', () => {
         </CompareProvider>,
       ),
     );
+    expect(observedProducts[beforeSecondAccountSwitchRender]).toBe('');
     expect(screen.getByTestId('products').props.children).toBe('');
   });
 });
