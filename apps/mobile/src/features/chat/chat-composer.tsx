@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,27 +16,92 @@ import { useOnline } from '@/providers/network-provider';
 import { deleteDraft, readDraft, saveDraft } from '@/shared/storage/database';
 import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
 import type { UploadedAsset } from './asset-upload';
+import { pollAssetUntilSettled, readAssetStatus } from './asset-status';
+
+type Attachment = UploadedAsset &
+  Readonly<{ state: 'checking' | 'processing' | 'ready' | 'timeout' }>;
 
 type ChatComposerProps = Readonly<{
   conversationId: string;
   loading: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
+  onStop: () => Promise<void>;
 }>;
 
-export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerProps) => {
+export const ChatComposer = ({
+  conversationId,
+  loading,
+  onSend,
+  onStop,
+}: ChatComposerProps) => {
   const [text, setText] = useState('');
-  const [asset, setAsset] = useState<UploadedAsset | null>(null);
+  const [asset, setAsset] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
   const online = useOnline();
+  const assetRef = useRef<Attachment | null>(null);
+  const verificationRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    assetRef.current = asset;
+  }, [asset]);
+
+  const applyProcessingResult = useCallback(
+    (id: string, result: Awaited<ReturnType<typeof pollAssetUntilSettled>>): void => {
+      if (assetRef.current?.id !== id) return;
+      if (result === 'READY') {
+        setAsset((current) =>
+          current?.id === id ? { ...current, state: 'ready' } : current,
+        );
+        return;
+      }
+      if (result === 'REJECTED') {
+        setAsset((current) => (current?.id === id ? null : current));
+        Alert.alert(
+          '이미지 처리 실패',
+          '이미지를 처리할 수 없습니다. 다른 이미지를 선택해 주세요.',
+        );
+        return;
+      }
+      setAsset((current) =>
+        current?.id === id ? { ...current, state: 'timeout' } : current,
+      );
+    },
+    [],
+  );
+
+  const verifyAsset = useCallback(
+    async (target: Attachment): Promise<void> => {
+      if (verificationRef.current === target.id) return;
+      verificationRef.current = target.id;
+      setAsset((current) =>
+        current?.id === target.id ? { ...current, state: 'checking' } : current,
+      );
+      try {
+        applyProcessingResult(target.id, await pollAssetUntilSettled(target.id));
+      } catch (error) {
+        setAsset((current) =>
+          current?.id === target.id ? { ...current, state: 'timeout' } : current,
+        );
+        Alert.alert(
+          '이미지 상태 확인 실패',
+          error instanceof Error ? error.message : '연결을 확인하고 다시 시도해 주세요.',
+        );
+      } finally {
+        if (verificationRef.current === target.id) verificationRef.current = null;
+      }
+    },
+    [applyProcessingResult],
+  );
 
   useEffect(() => {
     void readDraft(conversationId).then((draft) => {
       setText(draft.text);
-      setAsset(
+      const restored: Attachment | null =
         draft.assetId && draft.assetUri
-          ? { id: draft.assetId, uri: draft.assetUri }
-          : null,
-      );
+          ? { id: draft.assetId, uri: draft.assetUri, state: 'timeout' }
+          : null;
+      assetRef.current = restored;
+      setAsset(restored);
     });
   }, [conversationId]);
 
@@ -50,6 +116,20 @@ export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerPr
     return () => clearTimeout(timeout);
   }, [asset, conversationId, text]);
 
+  useEffect(() => {
+    const current = assetRef.current;
+    if (!online || !current || current.state === 'ready') return;
+    void verifyAsset(current);
+  }, [asset?.id, online, verifyAsset]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      const current = assetRef.current;
+      if (state === 'active' && online && current) void verifyAsset(current);
+    });
+    return () => subscription.remove();
+  }, [online, verifyAsset]);
+
   const attach = async (): Promise<void> => {
     if (!online) {
       Alert.alert('오프라인', '이미지 업로드는 온라인에서만 가능합니다.');
@@ -60,7 +140,9 @@ export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerPr
       const uploaded = await selectAndUploadAsset(conversationId);
       if (!uploaded) return;
       if (asset) await removeUploadedAsset(asset.id);
-      setAsset(uploaded);
+      const next: Attachment = { ...uploaded, state: 'processing' };
+      assetRef.current = next;
+      setAsset(next);
       await Haptics.selectionAsync();
     } catch (error) {
       Alert.alert(
@@ -79,13 +161,29 @@ export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerPr
       return;
     }
     await removeUploadedAsset(asset.id);
+    assetRef.current = null;
     setAsset(null);
   };
 
   const send = async (): Promise<void> => {
     const trimmed = text.trim();
-    if ((!trimmed && !asset) || !online || loading || uploading) return;
+    if (
+      (!trimmed && !asset) ||
+      !online ||
+      loading ||
+      uploading ||
+      (asset && asset.state !== 'ready')
+    )
+      return;
     try {
+      if (asset) {
+        const status = await readAssetStatus(asset.id);
+        if (status !== 'READY') {
+          if (status === 'REJECTED') applyProcessingResult(asset.id, 'REJECTED');
+          else void verifyAsset(asset);
+          return;
+        }
+      }
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await onSend(trimmed, asset?.id ?? null);
       setText('');
@@ -123,6 +221,30 @@ export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerPr
               이미지 제거
             </Text>
           </Pressable>
+          {asset.state !== 'ready' ? (
+            <View style={styles.assetStatus}>
+              <Text
+                accessibilityLiveRegion="polite"
+                allowFontScaling
+                style={styles.statusLabel}
+              >
+                {asset.state === 'timeout'
+                  ? '처리 확인 시간이 초과되었습니다'
+                  : '이미지 처리 중'}
+              </Text>
+              {asset.state === 'timeout' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void verifyAsset(asset)}
+                  style={styles.retryButton}
+                >
+                  <Text allowFontScaling style={styles.retryLabel}>
+                    상태 다시 확인
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
       <View style={styles.root}>
@@ -149,11 +271,20 @@ export const ChatComposer = ({ conversationId, loading, onSend }: ChatComposerPr
           value={text}
         />
         <Pressable
-          accessibilityLabel="메시지 보내기"
+          accessibilityLabel={loading ? '응답 중지' : '메시지 보내기'}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !online || loading || uploading }}
-          disabled={!online || loading || uploading}
-          onPress={() => void send()}
+          accessibilityState={{
+            disabled:
+              !online ||
+              uploading ||
+              (!loading && Boolean(asset && asset.state !== 'ready')),
+          }}
+          disabled={
+            !online ||
+            uploading ||
+            (!loading && Boolean(asset && asset.state !== 'ready'))
+          }
+          onPress={() => void (loading ? onStop() : send())}
           style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
         >
           <Text allowFontScaling style={styles.sendLabel}>
@@ -231,4 +362,8 @@ const styles = StyleSheet.create((theme, runtime) => ({
   thumbnail: { borderRadius: theme.radii.sm, height: 64, width: 64 },
   removeButton: { minHeight: 44, justifyContent: 'center' },
   removeLabel: { color: theme.colors.danger, fontSize: 14, fontWeight: '700' },
+  assetStatus: { flex: 1, gap: theme.spacing.xs },
+  statusLabel: { color: theme.colors.textMuted, fontSize: 13 },
+  retryButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  retryLabel: { color: theme.colors.primary, fontSize: 14, fontWeight: '700' },
 }));

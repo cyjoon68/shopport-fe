@@ -94,7 +94,12 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
         const identity =
           provider === 'apple' ? await appleIdentity() : await kakaoIdentity();
         await install(
-          await authenticate(provider, identity.identityToken, identity.nonce),
+          await authenticate(
+            provider,
+            identity.identityToken,
+            identity.nonce,
+            identity.displayName,
+          ),
         );
       } catch (loginError) {
         setError(messageFrom(loginError));

@@ -11,7 +11,7 @@ cp .env.example .env.local
 pnpm start
 ```
 
-Apple·Kakao·RevenueCat을 포함하므로 Expo Go가 아닌 development build가 필요하다. 로컬 API 기본 주소는 `http://127.0.0.1:3000`이다. Android emulator에서는 `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000`을 사용한다.
+Apple·Kakao·RevenueCat을 포함하므로 Expo Go가 아닌 development build가 필요하다. 로컬 API 기본 주소는 `http://127.0.0.1:4000`이다. Android emulator에서는 `EXPO_PUBLIC_API_URL=http://10.0.2.2:4000`을 사용한다.
 
 ```bash
 cd apps/mobile

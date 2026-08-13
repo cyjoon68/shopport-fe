@@ -81,6 +81,14 @@ export type CreateAssetUploadMutation = {
   };
 };
 
+export type AssetQueryVariables = Exact<{
+  id: string;
+}>;
+
+export type AssetQuery = {
+  asset: { id: string; status: AssetStatus; url: string | null } | null;
+};
+
 export type DeleteAssetMutationVariables = Exact<{
   input: DeleteAssetInput;
 }>;
@@ -489,6 +497,50 @@ export const CreateAssetUploadDocument = {
   CreateAssetUploadMutation,
   CreateAssetUploadMutationVariables
 >;
+export const AssetDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'Asset' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'UUID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'asset' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'url' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<AssetQuery, AssetQueryVariables>;
 export const DeleteAssetDocument = {
   kind: 'Document',
   definitions: [

@@ -20,7 +20,7 @@ export const FavoritesScreen = () => {
   const { data, fetchMore } = useQuery(SavedProductsDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
-    skip: status !== 'authenticated',
+    skip: status !== 'authenticated' || !online,
   });
   const products = data?.savedProducts.edges.map(({ node }) => productFromFragment(node));
   useEffect(() => {

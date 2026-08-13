@@ -22,6 +22,13 @@ const storyEntries = [
     importPathMatcher: matcher,
     req: metroRequire.context('../../../packages/storybook/src/stories', true, matcher),
   },
+  {
+    titlePrefix: '',
+    directory: '../src',
+    files: '**/*.stories.?(ts|tsx|js|jsx)',
+    importPathMatcher: matcher,
+    req: metroRequire.context('../src', true, matcher),
+  },
 ];
 type Annotation = NonNullable<Parameters<typeof start>[0]['annotations']>[number];
 const annotation = (id: string): Annotation => metroRequire(id) as Annotation;

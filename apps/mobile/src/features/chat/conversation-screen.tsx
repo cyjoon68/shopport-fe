@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { Redirect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { xhrHttpStream, useChat } from '@tanstack/ai-react';
 import { useQuery } from '@apollo/client/react';
 import { StyleSheet } from 'react-native-unistyles';
@@ -14,11 +14,15 @@ import { environment } from '@/shared/config/environment';
 import { sqliteChatPersistence } from '@/shared/storage/database';
 import { ChatComposer } from './chat-composer';
 import { MessageList } from './message-list';
+import { cancelRunThenStop } from './chat-http';
+import { chatErrorPresentation } from './chat-errors';
+import { useOnline } from '@/providers/network-provider';
 
 export const ConversationScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
   const { status } = useSession();
+  const online = useOnline();
   const assetId = useRef<string | null>(null);
   const connection = useMemo(
     () =>
@@ -34,7 +38,7 @@ export const ConversationScreen = () => {
   );
   const { data, loading: historyLoading } = useQuery(ConversationDocument, {
     variables: { id },
-    skip: !id,
+    skip: !id || !online,
     fetchPolicy: 'cache-and-network',
   });
   const chat = useChat({
@@ -53,6 +57,12 @@ export const ConversationScreen = () => {
     if (title) navigation.setOptions({ title });
   }, [navigation, summary?.title]);
 
+  const errorPresentation = chat.error ? chatErrorPresentation(chat.error) : null;
+
+  useEffect(() => {
+    if (errorPresentation?.route) router.push(errorPresentation.route);
+  }, [errorPresentation?.route]);
+
   if (status === 'guest') return <Redirect href="/auth" />;
   if (!id) return <Redirect href="/" />;
 
@@ -62,6 +72,21 @@ export const ConversationScreen = () => {
       await chat.sendMessage(text || '이 이미지와 관련된 상품을 찾아줘');
     } finally {
       assetId.current = null;
+    }
+  };
+
+  const stop = async (): Promise<void> => {
+    if (!chat.runId) {
+      chat.stop();
+      return;
+    }
+    try {
+      await cancelRunThenStop(id, chat.runId, chat.stop);
+    } catch (error) {
+      Alert.alert(
+        '응답 중지 실패',
+        error instanceof Error ? error.message : '다시 시도해 주세요.',
+      );
     }
   };
 
@@ -78,12 +103,17 @@ export const ConversationScreen = () => {
             messages={chat.messages}
           />
         )}
-        {chat.error ? (
+        {errorPresentation ? (
           <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.error}>
-            응답을 이어오지 못했습니다. 연결을 확인하고 다시 보내 주세요.
+            {errorPresentation.message}
           </Text>
         ) : null}
-        <ChatComposer conversationId={id} loading={chat.isLoading} onSend={send} />
+        <ChatComposer
+          conversationId={id}
+          loading={chat.isLoading}
+          onSend={send}
+          onStop={stop}
+        />
       </View>
     </Screen>
   );

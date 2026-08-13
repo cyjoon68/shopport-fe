@@ -157,6 +157,17 @@ export const readCachedProducts = async (): Promise<Array<CachedProduct>> => {
   });
 };
 
+export const readCachedProduct = async (id: string): Promise<CachedProduct | null> => {
+  const db = await database();
+  const row = await db.getFirstAsync<{ payload: string }>(
+    'SELECT payload FROM product_cache WHERE id = ? LIMIT 1',
+    id,
+  );
+  if (!row) return null;
+  const parsed: unknown = JSON.parse(row.payload);
+  return isRecord(parsed) && parsed.id === id ? (parsed as CachedProduct) : null;
+};
+
 export const saveDraft = async (conversationId: string, draft: Draft): Promise<void> => {
   const db = await database();
   await db.runAsync(

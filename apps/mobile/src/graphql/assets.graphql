@@ -20,6 +20,14 @@ mutation CreateAssetUpload($input: CreateAssetUploadInput!) {
   }
 }
 
+query Asset($id: UUID!) {
+  asset(id: $id) {
+    id
+    status
+    url
+  }
+}
+
 mutation DeleteAsset($input: DeleteAssetInput!) {
   deleteAsset(input: $input) {
     success

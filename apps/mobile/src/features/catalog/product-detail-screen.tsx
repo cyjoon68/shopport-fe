@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
@@ -7,17 +8,47 @@ import { ProductDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { ProductCard } from './product-card';
 import { formatMoney, productFromFragment } from './product-model';
+import { useOnline } from '@/providers/network-provider';
+import { cacheProducts, readCachedProduct } from '@/shared/storage/database';
+import type { CachedProduct } from '@/shared/storage/database';
 
 export const ProductDetailScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { status } = useSession();
-  const { data, loading } = useQuery(ProductDocument, { variables: { id }, skip: !id });
+  const online = useOnline();
+  const [cached, setCached] = useState<CachedProduct | null>(null);
+  const [cacheLoading, setCacheLoading] = useState(true);
+  const { data, loading } = useQuery(ProductDocument, {
+    variables: { id },
+    fetchPolicy: 'cache-and-network',
+    skip: !id || !online,
+  });
+  const remoteProduct = useMemo(
+    () => (data?.product ? productFromFragment(data.product) : null),
+    [data?.product],
+  );
+
+  useEffect(() => {
+    if (!id) return;
+    if (remoteProduct) {
+      setCached(remoteProduct);
+      setCacheLoading(false);
+      void cacheProducts([remoteProduct]);
+      return;
+    }
+    void readCachedProduct(id).then((product) => {
+      setCached(product);
+      setCacheLoading(false);
+    });
+  }, [id, remoteProduct]);
+
   if (status === 'guest') return <Redirect href="/auth" />;
   if (!id) return <Redirect href="/" />;
-  if (!data?.product) {
+  const product = remoteProduct ?? cached;
+  if (!product) {
     return (
       <Screen>
-        {loading ? (
+        {loading || cacheLoading ? (
           <Text style={styles.status}>상품을 불러오는 중입니다</Text>
         ) : (
           <EmptyState
@@ -28,8 +59,11 @@ export const ProductDetailScreen = () => {
       </Screen>
     );
   }
-  const product = productFromFragment(data.product);
   const open = async (): Promise<void> => {
+    if (!online) {
+      Alert.alert('오프라인', '구매 링크는 온라인에서 열 수 있습니다.');
+      return;
+    }
     const url = new URL(product.outboundUrl);
     if (url.protocol !== 'https:') {
       Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
@@ -58,7 +92,10 @@ export const ProductDetailScreen = () => {
               : '제휴 수수료가 없는 링크입니다.'}
           </Text>
         </View>
-        <ActionButton disabled={!product.isInStock} onPress={() => void open()}>
+        <ActionButton
+          disabled={!online || !product.isInStock}
+          onPress={() => void open()}
+        >
           {product.isInStock ? `${product.providerName}에서 구매하기` : '현재 품절'}
         </ActionButton>
       </ScrollView>
