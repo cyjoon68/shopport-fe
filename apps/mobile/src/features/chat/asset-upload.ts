@@ -60,10 +60,7 @@ export const selectAndUploadAsset = async (
     body: blob,
   });
   if (!upload.ok) {
-    await apolloClient.mutate({
-      mutation: DeleteAssetDocument,
-      variables: { input: { id: payload.upload.asset.id } },
-    });
+    await bestEffortRemoveUploadedAsset(payload.upload.asset.id);
     throw new Error('이미지를 업로드하지 못했습니다.');
   }
   return { id: payload.upload.asset.id, uri: selected.uri };
@@ -77,5 +74,13 @@ export const removeUploadedAsset = async (id: string): Promise<void> => {
   const payload = response.data?.deleteAsset;
   if (!payload || payload.success !== true) {
     throw new Error(payload?.userErrors?.[0]?.message || '이미지를 삭제하지 못했습니다.');
+  }
+};
+
+const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
+  try {
+    await removeUploadedAsset(id);
+  } catch {
+    return;
   }
 };
