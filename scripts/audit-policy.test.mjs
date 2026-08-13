@@ -7,6 +7,10 @@ import { evaluateAudit, loadAuditPolicy } from './audit-policy.mjs';
 
 const policy = loadAuditPolicy();
 const fixturesDirectory = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const workflow = readFileSync(
+  resolve(fixturesDirectory, '../../.github/workflows/ci.yml'),
+  'utf8',
+);
 const fixture = (name) =>
   JSON.parse(readFileSync(resolve(fixturesDirectory, `${name}.json`), 'utf8'));
 
@@ -14,6 +18,23 @@ test('allows only the two reviewed high image-size Metro advisories', () => {
   const result = evaluateAudit(fixture('audit-known'), policy);
 
   assert.deepEqual(result, { allowedCount: 2, violations: [] });
+});
+
+test('keeps PR verification isolated from fork credentials and privileged triggers', () => {
+  assert.match(workflow, /pull_request:/u);
+  assert.doesNotMatch(workflow, /pull_request_target/u);
+  assert.match(workflow, /timeout-minutes: 20/u);
+  assert.match(workflow, /permissions:\n\x20{2}contents: read/u);
+  assert.match(workflow, /GITHUB_TOKEN: \$\{\{ github\.token \}\}/u);
+  for (const forbidden of [
+    /secrets\./u,
+    /EXPO_TOKEN/u,
+    /EAS_TOKEN/u,
+    /APPLE[_-](?:CERTIFICATE|KEY|PASSWORD)/u,
+    /GOOGLE[_-](?:APPLICATION|PLAY)/u,
+  ]) {
+    assert.doesNotMatch(workflow, forbidden);
+  }
 });
 
 test('rejects a reviewed advisory if its severity is critical', () => {

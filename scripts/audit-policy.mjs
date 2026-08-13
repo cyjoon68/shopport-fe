@@ -44,6 +44,35 @@ const validatePolicy = (policy) => {
   if (!isValidDate(policy.reviewedOn)) {
     violations.push(policyViolation('policy reviewedOn must be an ISO date'));
   }
+  const constraints = policy.operationalConstraints;
+  if (!isPlainObject(constraints)) {
+    violations.push(policyViolation('policy operationalConstraints must be an object'));
+  } else {
+    const requiredConstraintStrings = [
+      'runtimeUserUploads',
+      'publicForkAssets',
+      'verifyTrigger',
+      'verifyContentsPermission',
+      'prCiCredentials',
+      'easSigningDeployment',
+    ];
+    for (const field of requiredConstraintStrings) {
+      if (!isNonEmptyString(constraints[field])) {
+        violations.push(
+          policyViolation(`policy operationalConstraints missing ${field}`),
+        );
+      }
+    }
+    if (constraints.verifyTrigger !== 'pull_request') {
+      violations.push(policyViolation('policy verifyTrigger must be pull_request'));
+    }
+    if (constraints.verifyContentsPermission !== 'read') {
+      violations.push(policyViolation('policy verifyContentsPermission must be read'));
+    }
+    if (constraints.verifyTimeoutMinutes !== 20) {
+      violations.push(policyViolation('policy verifyTimeoutMinutes must be 20'));
+    }
+  }
   if (!Array.isArray(policy.exceptions)) {
     violations.push(policyViolation('policy exceptions must be an array'));
     return violations;
