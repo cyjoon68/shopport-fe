@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { Alert } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { readDraft, saveDraft } from '@/shared/storage/database';
 import { ChatComposer } from './chat-composer';
 import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
@@ -52,6 +53,9 @@ const mockedSelectAndUploadAsset = selectAndUploadAsset as jest.MockedFunction<
 const mockedPollAssetUntilSettled = pollAssetUntilSettled as jest.MockedFunction<
   typeof pollAssetUntilSettled
 >;
+const mockedImpactAsync = Haptics.impactAsync as jest.MockedFunction<
+  typeof Haptics.impactAsync
+>;
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -97,6 +101,8 @@ describe('chat composer conversation draft isolation', () => {
     mockedRemoveUploadedAsset.mockClear();
     mockedSelectAndUploadAsset.mockReset();
     mockedPollAssetUntilSettled.mockReset();
+    mockedImpactAsync.mockReset();
+    mockedImpactAsync.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -268,10 +274,35 @@ describe('chat composer conversation draft isolation', () => {
     );
     await act(flushPromises);
     fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
     screen.unmount();
     rejectSend(new Error('stale failure'));
     await act(flushPromises);
     expect(alertSpy).not.toHaveBeenCalledWith('메시지 전송 실패', 'stale failure');
     alertSpy.mockRestore();
+  });
+
+  it('does not send A after a deferred haptic resolves post-unmount', async () => {
+    const impact = deferred<void>();
+    mockedImpactAsync.mockReturnValue(impact.promise);
+    mockedReadDraft.mockResolvedValue({ text: 'A', assetId: null, assetUri: null });
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    expect(mockedImpactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+    screen.unmount();
+    await act(async () => {
+      impact.resolve();
+      await flushPromises();
+    });
+    expect(onSend).not.toHaveBeenCalled();
   });
 });

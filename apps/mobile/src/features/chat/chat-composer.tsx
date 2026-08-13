@@ -401,6 +401,14 @@ export const ChatComposer = ({
       )
         return;
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (
+        !isCurrentConversation(
+          expectedConversationId,
+          expectedVersion,
+          expectedGeneration,
+        )
+      )
+        return;
       await onSend(trimmed, currentAsset?.id ?? null);
       if (
         !isCurrentConversation(
