@@ -1,6 +1,7 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
 import { fromHistoricalMessage, mergeMessages } from './message-list';
+import { isStableChatMessageId, messageIdentity } from './message-id';
 
 const product = {
   id: 'product-1',
@@ -26,7 +27,7 @@ type HistoricalMessage = NonNullable<
 >['messages'][number];
 
 const historical = {
-  id: 'message-1',
+  id: '0198a122-0c00-7000-8000-000000000001',
   role: 'ASSISTANT',
   status: 'COMPLETED',
   createdAt: '2026-08-13T00:00:00.000Z',
@@ -61,7 +62,7 @@ describe('historical message parts', () => {
 
   it('deduplicates server and persisted live messages by stable ID', () => {
     const live: UIMessage = {
-      id: 'message-1',
+      id: '0198a122-0c00-7000-8000-000000000001',
       role: 'assistant',
       parts: [{ type: 'text', content: '완료된 추천 결과' }],
     };
@@ -73,5 +74,12 @@ describe('historical message parts', () => {
         products: [expect.anything()],
       }),
     );
+  });
+
+  it('requires canonical UUIDs for cross-source identity and isolates legacy IDs', () => {
+    expect(isStableChatMessageId('0198a122-0c00-7000-8000-000000000001')).toBe(true);
+    expect(isStableChatMessageId('msg-legacy')).toBe(false);
+    expect(messageIdentity('server', 'msg-legacy')).toBe('server:msg-legacy');
+    expect(messageIdentity('live', 'msg-legacy')).toBe('live:msg-legacy');
   });
 });

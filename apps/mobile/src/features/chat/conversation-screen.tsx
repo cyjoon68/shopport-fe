@@ -17,6 +17,7 @@ import { MessageList } from './message-list';
 import { cancelRunThenStop } from './chat-http';
 import { chatErrorPresentation } from './chat-errors';
 import { useOnline } from '@/providers/network-provider';
+import { createStableChatMessageId } from './message-id';
 
 export const ConversationScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -69,7 +70,10 @@ export const ConversationScreen = () => {
   const send = async (text: string, nextAssetId: string | null): Promise<void> => {
     assetId.current = nextAssetId;
     try {
-      await chat.sendMessage(text || '이 이미지와 관련된 상품을 찾아줘');
+      await chat.sendMessage({
+        id: createStableChatMessageId(),
+        content: text || '이 이미지와 관련된 상품을 찾아줘',
+      });
     } finally {
       assetId.current = null;
     }

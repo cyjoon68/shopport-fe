@@ -47,10 +47,10 @@ export const SubscriptionScreen = () => {
 
   if (status === 'guest') return <Redirect href="/auth" />;
 
-  const sync = async (expectedActive: boolean): Promise<'SYNCED' | 'TIMEOUT'> => {
+  const sync = async (expectedPro: boolean): Promise<'SYNCED' | 'TIMEOUT'> => {
     setSyncing(true);
     try {
-      const result = await syncViewerEntitlement(refetch, expectedActive);
+      const result = await syncViewerEntitlement(refetch, expectedPro);
       if (result === 'TIMEOUT') {
         Alert.alert(
           '구독 동기화 지연',
@@ -161,7 +161,9 @@ export const SubscriptionScreen = () => {
             구매 복원
           </ActionButton>
         ) : null}
-        {viewer?.entitlement.isActive && configured ? (
+        {viewer?.entitlement.key === 'pro' &&
+        viewer.entitlement.isActive &&
+        configured ? (
           <ActionButton onPress={() => void manage()} variant="secondary">
             구독 관리·해지
           </ActionButton>

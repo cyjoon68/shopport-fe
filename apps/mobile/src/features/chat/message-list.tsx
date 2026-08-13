@@ -11,6 +11,7 @@ import {
   productsFromToolResult,
 } from '@/features/catalog/product-model';
 import type { CachedProduct } from '@/shared/storage/database';
+import { messageIdentity } from './message-id';
 
 type HistoricalMessage = NonNullable<
   ConversationQuery['conversation']
@@ -81,7 +82,7 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
     }
   }
   return {
-    id: message.id,
+    id: messageIdentity('live', message.id),
     role: message.role === 'user' ? 'user' : 'assistant',
     status: tools.some(({ status }) => status === 'FAILED')
       ? 'FAILED'
@@ -111,7 +112,7 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
 };
 
 export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessage => ({
-  id: message.id,
+  id: messageIdentity('server', message.id),
   role: message.role === 'USER' ? 'user' : 'assistant',
   status: message.status,
   text: message.parts
