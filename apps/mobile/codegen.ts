@@ -1,4 +1,10 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
+import { addTypenameSelectionDocumentTransform } from '@graphql-codegen/client-preset';
+import { createHash } from 'node:crypto';
+import { stripIgnoredCharacters } from 'graphql';
+
+const hashPersistedDocument = (document: string): string =>
+  `sha256:${createHash('sha256').update(stripIgnoredCharacters(document)).digest('hex')}`;
 
 const config: CodegenConfig = {
   hooks: {
@@ -11,9 +17,11 @@ const config: CodegenConfig = {
   documents: ['src/**/*.graphql'],
   generates: {
     'src/graphql/generated/': {
+      documentTransforms: [addTypenameSelectionDocumentTransform],
       preset: 'client',
       presetConfig: {
         fragmentMasking: { unmaskFunctionName: 'readFragment' },
+        persistedDocuments: { hashAlgorithm: hashPersistedDocument },
       },
       config: {
         arrayInputCoercion: false,

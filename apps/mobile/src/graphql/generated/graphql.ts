@@ -71,13 +71,21 @@ export type CreateAssetUploadMutationVariables = Exact<{
 }>;
 
 export type CreateAssetUploadMutation = {
+  __typename: 'Mutation';
   createAssetUpload: {
+    __typename: 'AssetUploadPayload';
     upload: {
+      __typename: 'AssetUpload';
       uploadUrl: string;
-      asset: { id: string; status: AssetStatus; createdAt: string };
-      headers: Array<{ name: string; value: string }>;
+      asset: { __typename: 'Asset'; id: string; status: AssetStatus; createdAt: string };
+      headers: Array<{ __typename: 'UploadHeader'; name: string; value: string }>;
     } | null;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
@@ -86,7 +94,13 @@ export type AssetQueryVariables = Exact<{
 }>;
 
 export type AssetQuery = {
-  asset: { id: string; status: AssetStatus; url: string | null } | null;
+  __typename: 'Query';
+  asset: {
+    __typename: 'Asset';
+    id: string;
+    status: AssetStatus;
+    url: string | null;
+  } | null;
 };
 
 export type DeleteAssetMutationVariables = Exact<{
@@ -94,28 +108,37 @@ export type DeleteAssetMutationVariables = Exact<{
 }>;
 
 export type DeleteAssetMutation = {
+  __typename: 'Mutation';
   deleteAsset: {
+    __typename: 'DeletePayload';
     success: boolean;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
 export type ProductCardFragment = {
+  __typename: 'Product';
   id: string;
   title: string;
   imageUrl: string;
   isAffiliate: boolean;
   isSaved: boolean;
-  provider: { providerId: string; displayName: string };
+  provider: { __typename: 'Provider'; providerId: string; displayName: string };
   offer: {
+    __typename: 'Offer';
     id: string;
     isInStock: boolean;
     deliveryExpectedAt: string | null;
     observedAt: string;
     outboundUrl: string;
-    price: { amountMinor: string; currency: string };
-    shipping: { amountMinor: string; currency: string };
-    total: { amountMinor: string; currency: string };
+    price: { __typename: 'Money'; amountMinor: string; currency: string };
+    shipping: { __typename: 'Money'; amountMinor: string; currency: string };
+    total: { __typename: 'Money'; amountMinor: string; currency: string };
   };
 } & { ' $fragmentName'?: 'ProductCardFragment' };
 
@@ -126,12 +149,17 @@ export type SearchProductsQueryVariables = Exact<{
 }>;
 
 export type SearchProductsQuery = {
+  __typename: 'Query';
   searchProducts: {
+    __typename: 'ProductConnection';
     edges: Array<{
+      __typename: 'ProductEdge';
       cursor: string;
-      node: { ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment } };
+      node: { __typename: 'Product' } & {
+        ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
+      };
     }>;
-    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    pageInfo: { __typename: 'PageInfo'; hasNextPage: boolean; endCursor: string | null };
   };
 };
 
@@ -140,7 +168,12 @@ export type ProductQueryVariables = Exact<{
 }>;
 
 export type ProductQuery = {
-  product: { ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment } } | null;
+  __typename: 'Query';
+  product:
+    | ({ __typename: 'Product' } & {
+        ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
+      })
+    | null;
 };
 
 export type SavedProductsQueryVariables = Exact<{
@@ -149,12 +182,17 @@ export type SavedProductsQueryVariables = Exact<{
 }>;
 
 export type SavedProductsQuery = {
+  __typename: 'Query';
   savedProducts: {
+    __typename: 'ProductConnection';
     edges: Array<{
+      __typename: 'ProductEdge';
       cursor: string;
-      node: { ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment } };
+      node: { __typename: 'Product' } & {
+        ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
+      };
     }>;
-    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    pageInfo: { __typename: 'PageInfo'; hasNextPage: boolean; endCursor: string | null };
   };
 };
 
@@ -163,9 +201,20 @@ export type SaveProductMutationVariables = Exact<{
 }>;
 
 export type SaveProductMutation = {
+  __typename: 'Mutation';
   saveProduct: {
-    product: { ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment } } | null;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    __typename: 'ProductPayload';
+    product:
+      | ({ __typename: 'Product' } & {
+          ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
+        })
+      | null;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
@@ -174,13 +223,25 @@ export type UnsaveProductMutationVariables = Exact<{
 }>;
 
 export type UnsaveProductMutation = {
+  __typename: 'Mutation';
   unsaveProduct: {
-    product: { ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment } } | null;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    __typename: 'ProductPayload';
+    product:
+      | ({ __typename: 'Product' } & {
+          ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
+        })
+      | null;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
 export type ConversationSummaryFragment = {
+  __typename: 'Conversation';
   id: string;
   title: string;
   createdAt: string;
@@ -193,14 +254,17 @@ export type ConversationsQueryVariables = Exact<{
 }>;
 
 export type ConversationsQuery = {
+  __typename: 'Query';
   conversations: {
+    __typename: 'ConversationConnection';
     edges: Array<{
+      __typename: 'ConversationEdge';
       cursor: string;
-      node: {
+      node: { __typename: 'Conversation' } & {
         ' $fragmentRefs'?: { ConversationSummaryFragment: ConversationSummaryFragment };
       };
     }>;
-    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    pageInfo: { __typename: 'PageInfo'; hasNextPage: boolean; endCursor: string | null };
   };
 };
 
@@ -209,9 +273,12 @@ export type ConversationQueryVariables = Exact<{
 }>;
 
 export type ConversationQuery = {
+  __typename: 'Query';
   conversation:
     | ({
+        __typename: 'Conversation';
         messages: Array<{
+          __typename: 'Message';
           id: string;
           role: MessageRole;
           status: MessageStatus;
@@ -220,12 +287,17 @@ export type ConversationQuery = {
             | {
                 __typename: 'ImageMessagePart';
                 id: string;
-                asset: { id: string; status: AssetStatus; url: string | null };
+                asset: {
+                  __typename: 'Asset';
+                  id: string;
+                  status: AssetStatus;
+                  url: string | null;
+                };
               }
             | {
                 __typename: 'ProductReferenceMessagePart';
                 id: string;
-                product: {
+                product: { __typename: 'Product' } & {
                   ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
                 };
               }
@@ -249,11 +321,20 @@ export type CreateConversationMutationVariables = Exact<{
 }>;
 
 export type CreateConversationMutation = {
+  __typename: 'Mutation';
   createConversation: {
-    conversation: {
-      ' $fragmentRefs'?: { ConversationSummaryFragment: ConversationSummaryFragment };
-    } | null;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    __typename: 'ConversationPayload';
+    conversation:
+      | ({ __typename: 'Conversation' } & {
+          ' $fragmentRefs'?: { ConversationSummaryFragment: ConversationSummaryFragment };
+        })
+      | null;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
@@ -262,11 +343,20 @@ export type RenameConversationMutationVariables = Exact<{
 }>;
 
 export type RenameConversationMutation = {
+  __typename: 'Mutation';
   renameConversation: {
-    conversation: {
-      ' $fragmentRefs'?: { ConversationSummaryFragment: ConversationSummaryFragment };
-    } | null;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    __typename: 'ConversationPayload';
+    conversation:
+      | ({ __typename: 'Conversation' } & {
+          ' $fragmentRefs'?: { ConversationSummaryFragment: ConversationSummaryFragment };
+        })
+      | null;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
@@ -275,31 +365,48 @@ export type DeleteConversationMutationVariables = Exact<{
 }>;
 
 export type DeleteConversationMutation = {
+  __typename: 'Mutation';
   deleteConversation: {
+    __typename: 'DeletePayload';
     success: boolean;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
 export type DeleteViewerAccountMutationVariables = Exact<{ [key: string]: never }>;
 
 export type DeleteViewerAccountMutation = {
+  __typename: 'Mutation';
   deleteViewerAccount: {
+    __typename: 'DeletePayload';
     success: boolean;
-    userErrors: Array<{ code: string; message: string; path: Array<string> }>;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
   };
 };
 
 export type ViewerQueryVariables = Exact<{ [key: string]: never }>;
 
 export type ViewerQuery = {
+  __typename: 'Query';
   viewer: {
+    __typename: 'Viewer';
     id: string;
     displayName: string;
     profileImageUrl: string | null;
     trialStartedAt: string;
     trialEndsAt: string;
     entitlement: {
+      __typename: 'Entitlement';
       key: string;
       isActive: boolean;
       productId: string | null;
@@ -318,6 +425,7 @@ export const ProductCardFragmentDoc = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -329,6 +437,7 @@ export const ProductCardFragmentDoc = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -340,6 +449,7 @@ export const ProductCardFragmentDoc = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -351,6 +461,7 @@ export const ProductCardFragmentDoc = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -362,6 +473,7 @@ export const ProductCardFragmentDoc = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -373,6 +485,7 @@ export const ProductCardFragmentDoc = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -396,6 +509,7 @@ export const ConversationSummaryFragmentDoc = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -406,6 +520,9 @@ export const ConversationSummaryFragmentDoc = {
   ],
 } as unknown as DocumentNode<ConversationSummaryFragment, unknown>;
 export const CreateAssetUploadDocument = {
+  __meta__: {
+    hash: 'sha256:7241e3bebd67ed252a5c9f43ffe58701e900e504fff18eb60d74f909c268ffcc',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -428,6 +545,7 @@ export const CreateAssetUploadDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'createAssetUpload' },
@@ -441,18 +559,24 @@ export const CreateAssetUploadDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'upload' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'asset' },
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: '__typename' },
+                            },
                             { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -466,6 +590,10 @@ export const CreateAssetUploadDocument = {
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: '__typename' },
+                            },
                             { kind: 'Field', name: { kind: 'Name', value: 'name' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'value' } },
                           ],
@@ -480,6 +608,7 @@ export const CreateAssetUploadDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -498,6 +627,9 @@ export const CreateAssetUploadDocument = {
   CreateAssetUploadMutationVariables
 >;
 export const AssetDocument = {
+  __meta__: {
+    hash: 'sha256:b750d22f5cc29cf5a003b5dc4a80e1504d3c9b6ef99415c35708841779b9647d',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -517,6 +649,7 @@ export const AssetDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'asset' },
@@ -530,6 +663,7 @@ export const AssetDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'url' } },
@@ -542,6 +676,9 @@ export const AssetDocument = {
   ],
 } as unknown as DocumentNode<AssetQuery, AssetQueryVariables>;
 export const DeleteAssetDocument = {
+  __meta__: {
+    hash: 'sha256:908e3d72c99fc4159ea308e03c07a65c844974e8cbf33bbab13c900eb943eff6',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -564,6 +701,7 @@ export const DeleteAssetDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'deleteAsset' },
@@ -577,6 +715,7 @@ export const DeleteAssetDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'success' } },
                 {
                   kind: 'Field',
@@ -584,6 +723,7 @@ export const DeleteAssetDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -599,6 +739,9 @@ export const DeleteAssetDocument = {
   ],
 } as unknown as DocumentNode<DeleteAssetMutation, DeleteAssetMutationVariables>;
 export const SearchProductsDocument = {
+  __meta__: {
+    hash: 'sha256:f4f6469083c5fe0e294229875ce6da554af5f64ee4fefbeea4fc89c4cc224aff',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -634,6 +777,7 @@ export const SearchProductsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'searchProducts' },
@@ -657,12 +801,14 @@ export const SearchProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'edges' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'cursor' } },
                       {
                         kind: 'Field',
@@ -670,6 +816,10 @@ export const SearchProductsDocument = {
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: '__typename' },
+                            },
                             {
                               kind: 'FragmentSpread',
                               name: { kind: 'Name', value: 'ProductCard' },
@@ -686,6 +836,7 @@ export const SearchProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'hasNextPage' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'endCursor' } },
                     ],
@@ -704,6 +855,7 @@ export const SearchProductsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -715,6 +867,7 @@ export const SearchProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -726,6 +879,7 @@ export const SearchProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -737,6 +891,7 @@ export const SearchProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -748,6 +903,7 @@ export const SearchProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -759,6 +915,7 @@ export const SearchProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -773,6 +930,9 @@ export const SearchProductsDocument = {
   ],
 } as unknown as DocumentNode<SearchProductsQuery, SearchProductsQueryVariables>;
 export const ProductDocument = {
+  __meta__: {
+    hash: 'sha256:04b82f110066e77230fca4c0d42f3c993ff27ce804c74e424c502472396beb1a',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -792,6 +952,7 @@ export const ProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'product' },
@@ -805,6 +966,7 @@ export const ProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'FragmentSpread', name: { kind: 'Name', value: 'ProductCard' } },
               ],
             },
@@ -819,6 +981,7 @@ export const ProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -830,6 +993,7 @@ export const ProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -841,6 +1005,7 @@ export const ProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -852,6 +1017,7 @@ export const ProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -863,6 +1029,7 @@ export const ProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -874,6 +1041,7 @@ export const ProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -888,6 +1056,9 @@ export const ProductDocument = {
   ],
 } as unknown as DocumentNode<ProductQuery, ProductQueryVariables>;
 export const SavedProductsDocument = {
+  __meta__: {
+    hash: 'sha256:bf57c797b4648170197cfea2a3603e97894cf05bc6e06e0102ed2ef420d41b32',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -912,6 +1083,7 @@ export const SavedProductsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'savedProducts' },
@@ -930,12 +1102,14 @@ export const SavedProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'edges' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'cursor' } },
                       {
                         kind: 'Field',
@@ -943,6 +1117,10 @@ export const SavedProductsDocument = {
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: '__typename' },
+                            },
                             {
                               kind: 'FragmentSpread',
                               name: { kind: 'Name', value: 'ProductCard' },
@@ -959,6 +1137,7 @@ export const SavedProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'hasNextPage' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'endCursor' } },
                     ],
@@ -977,6 +1156,7 @@ export const SavedProductsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -988,6 +1168,7 @@ export const SavedProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -999,6 +1180,7 @@ export const SavedProductsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -1010,6 +1192,7 @@ export const SavedProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1021,6 +1204,7 @@ export const SavedProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1032,6 +1216,7 @@ export const SavedProductsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1046,6 +1231,9 @@ export const SavedProductsDocument = {
   ],
 } as unknown as DocumentNode<SavedProductsQuery, SavedProductsQueryVariables>;
 export const SaveProductDocument = {
+  __meta__: {
+    hash: 'sha256:c4dbff567b493b3f63e298e3e6ba0109707689eed4e0c9c5ff2850dc4b1f42bc',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1068,6 +1256,7 @@ export const SaveProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'saveProduct' },
@@ -1081,12 +1270,14 @@ export const SaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'product' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       {
                         kind: 'FragmentSpread',
                         name: { kind: 'Name', value: 'ProductCard' },
@@ -1100,6 +1291,7 @@ export const SaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1119,6 +1311,7 @@ export const SaveProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -1130,6 +1323,7 @@ export const SaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -1141,6 +1335,7 @@ export const SaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -1152,6 +1347,7 @@ export const SaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1163,6 +1359,7 @@ export const SaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1174,6 +1371,7 @@ export const SaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1188,6 +1386,9 @@ export const SaveProductDocument = {
   ],
 } as unknown as DocumentNode<SaveProductMutation, SaveProductMutationVariables>;
 export const UnsaveProductDocument = {
+  __meta__: {
+    hash: 'sha256:940b259c57100b1d07a93b02817ffcc88d60671d93078e40d153596767ef7809',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1210,6 +1411,7 @@ export const UnsaveProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'unsaveProduct' },
@@ -1223,12 +1425,14 @@ export const UnsaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'product' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       {
                         kind: 'FragmentSpread',
                         name: { kind: 'Name', value: 'ProductCard' },
@@ -1242,6 +1446,7 @@ export const UnsaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1261,6 +1466,7 @@ export const UnsaveProductDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -1272,6 +1478,7 @@ export const UnsaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -1283,6 +1490,7 @@ export const UnsaveProductDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -1294,6 +1502,7 @@ export const UnsaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1305,6 +1514,7 @@ export const UnsaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1316,6 +1526,7 @@ export const UnsaveProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1330,6 +1541,9 @@ export const UnsaveProductDocument = {
   ],
 } as unknown as DocumentNode<UnsaveProductMutation, UnsaveProductMutationVariables>;
 export const ConversationsDocument = {
+  __meta__: {
+    hash: 'sha256:aea313be0a5c7afd3c63a46552e9cab21faea5eae0a2c091756b4dc3799478ed',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1354,6 +1568,7 @@ export const ConversationsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'conversations' },
@@ -1372,12 +1587,14 @@ export const ConversationsDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'edges' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'cursor' } },
                       {
                         kind: 'Field',
@@ -1385,6 +1602,10 @@ export const ConversationsDocument = {
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: '__typename' },
+                            },
                             {
                               kind: 'FragmentSpread',
                               name: { kind: 'Name', value: 'ConversationSummary' },
@@ -1401,6 +1622,7 @@ export const ConversationsDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'hasNextPage' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'endCursor' } },
                     ],
@@ -1419,6 +1641,7 @@ export const ConversationsDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -1429,6 +1652,9 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
+  __meta__: {
+    hash: 'sha256:1a3087ec736590bb039f90e51a0b28aef3b7eb305d66507f2e782c53a627c7a7',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1448,6 +1674,7 @@ export const ConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'conversation' },
@@ -1461,6 +1688,7 @@ export const ConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'FragmentSpread',
                   name: { kind: 'Name', value: 'ConversationSummary' },
@@ -1471,6 +1699,7 @@ export const ConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'role' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'status' } },
@@ -1494,6 +1723,10 @@ export const ConversationDocument = {
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: '__typename' },
+                                  },
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   {
                                     kind: 'Field',
@@ -1511,6 +1744,10 @@ export const ConversationDocument = {
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: '__typename' },
+                                  },
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   {
                                     kind: 'Field',
@@ -1518,6 +1755,10 @@ export const ConversationDocument = {
                                     selectionSet: {
                                       kind: 'SelectionSet',
                                       selections: [
+                                        {
+                                          kind: 'Field',
+                                          name: { kind: 'Name', value: '__typename' },
+                                        },
                                         {
                                           kind: 'Field',
                                           name: { kind: 'Name', value: 'id' },
@@ -1548,6 +1789,10 @@ export const ConversationDocument = {
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: '__typename' },
+                                  },
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   {
                                     kind: 'Field',
@@ -1555,6 +1800,10 @@ export const ConversationDocument = {
                                     selectionSet: {
                                       kind: 'SelectionSet',
                                       selections: [
+                                        {
+                                          kind: 'Field',
+                                          name: { kind: 'Name', value: '__typename' },
+                                        },
                                         {
                                           kind: 'FragmentSpread',
                                           name: { kind: 'Name', value: 'ProductCard' },
@@ -1574,6 +1823,10 @@ export const ConversationDocument = {
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: '__typename' },
+                                  },
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   {
                                     kind: 'Field',
@@ -1605,6 +1858,7 @@ export const ConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -1619,6 +1873,7 @@ export const ConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
@@ -1630,6 +1885,7 @@ export const ConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
               ],
@@ -1641,6 +1897,7 @@ export const ConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
@@ -1652,6 +1909,7 @@ export const ConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1663,6 +1921,7 @@ export const ConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1674,6 +1933,7 @@ export const ConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
                     ],
@@ -1688,6 +1948,9 @@ export const ConversationDocument = {
   ],
 } as unknown as DocumentNode<ConversationQuery, ConversationQueryVariables>;
 export const CreateConversationDocument = {
+  __meta__: {
+    hash: 'sha256:6db9a01d2f27e9b2124a718b19cc71dbecdd35cf1e40ddc9dea61c327eb780aa',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1710,6 +1973,7 @@ export const CreateConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'createConversation' },
@@ -1723,12 +1987,14 @@ export const CreateConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'conversation' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       {
                         kind: 'FragmentSpread',
                         name: { kind: 'Name', value: 'ConversationSummary' },
@@ -1742,6 +2008,7 @@ export const CreateConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1761,6 +2028,7 @@ export const CreateConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -1774,6 +2042,9 @@ export const CreateConversationDocument = {
   CreateConversationMutationVariables
 >;
 export const RenameConversationDocument = {
+  __meta__: {
+    hash: 'sha256:1ad41dd2a2a1ab3f6cf2879c5e676ff2eea45cc1466a55f63ede1ed32b72ad37',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1796,6 +2067,7 @@ export const RenameConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'renameConversation' },
@@ -1809,12 +2081,14 @@ export const RenameConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'conversation' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       {
                         kind: 'FragmentSpread',
                         name: { kind: 'Name', value: 'ConversationSummary' },
@@ -1828,6 +2102,7 @@ export const RenameConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1847,6 +2122,7 @@ export const RenameConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           { kind: 'Field', name: { kind: 'Name', value: 'id' } },
           { kind: 'Field', name: { kind: 'Name', value: 'title' } },
           { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
@@ -1860,6 +2136,9 @@ export const RenameConversationDocument = {
   RenameConversationMutationVariables
 >;
 export const DeleteConversationDocument = {
+  __meta__: {
+    hash: 'sha256:74b4b50db65d29a9221f9eed833e2725bdc378349b6c20b3802a559fd7ba7b64',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1882,6 +2161,7 @@ export const DeleteConversationDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'deleteConversation' },
@@ -1895,6 +2175,7 @@ export const DeleteConversationDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'success' } },
                 {
                   kind: 'Field',
@@ -1902,6 +2183,7 @@ export const DeleteConversationDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1920,6 +2202,9 @@ export const DeleteConversationDocument = {
   DeleteConversationMutationVariables
 >;
 export const DeleteViewerAccountDocument = {
+  __meta__: {
+    hash: 'sha256:c8fa15afa194d3e2f9ce9fefb86de127ce7c37fd03afe484216944980d659f50',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1929,12 +2214,14 @@ export const DeleteViewerAccountDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'deleteViewerAccount' },
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'success' } },
                 {
                   kind: 'Field',
@@ -1942,6 +2229,7 @@ export const DeleteViewerAccountDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'path' } },
@@ -1960,6 +2248,9 @@ export const DeleteViewerAccountDocument = {
   DeleteViewerAccountMutationVariables
 >;
 export const ViewerDocument = {
+  __meta__: {
+    hash: 'sha256:04019bff4059c8cbcaefa660f6376ba8ed7911ae533b89627679cfb355e7b98f',
+  },
   kind: 'Document',
   definitions: [
     {
@@ -1969,12 +2260,14 @@ export const ViewerDocument = {
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
           {
             kind: 'Field',
             name: { kind: 'Name', value: 'viewer' },
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'profileImageUrl' } },
@@ -1986,6 +2279,7 @@ export const ViewerDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'key' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'isActive' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
