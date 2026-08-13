@@ -1,0 +1,27 @@
+name: Production builds
+
+on:
+  push:
+    branches: [main]
+
+defaults:
+  image: sdk-57
+  tools:
+    node: 22.13.0
+
+jobs:
+  build_android:
+    name: Android store build
+    type: build
+    environment: production
+    params:
+      platform: android
+      profile: production
+
+  build_ios:
+    name: iOS store build
+    type: build
+    environment: production
+    params:
+      platform: ios
+      profile: production

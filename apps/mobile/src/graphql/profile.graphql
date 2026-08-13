@@ -1,0 +1,10 @@
+mutation DeleteViewerAccount {
+  deleteViewerAccount {
+    success
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
