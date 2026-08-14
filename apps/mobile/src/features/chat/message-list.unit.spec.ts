@@ -1,6 +1,10 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
-import { fromHistoricalMessage, mergeMessages } from './message-list';
+import {
+  activeAskUserRequest,
+  fromHistoricalMessage,
+  mergeMessages,
+} from './message-list';
 import {
   createStableChatMessageId,
   createUuidV7,
@@ -74,6 +78,13 @@ describe('historical message parts', () => {
     expect(message.products[0]?.id).toBe('product-1');
     expect(message.tools[0]?.id).toBe('part-tool');
     expect(message.tools[0]?.status).toBe('COMPLETED');
+    expect(activeAskUserRequest([message])?.request.allowFreeText).toBe(true);
+    expect(
+      activeAskUserRequest([
+        message,
+        { ...message, askUsers: [], id: 'next-user', role: 'user' },
+      ]),
+    ).toBeNull();
   });
 
   it('deduplicates server and persisted live messages by stable ID', () => {

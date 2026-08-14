@@ -63,4 +63,19 @@ describe('askUser', () => {
     expect(screen.getByText('어떤 색이 좋아요?').props.maxFontSizeMultiplier).toBe(3);
     expect(screen.getByText('검정').props.maxFontSizeMultiplier).toBe(3);
   });
+
+  it('tells the user when only an option is accepted', () => {
+    const screen = render(
+      <AskUserCard onSelect={jest.fn()} request={{ ...request, allowFreeText: false }} />,
+    );
+    expect(screen.getByText('선택지에서 답해 주세요')).toBeTruthy();
+  });
+
+  it('does not accept an option while the assistant turn is still running', () => {
+    const onSelect = jest.fn().mockResolvedValue(undefined);
+    const screen = render(<AskUserCard disabled onSelect={onSelect} request={request} />);
+    fireEvent.press(screen.getByText('검정'));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '검정' })).toBeDisabled();
+  });
 });

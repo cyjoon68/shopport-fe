@@ -176,6 +176,30 @@ describe('chat composer conversation draft isolation', () => {
     expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
   });
 
+  it('blocks direct input when a clarification requires an option', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '직접 쓴 답',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        allowFreeText={false}
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+    await act(flushPromises);
+    expect(screen.getByLabelText('쇼핑 질문').props.editable).toBe(false);
+    expect(accessibilityDisabled(screen, '이미지 첨부')).toBe(true);
+    expect(accessibilityDisabled(screen, '메시지 보내기')).toBe(true);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
   it('ignores an out-of-order A read after switching to B', async () => {
     const draftA = deferred<DraftValue>();
     const draftB = deferred<DraftValue>();

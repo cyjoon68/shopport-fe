@@ -91,7 +91,7 @@ type TextMessagePart {
 type AskUserOption {
   "The stable option identifier."
   id: String!
-  "The short label shown to the user."
+  "The short Korean label shown to the user."
   label: String!
 }
 

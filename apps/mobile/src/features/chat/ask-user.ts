@@ -1,10 +1,4 @@
-export type AskUserOption = Readonly<{ id: string; label: string }>;
-
-export type AskUserRequest = Readonly<{
-  allowFreeText: boolean;
-  options: ReadonlyArray<AskUserOption>;
-  question: string;
-}>;
+import type { AskUserRequest } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -1,0 +1,11 @@
+appId: com.cyjoon68.shopport
+---
+- launchApp:
+    clearState: true
+- tapOn: '로컬 데모로 시작'
+- tapOn: '쇼핑 질문'
+- inputText: '무선 이어폰 찾아줘'
+- tapOn: '보내기'
+- assertVisible: '어디에서 주로 사용할 건가요?'
+- tapOn: '출퇴근'
+- assertVisible: '노이즈 캔슬링 무선 이어폰'

@@ -62,11 +62,18 @@ export const NewChatScreen = () => {
           assetUri: null,
         });
       if (Platform.OS === 'ios')
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+          () => undefined,
+        );
       router.push({
         pathname: '/chat/[id]',
         params: draft ? { id: conversation.id, send: '1' } : { id: conversation.id },
       });
+    } catch (error) {
+      Alert.alert(
+        '대화를 만들지 못했습니다',
+        error instanceof Error ? error.message : '다시 시도해 주세요.',
+      );
     } finally {
       setLoading(false);
     }

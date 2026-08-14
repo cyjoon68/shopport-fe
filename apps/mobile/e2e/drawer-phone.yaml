@@ -1,9 +1,8 @@
 appId: com.cyjoon68.shopport
 ---
 - launchApp
-- tapOn: '내비게이션 메뉴 열기'
-- assertVisible: '새 대화'
-- assertVisible: '대화 기록'
-- assertVisible: '찜'
-- assertVisible: '구독'
-- assertVisible: '설정'
+- assertVisible: '기록 화면 열기'
+- assertVisible: '설정 화면 열기'
+- tapOn: '설정 화면 열기'
+- assertVisible: '찜한 상품'
+- assertVisible: '구독 관리'

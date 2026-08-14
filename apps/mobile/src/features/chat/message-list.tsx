@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
@@ -14,15 +13,15 @@ import type { CachedProduct } from '@/shared/storage/database';
 import { messageIdentity } from './message-id';
 import { AskUserCard } from './ask-user-card';
 import { askUserArgsFromToolPart } from './ask-user';
-import type { AskUserRequest } from './ask-user';
+import type { AskUserRequest } from './types';
 
 type HistoricalMessage = NonNullable<
   ConversationQuery['conversation']
 >['messages'][number];
 
 type MessageListProps = Readonly<{
-  historical: ReadonlyArray<HistoricalMessage>;
-  messages: ReadonlyArray<UIMessage>;
+  answerDisabled: boolean;
+  messages: ReadonlyArray<DisplayMessage>;
   onAnswer: (label: string) => Promise<void>;
 }>;
 
@@ -196,6 +195,13 @@ export const mergeMessages = (
   return merged;
 };
 
+export const activeAskUserRequest = (
+  messages: ReadonlyArray<DisplayMessage>,
+): Readonly<{ id: string; request: AskUserRequest }> | null => {
+  const lastMessage = messages.at(-1);
+  return lastMessage?.role === 'assistant' ? (lastMessage.askUsers.at(-1) ?? null) : null;
+};
+
 const toolStatusLabel = (tool: DisplayTool): string => {
   if (tool.status === 'COMPLETED') return `${tool.name} 완료`;
   if (tool.status === 'FAILED') return `${tool.name} 실패`;
@@ -204,10 +210,12 @@ const toolStatusLabel = (tool: DisplayTool): string => {
 
 const MessageRow = ({
   activeAskUserId,
+  answerDisabled,
   message,
   onAnswer,
 }: Readonly<{
   activeAskUserId: string | null;
+  answerDisabled: boolean;
   message: DisplayMessage;
   onAnswer: (label: string) => Promise<void>;
 }>) => {
@@ -246,7 +254,7 @@ const MessageRow = ({
       )}
       {message.askUsers.map(({ id, request }) => (
         <AskUserCard
-          disabled={id !== activeAskUserId}
+          disabled={answerDisabled || id !== activeAskUserId}
           key={id}
           onSelect={onAnswer}
           request={request}
@@ -275,21 +283,19 @@ const MessageRow = ({
   );
 };
 
-export const MessageList = ({ historical, messages, onAnswer }: MessageListProps) => {
-  const data = useMemo(() => mergeMessages(historical, messages), [historical, messages]);
-  const lastMessage = data.at(-1);
-  const activeAskUserId =
-    lastMessage?.role === 'assistant' ? (lastMessage.askUsers.at(-1)?.id ?? null) : null;
+export const MessageList = ({ answerDisabled, messages, onAnswer }: MessageListProps) => {
+  const activeAskUserId = activeAskUserRequest(messages)?.id ?? null;
   return (
     <FlashList
       contentContainerStyle={styles.list}
-      data={data}
+      data={messages}
       keyExtractor={(message) => message.id}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       renderItem={({ item }) => (
         <MessageRow
           activeAskUserId={activeAskUserId}
+          answerDisabled={answerDisabled}
           message={item}
           onAnswer={onAnswer}
         />

@@ -22,6 +22,7 @@ type Attachment = UploadedAsset &
   Readonly<{ state: 'checking' | 'processing' | 'ready' | 'timeout' }>;
 
 type ChatComposerProps = Readonly<{
+  allowFreeText?: boolean;
   conversationId: string;
   loading: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
@@ -38,6 +39,7 @@ const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
 };
 
 export const ChatComposer = ({
+  allowFreeText = true,
   conversationId,
   loading,
   onSend,
@@ -396,6 +398,7 @@ export const ChatComposer = ({
     const currentAsset = draftReadyFor === conversationId ? asset : null;
     const trimmed = currentText.trim();
     if (
+      !allowFreeText ||
       (!trimmed && !currentAsset) ||
       !online ||
       loading ||
@@ -461,6 +464,7 @@ export const ChatComposer = ({
       }
     }
   }, [
+    allowFreeText,
     applyProcessingResult,
     asset,
     conversationId,
@@ -492,7 +496,8 @@ export const ChatComposer = ({
     !online ||
     uploading ||
     (!loading &&
-      (!draftReady ||
+      (!allowFreeText ||
+        !draftReady ||
         (!visibleText.trim() && !visibleAsset) ||
         Boolean(visibleAsset && visibleAsset.state !== 'ready')));
 
@@ -559,7 +564,7 @@ export const ChatComposer = ({
         <Pressable
           accessibilityLabel="이미지 첨부"
           accessibilityRole="button"
-          disabled={loading || uploading || !draftReady}
+          disabled={loading || uploading || !draftReady || !allowFreeText}
           hitSlop={4}
           onPress={() => void attach()}
           style={styles.iconButton}
@@ -570,7 +575,7 @@ export const ChatComposer = ({
         </Pressable>
         <TextInput
           accessibilityLabel="쇼핑 질문"
-          editable={!loading && draftReady}
+          editable={!loading && draftReady && allowFreeText}
           maxLength={2_000}
           multiline
           blurOnSubmit={false}
@@ -650,8 +655,10 @@ const styles = StyleSheet.create((theme, runtime) => ({
   },
   sendLabel: {
     color: theme.colors.primaryText,
+    fontFamily: 'monospace',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '400',
+    letterSpacing: 1.4,
   },
   pressed: { opacity: 0.72 },
   offline: {

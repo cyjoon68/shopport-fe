@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
-import type { AskUserRequest } from './ask-user';
+import type { AskUserRequest } from './types';
 
 type AskUserCardProps = Readonly<{
   disabled?: boolean;
@@ -57,11 +57,9 @@ export const AskUserCard = ({
           );
         })}
       </View>
-      {request.allowFreeText ? (
-        <Text allowFontScaling maxFontSizeMultiplier={3} style={styles.hint}>
-          직접 답해도 좋아요
-        </Text>
-      ) : null}
+      <Text allowFontScaling maxFontSizeMultiplier={3} style={styles.hint}>
+        {request.allowFreeText ? '직접 답해도 좋아요' : '선택지에서 답해 주세요'}
+      </Text>
       {failed ? (
         <Text
           accessibilityLiveRegion="polite"
