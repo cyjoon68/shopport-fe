@@ -12,6 +12,9 @@ import {
 } from '@/features/catalog/product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 import { messageIdentity } from './message-id';
+import { AskUserCard } from './ask-user-card';
+import { askUserArgsFromToolPart } from './ask-user';
+import type { AskUserRequest } from './ask-user';
 
 type HistoricalMessage = NonNullable<
   ConversationQuery['conversation']
@@ -20,6 +23,7 @@ type HistoricalMessage = NonNullable<
 type MessageListProps = Readonly<{
   historical: ReadonlyArray<HistoricalMessage>;
   messages: ReadonlyArray<UIMessage>;
+  onAnswer: (label: string) => Promise<void>;
 }>;
 
 type DisplayImage = Readonly<{
@@ -35,6 +39,7 @@ type DisplayTool = Readonly<{
 }>;
 
 export type DisplayMessage = Readonly<{
+  askUsers: ReadonlyArray<Readonly<{ id: string; request: AskUserRequest }>>;
   id: string;
   images: ReadonlyArray<DisplayImage>;
   products: ReadonlyArray<CachedProduct>;
@@ -82,6 +87,10 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
     }
   }
   return {
+    askUsers: message.parts.flatMap((part) => {
+      const request = askUserArgsFromToolPart(part);
+      return request && part.type === 'tool-call' ? [{ id: part.id, request }] : [];
+    }),
     id: messageIdentity('live', message.id),
     role: message.role === 'user' ? 'user' : 'assistant',
     status: tools.some(({ status }) => status === 'FAILED')
@@ -112,6 +121,20 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
 };
 
 export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessage => ({
+  askUsers: message.parts.flatMap((part) =>
+    part.__typename === 'AskUserMessagePart'
+      ? [
+          {
+            id: part.id,
+            request: {
+              allowFreeText: part.allowFreeText,
+              options: part.options,
+              question: part.question,
+            },
+          },
+        ]
+      : [],
+  ),
   id: messageIdentity('server', message.id),
   role: message.role === 'USER' ? 'user' : 'assistant',
   status: message.status,
@@ -151,6 +174,7 @@ const mergeDisplayMessage = (
   images: uniqueById([...historical.images, ...live.images]),
   products: uniqueById([...historical.products, ...live.products]),
   tools: uniqueById([...historical.tools, ...live.tools]),
+  askUsers: live.askUsers.length ? live.askUsers : historical.askUsers,
 });
 
 export const mergeMessages = (
@@ -178,7 +202,15 @@ const toolStatusLabel = (tool: DisplayTool): string => {
   return `${tool.name} 실행 중`;
 };
 
-const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
+const MessageRow = ({
+  activeAskUserId,
+  message,
+  onAnswer,
+}: Readonly<{
+  activeAskUserId: string | null;
+  message: DisplayMessage;
+  onAnswer: (label: string) => Promise<void>;
+}>) => {
   styles.useVariants({ role: message.role });
   return (
     <View
@@ -212,11 +244,21 @@ const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
           </Text>
         ),
       )}
-      {message.tools.map((tool) => (
-        <Text accessibilityLiveRegion="polite" key={tool.id} style={styles.partStatus}>
-          {toolStatusLabel(tool)}
-        </Text>
+      {message.askUsers.map(({ id, request }) => (
+        <AskUserCard
+          disabled={id !== activeAskUserId}
+          key={id}
+          onSelect={onAnswer}
+          request={request}
+        />
       ))}
+      {message.tools
+        .filter((tool) => !message.askUsers.some(({ id }) => id === tool.id))
+        .map((tool) => (
+          <Text accessibilityLiveRegion="polite" key={tool.id} style={styles.partStatus}>
+            {toolStatusLabel(tool)}
+          </Text>
+        ))}
       {message.products.length ? (
         <ScrollView
           accessibilityLabel="추천 상품"
@@ -233,8 +275,11 @@ const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
   );
 };
 
-export const MessageList = ({ historical, messages }: MessageListProps) => {
+export const MessageList = ({ historical, messages, onAnswer }: MessageListProps) => {
   const data = useMemo(() => mergeMessages(historical, messages), [historical, messages]);
+  const lastMessage = data.at(-1);
+  const activeAskUserId =
+    lastMessage?.role === 'assistant' ? (lastMessage.askUsers.at(-1)?.id ?? null) : null;
   return (
     <FlashList
       contentContainerStyle={styles.list}
@@ -242,13 +287,22 @@ export const MessageList = ({ historical, messages }: MessageListProps) => {
       keyExtractor={(message) => message.id}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      renderItem={({ item }) => <MessageRow message={item} />}
+      renderItem={({ item }) => (
+        <MessageRow
+          activeAskUserId={activeAskUserId}
+          message={item}
+          onAnswer={onAnswer}
+        />
+      )}
     />
   );
 };
 
 const styles = StyleSheet.create((theme) => ({
-  list: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md },
+  list: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
   row: {
     gap: theme.spacing.md,
     marginBottom: theme.spacing.lg,

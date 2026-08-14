@@ -20,7 +20,10 @@ import { useOnline } from '@/providers/network-provider';
 import { createStableChatMessageId } from './message-id';
 
 export const ConversationScreen = () => {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, send: initialSend } = useLocalSearchParams<{
+    id: string;
+    send?: string;
+  }>();
   const navigation = useNavigation();
   const { status } = useSession();
   const online = useOnline();
@@ -105,6 +108,7 @@ export const ConversationScreen = () => {
           <MessageList
             historical={data?.conversation?.messages ?? []}
             messages={chat.messages}
+            onAnswer={(label) => send(label, null)}
           />
         )}
         {errorPresentation ? (
@@ -118,6 +122,7 @@ export const ConversationScreen = () => {
           loading={chat.isLoading}
           onSend={send}
           onStop={stop}
+          sendInitialDraft={initialSend === '1'}
         />
       </View>
     </Screen>

@@ -36,8 +36,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: 'com.cyjoon68.shopport',
-      adaptiveIcon: { backgroundColor: '#F7F7F4' },
+      adaptiveIcon: { backgroundColor: '#1F2228' },
       predictiveBackGestureEnabled: true,
+      softwareKeyboardLayoutMode: 'resize',
     },
     plugins: [
       'expo-router',

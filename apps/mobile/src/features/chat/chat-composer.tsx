@@ -26,6 +26,7 @@ type ChatComposerProps = Readonly<{
   loading: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
   onStop: () => Promise<void>;
+  sendInitialDraft?: boolean;
 }>;
 
 const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
@@ -41,6 +42,7 @@ export const ChatComposer = ({
   loading,
   onSend,
   onStop,
+  sendInitialDraft = false,
 }: ChatComposerProps) => {
   const [text, setText] = useState('');
   const [asset, setAsset] = useState<Attachment | null>(null);
@@ -54,6 +56,7 @@ export const ChatComposer = ({
   const draftReadyRef = useRef<string | null>(null);
   const mountedRef = useRef(false);
   const lifecycleGenerationRef = useRef(0);
+  const initialDraftPendingRef = useRef(sendInitialDraft);
 
   const isCurrentConversation = useCallback(
     (id: string, version: number, generation = lifecycleGenerationRef.current): boolean =>
@@ -309,7 +312,7 @@ export const ChatComposer = ({
         return;
       }
       const next: Attachment = { ...uploaded, state: 'processing' };
-      await Haptics.selectionAsync();
+      if (Platform.OS === 'ios') await Haptics.selectionAsync();
       if (
         !isCurrentConversation(
           expectedConversationId,
@@ -384,7 +387,7 @@ export const ChatComposer = ({
     setAsset(null);
   };
 
-  const send = async (): Promise<void> => {
+  const send = useCallback(async (): Promise<void> => {
     const expectedConversationId = conversationId;
     const expectedVersion = conversationVersionRef.current;
     const expectedGeneration = lifecycleGenerationRef.current;
@@ -425,7 +428,8 @@ export const ChatComposer = ({
         )
       )
         return;
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS === 'ios')
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (
         !isCurrentConversation(
           expectedConversationId,
@@ -456,11 +460,41 @@ export const ChatComposer = ({
         );
       }
     }
-  };
+  }, [
+    applyProcessingResult,
+    asset,
+    conversationId,
+    draftReadyFor,
+    isCurrentConversation,
+    loading,
+    onSend,
+    online,
+    text,
+    uploading,
+    verifyAsset,
+  ]);
+
+  useEffect(() => {
+    if (
+      !initialDraftPendingRef.current ||
+      draftReadyFor !== conversationId ||
+      !text.trim()
+    )
+      return;
+    initialDraftPendingRef.current = false;
+    void send();
+  }, [conversationId, draftReadyFor, send, text]);
 
   const draftReady = draftReadyFor === conversationId;
   const visibleAsset = draftReady ? asset : null;
   const visibleText = draftReady ? text : '';
+  const sendDisabled =
+    !online ||
+    uploading ||
+    (!loading &&
+      (!draftReady ||
+        (!visibleText.trim() && !visibleAsset) ||
+        Boolean(visibleAsset && visibleAsset.state !== 'ready')));
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -526,11 +560,12 @@ export const ChatComposer = ({
           accessibilityLabel="이미지 첨부"
           accessibilityRole="button"
           disabled={loading || uploading || !draftReady}
+          hitSlop={4}
           onPress={() => void attach()}
           style={styles.iconButton}
         >
-          <Text allowFontScaling style={styles.iconLabel}>
-            {uploading ? '…' : '+'}
+          <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.iconLabel}>
+            {uploading ? '첨부 중' : '첨부'}
           </Text>
         </Pressable>
         <TextInput
@@ -538,9 +573,12 @@ export const ChatComposer = ({
           editable={!loading && draftReady}
           maxLength={2_000}
           multiline
+          blurOnSubmit={false}
           onChangeText={setText}
           placeholder="원하는 상품과 조건을 알려주세요"
           placeholderTextColor={styles.placeholder.color}
+          returnKeyType="default"
+          scrollEnabled
           style={styles.input}
           value={visibleText}
         />
@@ -548,18 +586,9 @@ export const ChatComposer = ({
           accessibilityLabel={loading ? '응답 중지' : '메시지 보내기'}
           accessibilityRole="button"
           accessibilityState={{
-            disabled:
-              !online ||
-              uploading ||
-              (!loading &&
-                (!draftReady || Boolean(visibleAsset && visibleAsset.state !== 'ready'))),
+            disabled: sendDisabled,
           }}
-          disabled={
-            !online ||
-            uploading ||
-            (!loading &&
-              (!draftReady || Boolean(visibleAsset && visibleAsset.state !== 'ready')))
-          }
+          disabled={sendDisabled}
           onPress={() => void (loading ? onStop() : send())}
           style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
         >
@@ -586,7 +615,7 @@ const styles = StyleSheet.create((theme, runtime) => ({
   input: {
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
-    borderRadius: theme.radii.lg,
+    borderRadius: theme.radii.sm,
     borderWidth: 1,
     color: theme.colors.text,
     flex: 1,
@@ -602,23 +631,28 @@ const styles = StyleSheet.create((theme, runtime) => ({
     alignItems: 'center',
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
-    borderRadius: 24,
+    borderRadius: theme.radii.sm,
     borderWidth: 1,
     height: 48,
     justifyContent: 'center',
-    width: 48,
+    minWidth: 48,
+    paddingHorizontal: theme.spacing.sm,
   },
-  iconLabel: { color: theme.colors.text, fontSize: 26, fontWeight: '400' },
+  iconLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '400' },
   sendButton: {
     alignItems: 'center',
     backgroundColor: theme.colors.primary,
-    borderRadius: 24,
+    borderRadius: theme.radii.sm,
     height: 48,
     justifyContent: 'center',
     minWidth: 60,
     paddingHorizontal: theme.spacing.md,
   },
-  sendLabel: { color: theme.colors.primaryText, fontSize: 14, fontWeight: '800' },
+  sendLabel: {
+    color: theme.colors.primaryText,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   pressed: { opacity: 0.72 },
   offline: {
     backgroundColor: theme.colors.surfaceMuted,
@@ -646,6 +680,10 @@ const styles = StyleSheet.create((theme, runtime) => ({
   removeLabel: { color: theme.colors.danger, fontSize: 14, fontWeight: '700' },
   assetStatus: { flex: 1, gap: theme.spacing.xs },
   statusLabel: { color: theme.colors.textMuted, fontSize: 13 },
-  retryButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  retryButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   retryLabel: { color: theme.colors.primary, fontSize: 14, fontWeight: '700' },
 }));

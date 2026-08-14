@@ -154,6 +154,28 @@ describe('chat composer conversation draft isolation', () => {
     });
   });
 
+  it('sends a draft passed from the new-chat composer once', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '조용한 무선 마우스 추천해줘',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => Promise.resolve());
+    render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
+  });
+
   it('ignores an out-of-order A read after switching to B', async () => {
     const draftA = deferred<DraftValue>();
     const draftB = deferred<DraftValue>();

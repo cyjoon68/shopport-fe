@@ -285,6 +285,17 @@ export type ConversationQuery = {
           createdAt: string;
           parts: Array<
             | {
+                __typename: 'AskUserMessagePart';
+                id: string;
+                question: string;
+                allowFreeText: boolean;
+                options: Array<{
+                  __typename: 'AskUserOption';
+                  id: string;
+                  label: string;
+                }>;
+              }
+            | {
                 __typename: 'ImageMessagePart';
                 id: string;
                 asset: {
@@ -1634,7 +1645,7 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
-  __meta__: { hash: '1a3087ec736590bb039f90e51a0b28aef3b7eb305d66507f2e782c53a627c7a7' },
+  __meta__: { hash: 'c1534fb75481215be8735816256dd9b2cc6eaba1ac5182420c84f7bd52177e19' },
   kind: 'Document',
   definitions: [
     {
@@ -1711,6 +1722,52 @@ export const ConversationDocument = {
                                   {
                                     kind: 'Field',
                                     name: { kind: 'Name', value: 'text' },
+                                  },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'InlineFragment',
+                              typeCondition: {
+                                kind: 'NamedType',
+                                name: { kind: 'Name', value: 'AskUserMessagePart' },
+                              },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: '__typename' },
+                                  },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'question' },
+                                  },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'options' },
+                                    selectionSet: {
+                                      kind: 'SelectionSet',
+                                      selections: [
+                                        {
+                                          kind: 'Field',
+                                          name: { kind: 'Name', value: '__typename' },
+                                        },
+                                        {
+                                          kind: 'Field',
+                                          name: { kind: 'Name', value: 'id' },
+                                        },
+                                        {
+                                          kind: 'Field',
+                                          name: { kind: 'Name', value: 'label' },
+                                        },
+                                      ],
+                                    },
+                                  },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'allowFreeText' },
                                   },
                                 ],
                               },

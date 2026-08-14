@@ -59,6 +59,12 @@ export const SettingsScreen = () => {
             한국 · KRW
           </Text>
         </View>
+        <ActionButton onPress={() => router.push('/favorites')} variant="secondary">
+          찜한 상품
+        </ActionButton>
+        <ActionButton onPress={() => router.push('/subscription')} variant="secondary">
+          구독 관리
+        </ActionButton>
         <ActionButton onPress={() => void logout()} variant="secondary">
           로그아웃
         </ActionButton>
