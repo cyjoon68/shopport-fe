@@ -13,14 +13,17 @@ import { useSession } from '@/features/auth/session-provider';
 import { environment } from '@/shared/config/environment';
 import { sqliteChatPersistence } from '@/shared/storage/database';
 import { ChatComposer } from './chat-composer';
-import { MessageList } from './message-list';
+import { activeAskUserRequest, mergeMessages, MessageList } from './message-list';
 import { cancelRunThenStop } from './chat-http';
 import { chatErrorPresentation } from './chat-errors';
 import { useOnline } from '@/providers/network-provider';
 import { createStableChatMessageId } from './message-id';
 
 export const ConversationScreen = () => {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, send: initialSend } = useLocalSearchParams<{
+    id: string;
+    send?: string;
+  }>();
   const navigation = useNavigation();
   const { status } = useSession();
   const online = useOnline();
@@ -52,6 +55,12 @@ export const ConversationScreen = () => {
   const summary = data?.conversation
     ? readFragment(ConversationSummaryFragmentDoc, data.conversation)
     : null;
+  const historicalMessages = data?.conversation?.messages;
+  const displayMessages = useMemo(
+    () => mergeMessages(historicalMessages ?? [], chat.messages),
+    [chat.messages, historicalMessages],
+  );
+  const activeAskUser = activeAskUserRequest(displayMessages);
 
   useEffect(() => {
     const title = summary?.title;
@@ -103,8 +112,9 @@ export const ConversationScreen = () => {
           </View>
         ) : (
           <MessageList
-            historical={data?.conversation?.messages ?? []}
-            messages={chat.messages}
+            answerDisabled={chat.isLoading}
+            messages={displayMessages}
+            onAnswer={(label) => send(label, null)}
           />
         )}
         {errorPresentation ? (
@@ -113,11 +123,13 @@ export const ConversationScreen = () => {
           </Text>
         ) : null}
         <ChatComposer
+          allowFreeText={activeAskUser?.request.allowFreeText ?? true}
           key={id}
           conversationId={id}
           loading={chat.isLoading}
           onSend={send}
           onStop={stop}
+          sendInitialDraft={initialSend === '1'}
         />
       </View>
     </Screen>

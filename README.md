@@ -27,7 +27,7 @@ pnpm exec eas build --profile development --platform android
 - `packages/storybook`: 개발 빌드 전용 on-device Storybook
 - `apps/mobile/schema.graphql`: backend canonical schema의 pinned snapshot
 
-앱 루트는 `expo-router/drawer`다. 768px 미만은 `front`, 이상은 `permanent` drawer를 사용하며 chat, product, compare는 중첩 native Stack이다.
+앱 루트와 chat, product, compare는 `expo-router` native Stack을 사용한다. 첫 화면 헤더에서 대화 기록과 설정으로 이동하고, 설정에서 찜과 구독 화면으로 이어진다.
 
 채팅 메시지 ID 계약은 GraphQL `Message.id`와 live/SQLite `UIMessage.id`가 동일한 canonical UUID를 사용하는 것이다. 새 사용자 메시지는 클라이언트 UUID를 전송하고, 서버는 client/stream UUID를 DB와 replay에 그대로 보존해야 한다. 앱은 canonical UUID만 server/live merge 키로 사용하며 legacy 로컬 ID는 source별로 격리한다.
 

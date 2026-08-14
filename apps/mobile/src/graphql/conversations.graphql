@@ -34,6 +34,15 @@ query Conversation($id: UUID!) {
           id
           text
         }
+        ... on AskUserMessagePart {
+          id
+          question
+          options {
+            id
+            label
+          }
+          allowFreeText
+        }
         ... on ImageMessagePart {
           id
           asset {

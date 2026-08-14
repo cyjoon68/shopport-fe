@@ -1,6 +1,10 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
-import { fromHistoricalMessage, mergeMessages } from './message-list';
+import {
+  activeAskUserRequest,
+  fromHistoricalMessage,
+  mergeMessages,
+} from './message-list';
 import {
   createStableChatMessageId,
   createUuidV7,
@@ -39,6 +43,16 @@ const historical = {
   parts: [
     { __typename: 'TextMessagePart', id: 'part-text', text: '추천 결과' },
     {
+      __typename: 'AskUserMessagePart',
+      id: 'part-question',
+      question: '예산은 어느 정도인가요?',
+      options: [
+        { id: 'under-3', label: '3만원 이하' },
+        { id: 'under-5', label: '5만원 이하' },
+      ],
+      allowFreeText: true,
+    },
+    {
       __typename: 'ImageMessagePart',
       id: 'part-image',
       asset: { id: 'asset-1', status: 'READY', url: 'https://example.com/image.jpg' },
@@ -55,21 +69,45 @@ const historical = {
 
 describe('historical message parts', () => {
   it('renders text, image, product reference and tool status models', () => {
-    expect(fromHistoricalMessage(historical)).toEqual(
-      expect.objectContaining({
-        text: '추천 결과',
-        images: [expect.objectContaining({ id: 'part-image', status: 'READY' })],
-        products: [expect.objectContaining({ id: 'product-1' })],
-        tools: [expect.objectContaining({ id: 'part-tool', status: 'COMPLETED' })],
-      }),
-    );
+    const message = fromHistoricalMessage(historical);
+    expect(message.text).toBe('추천 결과');
+    expect(message.askUsers[0]?.id).toBe('part-question');
+    expect(message.askUsers[0]?.request.question).toBe('예산은 어느 정도인가요?');
+    expect(message.images[0]?.id).toBe('part-image');
+    expect(message.images[0]?.status).toBe('READY');
+    expect(message.products[0]?.id).toBe('product-1');
+    expect(message.tools[0]?.id).toBe('part-tool');
+    expect(message.tools[0]?.status).toBe('COMPLETED');
+    expect(activeAskUserRequest([message])?.request.allowFreeText).toBe(true);
+    expect(
+      activeAskUserRequest([
+        message,
+        { ...message, askUsers: [], id: 'next-user', role: 'user' },
+      ]),
+    ).toBeNull();
   });
 
   it('deduplicates server and persisted live messages by stable ID', () => {
     const live: UIMessage = {
       id: '0198a122-0c00-7000-8000-000000000001',
       role: 'assistant',
-      parts: [{ type: 'text', content: '완료된 추천 결과' }],
+      parts: [
+        { type: 'text', content: '완료된 추천 결과' },
+        {
+          type: 'tool-call',
+          id: 'live-question',
+          name: 'askUser',
+          arguments: JSON.stringify({
+            question: '예산은 어느 정도인가요?',
+            options: [
+              { id: 'under-3', label: '3만원 이하' },
+              { id: 'under-5', label: '5만원 이하' },
+            ],
+            allowFreeText: true,
+          }),
+          state: 'input-complete',
+        },
+      ],
     };
     const merged = mergeMessages([historical], [live]);
     expect(merged).toHaveLength(1);
@@ -79,6 +117,8 @@ describe('historical message parts', () => {
         products: [expect.anything()],
       }),
     );
+    expect(merged[0]?.askUsers).toHaveLength(1);
+    expect(merged[0]?.askUsers[0]?.id).toBe('live-question');
   });
 
   it('requires canonical UUIDs for cross-source identity and isolates legacy IDs', () => {
