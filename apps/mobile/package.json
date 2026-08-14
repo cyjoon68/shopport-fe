@@ -9,6 +9,8 @@
     "export": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android",
     "start": "expo start --dev-client",
     "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true expo start --dev-client",
+    "storybook:ios": "EXPO_PUBLIC_STORYBOOK_ENABLED=true expo start --ios",
+    "ios": "expo run:ios",
     "test": "jest --runInBand",
     "test:integration": "jest --runInBand --testPathPatterns=integration",
     "test:storybook": "jest --runInBand --testPathPatterns=storybook",

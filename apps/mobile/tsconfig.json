@@ -11,6 +11,8 @@
     ".rnstorybook/**/*.ts",
     ".rnstorybook/**/*.tsx",
     "app.config.ts",
-    "codegen.ts"
+    "codegen.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
   ]
 }
