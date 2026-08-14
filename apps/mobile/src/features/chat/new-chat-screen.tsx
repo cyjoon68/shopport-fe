@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Redirect, router } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
@@ -23,6 +31,7 @@ export const NewChatScreen = () => {
   const online = useOnline();
   const [createConversation] = useMutation(CreateConversationDocument);
   const [loading, setLoading] = useState(false);
+  const [text, setText] = useState('');
   if (status === 'guest') return <Redirect href="/auth" />;
 
   const create = async (draft = ''): Promise<void> => {
@@ -46,8 +55,13 @@ export const NewChatScreen = () => {
         payload.conversation,
       );
       if (draft)
-        await saveDraft(conversation.id, { text: draft, assetId: null, assetUri: null });
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        await saveDraft(conversation.id, {
+          text: draft,
+          assetId: null,
+          assetUri: null,
+        });
+      if (Platform.OS === 'ios')
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       router.push({ pathname: '/chat/[id]', params: { id: conversation.id } });
     } finally {
       setLoading(false);
@@ -58,9 +72,9 @@ export const NewChatScreen = () => {
     <Screen testID="new-chat-screen">
       <View style={styles.root}>
         <View style={styles.heading}>
-          <SectionTitle>오늘은 무엇을 찾을까요?</SectionTitle>
+          <SectionTitle>무엇을 찾고 있나요?</SectionTitle>
           <Text allowFontScaling style={styles.description}>
-            원하는 조건을 말하면 가격, 배송, 재고를 같은 기준으로 비교합니다.
+            조건을 편하게 말해 주세요. 같이 좁혀볼게요.
           </Text>
         </View>
         <View accessibilityLabel="추천 질문" style={styles.suggestions}>
@@ -70,7 +84,10 @@ export const NewChatScreen = () => {
               disabled={loading || !online}
               key={suggestion}
               onPress={() => void create(suggestion)}
-              style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.suggestion,
+                pressed && styles.pressed,
+              ]}
             >
               <Text allowFontScaling style={styles.suggestionText}>
                 {suggestion}
@@ -78,10 +95,28 @@ export const NewChatScreen = () => {
             </Pressable>
           ))}
         </View>
-        <ActionButton disabled={loading || !online} onPress={() => void create()}>
-          {loading ? '대화 준비 중' : '새 대화 시작'}
-        </ActionButton>
-        {loading ? <ActivityIndicator accessibilityLabel="대화 준비 중" /> : null}
+        <View style={styles.composer}>
+          <TextInput
+            accessibilityLabel="쇼핑 질문"
+            editable={!loading}
+            maxLength={2_000}
+            multiline
+            onChangeText={setText}
+            placeholder="찾는 상품을 알려주세요"
+            placeholderTextColor={styles.placeholder.color}
+            style={styles.input}
+            value={text}
+          />
+          <ActionButton
+            disabled={loading || !online || !text.trim()}
+            onPress={() => void create(text.trim())}
+          >
+            {loading ? '준비 중' : '보내기'}
+          </ActionButton>
+        </View>
+        {loading ? (
+          <ActivityIndicator accessibilityLabel="대화 준비 중" />
+        ) : null}
       </View>
     </Screen>
   );
@@ -100,11 +135,31 @@ const styles = StyleSheet.create((theme) => ({
   suggestion: {
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
-    borderRadius: theme.radii.lg,
+    borderRadius: theme.radii.sm,
     borderWidth: 1,
     minHeight: 56,
     padding: theme.spacing.lg,
   },
   pressed: { opacity: 0.72 },
   suggestionText: { color: theme.colors.text, fontSize: 16, lineHeight: 23 },
+  composer: {
+    borderTopColor: theme.colors.border,
+    borderTopWidth: 1,
+    gap: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
+  },
+  input: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.sm,
+    borderWidth: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+    lineHeight: 24,
+    maxHeight: 144,
+    minHeight: 56,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  placeholder: { color: theme.colors.textMuted },
 }));

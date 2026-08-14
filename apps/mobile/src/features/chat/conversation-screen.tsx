@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
-import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
+import {
+  Redirect,
+  router,
+  useLocalSearchParams,
+  useNavigation,
+} from 'expo-router';
 import { xhrHttpStream, useChat } from '@tanstack/ai-react';
 import { useQuery } from '@apollo/client/react';
 import { StyleSheet } from 'react-native-unistyles';
@@ -58,7 +63,9 @@ export const ConversationScreen = () => {
     if (title) navigation.setOptions({ title });
   }, [navigation, summary?.title]);
 
-  const errorPresentation = chat.error ? chatErrorPresentation(chat.error) : null;
+  const errorPresentation = chat.error
+    ? chatErrorPresentation(chat.error)
+    : null;
 
   useEffect(() => {
     if (errorPresentation?.route) router.push(errorPresentation.route);
@@ -67,7 +74,10 @@ export const ConversationScreen = () => {
   if (status === 'guest') return <Redirect href="/auth" />;
   if (!id) return <Redirect href="/" />;
 
-  const send = async (text: string, nextAssetId: string | null): Promise<void> => {
+  const send = async (
+    text: string,
+    nextAssetId: string | null,
+  ): Promise<void> => {
     assetId.current = nextAssetId;
     try {
       await chat.sendMessage({
@@ -105,10 +115,15 @@ export const ConversationScreen = () => {
           <MessageList
             historical={data?.conversation?.messages ?? []}
             messages={chat.messages}
+            onAnswer={(label) => send(label, null)}
           />
         )}
         {errorPresentation ? (
-          <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.error}>
+          <Text
+            accessibilityLiveRegion="polite"
+            allowFontScaling
+            style={styles.error}
+          >
             {errorPresentation.message}
           </Text>
         ) : null}

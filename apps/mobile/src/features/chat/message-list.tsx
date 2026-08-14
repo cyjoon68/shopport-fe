@@ -12,6 +12,9 @@ import {
 } from '@/features/catalog/product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 import { messageIdentity } from './message-id';
+import { AskUserCard } from './ask-user-card';
+import { askUserArgsFromToolPart } from './ask-user';
+import type { AskUserRequest } from './ask-user';
 
 type HistoricalMessage = NonNullable<
   ConversationQuery['conversation']
@@ -20,6 +23,7 @@ type HistoricalMessage = NonNullable<
 type MessageListProps = Readonly<{
   historical: ReadonlyArray<HistoricalMessage>;
   messages: ReadonlyArray<UIMessage>;
+  onAnswer: (label: string) => Promise<void>;
 }>;
 
 type DisplayImage = Readonly<{
@@ -35,6 +39,7 @@ type DisplayTool = Readonly<{
 }>;
 
 export type DisplayMessage = Readonly<{
+  askUsers: ReadonlyArray<Readonly<{ id: string; request: AskUserRequest }>>;
   id: string;
   images: ReadonlyArray<DisplayImage>;
   products: ReadonlyArray<CachedProduct>;
@@ -46,9 +51,12 @@ export type DisplayMessage = Readonly<{
 
 const uniqueById = <T extends Readonly<{ id: string }>>(
   values: ReadonlyArray<T>,
-): Array<T> => Array.from(new Map(values.map((value) => [value.id, value])).values());
+): Array<T> =>
+  Array.from(new Map(values.map((value) => [value.id, value])).values());
 
-const imageUrl = (part: Extract<UIMessage['parts'][number], { type: 'image' }>) =>
+const imageUrl = (
+  part: Extract<UIMessage['parts'][number], { type: 'image' }>,
+) =>
   part.source.type === 'url'
     ? part.source.value
     : `data:${part.source.mimeType};base64,${part.source.value}`;
@@ -68,7 +76,10 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
               : 'STARTED',
       });
     }
-    if (part.type === 'tool-result' && !tools.some(({ id }) => id === part.toolCallId)) {
+    if (
+      part.type === 'tool-result' &&
+      !tools.some(({ id }) => id === part.toolCallId)
+    ) {
       tools.push({
         id: part.toolCallId,
         name: '상품 검색',
@@ -82,6 +93,12 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
     }
   }
   return {
+    askUsers: message.parts.flatMap((part) => {
+      const request = askUserArgsFromToolPart(part);
+      return request && part.type === 'tool-call'
+        ? [{ id: part.id, request }]
+        : [];
+    }),
     id: messageIdentity('live', message.id),
     role: message.role === 'user' ? 'user' : 'assistant',
     status: tools.some(({ status }) => status === 'FAILED')
@@ -111,12 +128,17 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
   };
 };
 
-export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessage => ({
+export const fromHistoricalMessage = (
+  message: HistoricalMessage,
+): DisplayMessage => ({
+  askUsers: [],
   id: messageIdentity('server', message.id),
   role: message.role === 'USER' ? 'user' : 'assistant',
   status: message.status,
   text: message.parts
-    .flatMap((part) => (part.__typename === 'TextMessagePart' ? [part.text] : []))
+    .flatMap((part) =>
+      part.__typename === 'TextMessagePart' ? [part.text] : [],
+    )
     .join(''),
   images: message.parts.flatMap((part) =>
     part.__typename === 'ImageMessagePart'
@@ -151,6 +173,7 @@ const mergeDisplayMessage = (
   images: uniqueById([...historical.images, ...live.images]),
   products: uniqueById([...historical.products, ...live.products]),
   tools: uniqueById([...historical.tools, ...live.tools]),
+  askUsers: uniqueById([...historical.askUsers, ...live.askUsers]),
 });
 
 export const mergeMessages = (
@@ -158,7 +181,9 @@ export const mergeMessages = (
   live: ReadonlyArray<UIMessage>,
 ): Array<DisplayMessage> => {
   const merged = historical.map(fromHistoricalMessage);
-  const positions = new Map(merged.map((message, index) => [message.id, index]));
+  const positions = new Map(
+    merged.map((message, index) => [message.id, index]),
+  );
   for (const message of live.map(fromLiveMessage)) {
     const position = positions.get(message.id);
     if (position === undefined) {
@@ -178,11 +203,19 @@ const toolStatusLabel = (tool: DisplayTool): string => {
   return `${tool.name} 실행 중`;
 };
 
-const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
+const MessageRow = ({
+  message,
+  onAnswer,
+}: Readonly<{
+  message: DisplayMessage;
+  onAnswer: (label: string) => Promise<void>;
+}>) => {
   styles.useVariants({ role: message.role });
   return (
     <View
-      accessibilityLabel={message.role === 'user' ? '내 메시지' : 'Shopport 답변'}
+      accessibilityLabel={
+        message.role === 'user' ? '내 메시지' : 'Shopport 답변'
+      }
       style={styles.row}
     >
       {message.text ? (
@@ -207,16 +240,31 @@ const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
             style={styles.image}
           />
         ) : (
-          <Text accessibilityLiveRegion="polite" key={image.id} style={styles.partStatus}>
-            {image.status === 'REJECTED' ? '이미지 처리 실패' : '이미지 처리 중'}
+          <Text
+            accessibilityLiveRegion="polite"
+            key={image.id}
+            style={styles.partStatus}
+          >
+            {image.status === 'REJECTED'
+              ? '이미지 처리 실패'
+              : '이미지 처리 중'}
           </Text>
         ),
       )}
-      {message.tools.map((tool) => (
-        <Text accessibilityLiveRegion="polite" key={tool.id} style={styles.partStatus}>
-          {toolStatusLabel(tool)}
-        </Text>
+      {message.askUsers.map(({ id, request }) => (
+        <AskUserCard key={id} onSelect={onAnswer} request={request} />
       ))}
+      {message.tools
+        .filter((tool) => !message.askUsers.some(({ id }) => id === tool.id))
+        .map((tool) => (
+          <Text
+            accessibilityLiveRegion="polite"
+            key={tool.id}
+            style={styles.partStatus}
+          >
+            {toolStatusLabel(tool)}
+          </Text>
+        ))}
       {message.products.length ? (
         <ScrollView
           accessibilityLabel="추천 상품"
@@ -233,8 +281,15 @@ const MessageRow = ({ message }: Readonly<{ message: DisplayMessage }>) => {
   );
 };
 
-export const MessageList = ({ historical, messages }: MessageListProps) => {
-  const data = useMemo(() => mergeMessages(historical, messages), [historical, messages]);
+export const MessageList = ({
+  historical,
+  messages,
+  onAnswer,
+}: MessageListProps) => {
+  const data = useMemo(
+    () => mergeMessages(historical, messages),
+    [historical, messages],
+  );
   return (
     <FlashList
       contentContainerStyle={styles.list}
@@ -242,13 +297,18 @@ export const MessageList = ({ historical, messages }: MessageListProps) => {
       keyExtractor={(message) => message.id}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      renderItem={({ item }) => <MessageRow message={item} />}
+      renderItem={({ item }) => (
+        <MessageRow message={item} onAnswer={onAnswer} />
+      )}
     />
   );
 };
 
 const styles = StyleSheet.create((theme) => ({
-  list: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md },
+  list: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
   row: {
     gap: theme.spacing.md,
     marginBottom: theme.spacing.lg,

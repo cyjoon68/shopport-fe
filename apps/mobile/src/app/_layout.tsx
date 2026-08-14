@@ -1,89 +1,92 @@
 import 'react-native-gesture-handler';
 import '@/theme/unistyles';
 import '@/shared/observability/sentry';
-import { useWindowDimensions } from 'react-native';
-import { Drawer, DrawerToggleButton } from 'expo-router/drawer';
+import { Pressable, Text } from 'react-native';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { AppProviders } from '@/providers/app-providers';
-import { environment } from '@/shared/config/environment';
+import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
 
-const RootDrawer = () => {
-  const { width } = useWindowDimensions();
+const HeaderAction = ({
+  label,
+  route,
+}: Readonly<{ label: string; route: '/history' | '/settings' }>) => (
+  <Pressable
+    accessibilityLabel={`${label} 화면 열기`}
+    accessibilityRole="button"
+    hitSlop={8}
+    onPress={() => router.push(route)}
+    style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}
+  >
+    <Text
+      allowFontScaling
+      maxFontSizeMultiplier={2}
+      style={styles.headerActionLabel}
+    >
+      {label}
+    </Text>
+  </Pressable>
+);
+
+const RootStack = () => {
+  const reducedMotion = useReducedMotion();
   const { theme } = useUnistyles();
-  const tablet = width >= 768;
-  const hiddenOptions = { drawerItemStyle: styles.hidden } as const;
   return (
     <>
       <StatusBar style="auto" />
-      <Drawer
+      <Stack
         screenOptions={{
-          drawerActiveTintColor: theme.colors.primary,
-          drawerInactiveTintColor: theme.colors.textMuted,
-          drawerStyle: styles.drawer,
-          drawerType: tablet ? 'permanent' : 'front',
+          animation: reducedMotion ? 'none' : 'default',
+          contentStyle: styles.content,
+          headerBackButtonDisplayMode: 'minimal',
           headerStyle: styles.header,
           headerTintColor: theme.colors.text,
-          headerLeft: tablet
-            ? () => null
-            : (props) => (
-                <DrawerToggleButton
-                  {...props}
-                  accessibilityLabel="내비게이션 메뉴 열기"
-                />
-              ),
-          overlayAccessibilityLabel: '내비게이션 메뉴 닫기',
-          sceneStyle: styles.scene,
-          swipeEnabled: !tablet,
         }}
       >
-        <Drawer.Screen
+        <Stack.Screen
           name="index"
-          options={{ drawerLabel: '새 대화', title: '새 대화' }}
-        />
-        <Drawer.Screen
-          name="history"
-          options={{ drawerLabel: '대화 기록', title: '대화 기록' }}
-        />
-        <Drawer.Screen name="favorites" options={{ drawerLabel: '찜', title: '찜' }} />
-        <Drawer.Screen
-          name="subscription"
-          options={{ drawerLabel: '구독', title: '구독' }}
-        />
-        <Drawer.Screen name="settings" options={{ drawerLabel: '설정', title: '설정' }} />
-        <Drawer.Screen
-          name="auth"
-          options={{ ...hiddenOptions, headerShown: false, swipeEnabled: false }}
-        />
-        <Drawer.Screen name="chat" options={hiddenOptions} />
-        <Drawer.Screen name="product" options={hiddenOptions} />
-        <Drawer.Screen name="compare" options={hiddenOptions} />
-        <Drawer.Screen
-          name="storybook"
           options={{
-            ...hiddenOptions,
-            ...(environment.storybookEnabled
-              ? { drawerItemStyle: styles.storybookItem, title: 'Storybook' }
-              : {}),
+            headerRight: () => <HeaderAction label="기록" route="/history" />,
+            title: 'Shopport',
           }}
         />
-      </Drawer>
+        <Stack.Screen name="history" options={{ title: '대화 기록' }} />
+        <Stack.Screen name="favorites" options={{ title: '찜한 상품' }} />
+        <Stack.Screen name="settings" options={{ title: '설정' }} />
+        <Stack.Screen
+          name="subscription"
+          options={{ presentation: 'formSheet', title: '구독' }}
+        />
+        <Stack.Screen
+          name="auth"
+          options={{ headerShown: false, presentation: 'modal' }}
+        />
+        <Stack.Screen name="chat" options={{ headerShown: false }} />
+        <Stack.Screen name="product" options={{ headerShown: false }} />
+        <Stack.Screen name="compare" options={{ headerShown: false }} />
+        <Stack.Screen name="storybook" options={{ headerShown: false }} />
+      </Stack>
     </>
   );
 };
 
 const RootLayout = () => (
   <AppProviders>
-    <RootDrawer />
+    <RootStack />
   </AppProviders>
 );
 
 export default RootLayout;
 
 const styles = StyleSheet.create((theme) => ({
-  drawer: { backgroundColor: theme.colors.surface, width: 296 },
+  content: { backgroundColor: theme.colors.background },
   header: { backgroundColor: theme.colors.background },
-  scene: { backgroundColor: theme.colors.background },
-  hidden: { display: 'none' },
-  storybookItem: { display: 'flex' },
+  headerAction: {
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  headerActionLabel: { color: theme.colors.text, fontSize: 15 },
+  pressed: { opacity: 0.5 },
 }));

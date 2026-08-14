@@ -14,7 +14,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     environmentValue('EAS_BUILD_PROFILE') === 'production' &&
     kakaoNativeAppKey.startsWith('development-')
   ) {
-    throw new Error('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for production');
+    throw new Error(
+      'EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for production',
+    );
   }
   return {
     ...config,
@@ -36,8 +38,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: 'com.cyjoon68.shopport',
-      adaptiveIcon: { backgroundColor: '#F7F7F4' },
+      adaptiveIcon: { backgroundColor: '#1F2228' },
       predictiveBackGestureEnabled: true,
+      softwareKeyboardLayoutMode: 'resize',
     },
     plugins: [
       'expo-router',
@@ -56,7 +59,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           ios: { deploymentTarget: '16.4' },
           android: {
             minSdkVersion: 24,
-            extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
+            extraMavenRepos: [
+              'https://devrepo.kakao.com/nexus/content/groups/public/',
+            ],
           },
         },
       ],
@@ -71,16 +76,23 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ],
     experiments: { typedRoutes: true },
     extra: {
-      apiUrl: environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:4000',
-      appleAndroidClientId: environmentValue('EXPO_PUBLIC_APPLE_ANDROID_CLIENT_ID') ?? '',
+      apiUrl:
+        environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:4000',
+      appleAndroidClientId:
+        environmentValue('EXPO_PUBLIC_APPLE_ANDROID_CLIENT_ID') ?? '',
       appleAndroidRedirectUri:
         environmentValue('EXPO_PUBLIC_APPLE_ANDROID_REDIRECT_URI') ?? '',
-      revenueCatAppleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_APPLE_KEY') ?? '',
-      revenueCatGoogleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY') ?? '',
+      revenueCatAppleKey:
+        environmentValue('EXPO_PUBLIC_REVENUECAT_APPLE_KEY') ?? '',
+      revenueCatGoogleKey:
+        environmentValue('EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY') ?? '',
       sentryDsn: environmentValue('EXPO_PUBLIC_SENTRY_DSN') ?? '',
-      storybookEnabled: environmentValue('EXPO_PUBLIC_STORYBOOK_ENABLED') === 'true',
+      storybookEnabled:
+        environmentValue('EXPO_PUBLIC_STORYBOOK_ENABLED') === 'true',
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
-    ...(easProjectId ? { updates: { url: `https://u.expo.dev/${easProjectId}` } } : {}),
+    ...(easProjectId
+      ? { updates: { url: `https://u.expo.dev/${easProjectId}` } }
+      : {}),
   };
 };
