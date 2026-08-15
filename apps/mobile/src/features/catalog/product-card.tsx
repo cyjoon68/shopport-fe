@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import type { CachedProduct } from '@/shared/storage/database';
 import { cacheProducts } from '@/shared/storage/database';
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
+import { GlassButton } from '@/shared/ui/glass-button';
 import { useCompare } from './compare-provider';
 import { formatMoney } from './product-model';
 
@@ -83,9 +84,8 @@ export const ProductCard = ({ compact = false, product }: ProductCardProps) => {
       accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
       style={styles.card}
     >
-      <Pressable
+      <GlassButton
         accessibilityHint="상품 상세를 엽니다"
-        accessibilityRole="button"
         onPress={() =>
           router.push({ pathname: '/product/[id]', params: { id: product.id } })
         }
@@ -97,7 +97,7 @@ export const ProductCard = ({ compact = false, product }: ProductCardProps) => {
           style={styles.image}
           transition={reducedMotion ? 0 : 150}
         />
-      </Pressable>
+      </GlassButton>
       <View style={styles.body}>
         <Text
           allowFontScaling
@@ -118,24 +118,24 @@ export const ProductCard = ({ compact = false, product }: ProductCardProps) => {
           {product.isInStock ? '구매 가능' : '품절'}
         </Text>
         <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
+          <GlassButton
+            fallbackStyle={styles.smallButtonFallback}
             onPress={() => void toggleSaved()}
             style={styles.smallButton}
           >
             <Text allowFontScaling style={styles.smallButtonLabel}>
               {saved ? '찜 해제' : '찜'}
             </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
+          </GlassButton>
+          <GlassButton
+            fallbackStyle={styles.smallButtonFallback}
             onPress={addToCompare}
             style={styles.smallButton}
           >
             <Text allowFontScaling style={styles.smallButtonLabel}>
               비교
             </Text>
-          </Pressable>
+          </GlassButton>
         </View>
       </View>
     </View>
@@ -170,12 +170,12 @@ const styles = StyleSheet.create((theme) => ({
   actions: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.xs },
   smallButton: {
     alignItems: 'center',
-    borderColor: theme.colors.border,
+    borderCurve: 'continuous',
     borderRadius: theme.radii.pill,
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: theme.spacing.lg,
   },
+  smallButtonFallback: { borderColor: theme.colors.border, borderWidth: 1 },
   smallButtonLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
 }));

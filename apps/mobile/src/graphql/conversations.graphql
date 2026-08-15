@@ -67,6 +67,57 @@ query Conversation($id: UUID!) {
   }
 }
 
+query FoundProducts($first: Int!, $after: String) {
+  conversations(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        messages {
+          parts {
+            __typename
+            ... on ProductReferenceMessagePart {
+              id
+              product {
+                ...ProductCard
+              }
+            }
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query UploadedImages($first: Int!, $after: String) {
+  conversations(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        messages {
+          parts {
+            __typename
+            ... on ImageMessagePart {
+              id
+              asset {
+                id
+                url
+              }
+            }
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
 mutation CreateConversation($input: CreateConversationInput!) {
   createConversation(input: $input) {
     conversation {

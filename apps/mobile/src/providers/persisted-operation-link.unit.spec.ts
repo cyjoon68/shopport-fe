@@ -11,12 +11,14 @@ import {
   DeleteAssetDocument,
   DeleteConversationDocument,
   DeleteViewerAccountDocument,
+  FoundProductsDocument,
   ProductDocument,
   RenameConversationDocument,
   SaveProductDocument,
   SavedProductsDocument,
   SearchProductsDocument,
   UnsaveProductDocument,
+  UploadedImagesDocument,
   ViewerDocument,
 } from '@/graphql/generated/graphql';
 import {
@@ -38,6 +40,8 @@ const operationDocuments = [
   UnsaveProductDocument,
   ConversationsDocument,
   ConversationDocument,
+  FoundProductsDocument,
+  UploadedImagesDocument,
   CreateConversationDocument,
   RenameConversationDocument,
   DeleteConversationDocument,

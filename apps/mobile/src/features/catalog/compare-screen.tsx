@@ -1,8 +1,9 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { EmptyState, Screen } from '@shopport/ui';
 import { useSession } from '@/features/auth/session-provider';
+import { GlassButton } from '@/shared/ui/glass-button';
 import { useCompare } from './compare-provider';
 import { formatMoney } from './product-model';
 
@@ -26,11 +27,11 @@ export const CompareScreen = () => {
         <Text allowFontScaling style={styles.count}>
           {products.length}/4개 비교
         </Text>
-        <Pressable accessibilityRole="button" onPress={clear} style={styles.clearButton}>
+        <GlassButton onPress={clear} style={styles.clearButton}>
           <Text allowFontScaling style={styles.clearLabel}>
             모두 지우기
           </Text>
-        </Pressable>
+        </GlassButton>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={styles.table}>
@@ -63,16 +64,15 @@ export const CompareScreen = () => {
               <Text allowFontScaling style={styles.cell}>
                 {product.isAffiliate ? '제휴 링크' : '일반 링크'}
               </Text>
-              <Pressable
+              <GlassButton
                 accessibilityLabel={`${product.title} 비교에서 제거`}
-                accessibilityRole="button"
                 onPress={() => remove(product.id)}
                 style={styles.removeButton}
               >
                 <Text allowFontScaling style={styles.removeLabel}>
                   비교에서 제거
                 </Text>
-              </Pressable>
+              </GlassButton>
             </View>
           ))}
         </View>

@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Text, View } from 'react-native';
 import Purchases from 'react-native-purchases';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { useQuery } from '@apollo/client/react';
-import { ActionButton, Screen, SectionTitle } from '@shopport/ui';
+import { Screen, SectionTitle } from '@shopport/ui';
 import { ViewerDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { configureRevenueCat } from './revenuecat';
 import { syncViewerEntitlement } from './subscription-sync';
 import { useOnline } from '@/providers/network-provider';
+import { GlassActionButton, GlassButton } from '@/shared/ui/glass-button';
 
 const productIds = new Set(['shopport_pro_monthly', 'shopport_pro_annual']);
 
@@ -135,13 +136,13 @@ export const SubscriptionScreen = () => {
         ) : null}
         <View style={styles.packages}>
           {packages.map((item) => (
-            <Pressable
+            <GlassButton
               accessibilityLabel={`${item.product.title}, ${item.product.priceString}`}
-              accessibilityRole="button"
               disabled={syncing || !online}
+              fallbackStyle={styles.packageFallback}
               key={item.identifier}
               onPress={() => void purchase(item)}
-              style={({ pressed }) => [styles.package, pressed && styles.pressed]}
+              style={styles.package}
             >
               <Text allowFontScaling style={styles.packageTitle}>
                 {item.product.title}
@@ -149,24 +150,24 @@ export const SubscriptionScreen = () => {
               <Text allowFontScaling style={styles.price}>
                 {item.product.priceString}
               </Text>
-            </Pressable>
+            </GlassButton>
           ))}
         </View>
         {configured ? (
-          <ActionButton
+          <GlassActionButton
             disabled={syncing || !online}
             onPress={() => void restore()}
             variant="secondary"
           >
             구매 복원
-          </ActionButton>
+          </GlassActionButton>
         ) : null}
         {viewer?.entitlement.key === 'pro' &&
         viewer.entitlement.isActive &&
         configured ? (
-          <ActionButton onPress={() => void manage()} variant="secondary">
+          <GlassActionButton onPress={() => void manage()} variant="secondary">
             구독 관리·해지
-          </ActionButton>
+          </GlassActionButton>
         ) : null}
         <Text allowFontScaling style={styles.footnote}>
           무료 체험은 첫 로그인부터 168시간이며 결제수단이 필요 없습니다. 스토어 가격이
@@ -192,15 +193,16 @@ const styles = StyleSheet.create((theme) => ({
   },
   packages: { gap: theme.spacing.md },
   package: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
     borderRadius: theme.radii.md,
-    borderWidth: 1,
     gap: theme.spacing.sm,
     minHeight: 88,
     padding: theme.spacing.lg,
   },
-  pressed: { opacity: 0.72 },
+  packageFallback: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+  },
   packageTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '800' },
   price: { color: theme.colors.primary, fontSize: 22, fontWeight: '900' },
   footnote: { color: theme.colors.textMuted, fontSize: 13, lineHeight: 20 },

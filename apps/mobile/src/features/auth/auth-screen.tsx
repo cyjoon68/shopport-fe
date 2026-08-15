@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
-import { ActionButton, Screen } from '@shopport/ui';
+import { Screen } from '@shopport/ui';
+import { GlassActionButton } from '@/shared/ui/glass-button';
 import { useSession } from './session-provider';
 
 export const AuthScreen = () => {
@@ -30,22 +31,19 @@ export const AuthScreen = () => {
           <Text accessibilityRole="header" allowFontScaling style={styles.brand}>
             Shopport
           </Text>
-          <Text allowFontScaling style={styles.title}>
-            무엇을 살지, 대화로 찾으세요
-          </Text>
-          <Text allowFontScaling style={styles.description}>
-            여러 쇼핑몰의 승인된 상품 정보를 한곳에서 비교합니다.
+          <Text allowFontScaling style={styles.subtitle}>
+            나만의 쇼핑 에이전트
           </Text>
         </View>
         <View style={styles.actions}>
-          <ActionButton disabled={busy} onPress={() => void run()} variant="kakao">
-            카카오로 시작하기
-          </ActionButton>
           {error ? (
             <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.error}>
               {error}
             </Text>
           ) : null}
+          <GlassActionButton disabled={busy} onPress={() => void run()} variant="kakao">
+            카카오로 시작하기
+          </GlassActionButton>
         </View>
         <Text allowFontScaling style={styles.terms}>
           계속하면 개인정보처리방침과 서비스 약관에 동의한 것으로 간주합니다.
@@ -58,21 +56,23 @@ export const AuthScreen = () => {
 const styles = StyleSheet.create((theme) => ({
   root: {
     flex: 1,
-    gap: theme.spacing.xxl,
-    padding: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.xxl,
   },
   loading: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  hero: { gap: theme.spacing.md, marginTop: 64 },
-  brand: { color: theme.colors.primary, fontSize: 18, fontWeight: '800' },
-  title: {
-    color: theme.colors.text,
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: -1.2,
-    lineHeight: 44,
+  hero: {
+    alignItems: 'center',
+    flex: 1,
+    gap: theme.spacing.md,
+    justifyContent: 'center',
   },
-  description: { color: theme.colors.textMuted, fontSize: 17, lineHeight: 26 },
+  brand: {
+    color: theme.colors.primary,
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -2,
+  },
+  subtitle: { color: theme.colors.textMuted, fontSize: 18, lineHeight: 26 },
   actions: { gap: theme.spacing.md },
   error: {
     color: theme.colors.danger,
@@ -84,7 +84,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 'auto',
+    marginTop: 20,
     textAlign: 'center',
   },
 }));

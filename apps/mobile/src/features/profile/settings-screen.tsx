@@ -2,10 +2,11 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { useMutation, useQuery } from '@apollo/client/react';
-import { ActionButton, Screen, SectionTitle } from '@shopport/ui';
+import { Screen, SectionTitle } from '@shopport/ui';
 import { DeleteViewerAccountDocument, ViewerDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
+import { GlassActionButton } from '@/shared/ui/glass-button';
 
 export const SettingsScreen = () => {
   const { logout, status } = useSession();
@@ -59,15 +60,15 @@ export const SettingsScreen = () => {
             한국 · KRW
           </Text>
         </View>
-        <ActionButton onPress={() => router.push('/favorites')} variant="secondary">
+        <GlassActionButton onPress={() => router.push('/favorites')} variant="secondary">
           찜한 상품
-        </ActionButton>
-        <ActionButton onPress={() => router.push('/subscription')} variant="secondary">
+        </GlassActionButton>
+        <GlassActionButton onPress={() => router.push('/subscription')} variant="secondary">
           구독 관리
-        </ActionButton>
-        <ActionButton onPress={() => void logout()} variant="secondary">
+        </GlassActionButton>
+        <GlassActionButton onPress={() => void logout()} variant="secondary">
           로그아웃
-        </ActionButton>
+        </GlassActionButton>
         <View style={styles.privacy}>
           <Text accessibilityRole="header" allowFontScaling style={styles.privacyTitle}>
             데이터 보관
@@ -77,9 +78,9 @@ export const SettingsScreen = () => {
             제거됩니다.
           </Text>
         </View>
-        <ActionButton onPress={confirmDelete} variant="danger">
+        <GlassActionButton onPress={confirmDelete} variant="danger">
           계정 삭제
-        </ActionButton>
+        </GlassActionButton>
       </ScrollView>
     </Screen>
   );

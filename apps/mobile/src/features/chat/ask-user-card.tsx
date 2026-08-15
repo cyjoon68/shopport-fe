@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { GlassButton } from '@/shared/ui/glass-button';
 import type { AskUserRequest } from './types';
 
 type AskUserCardProps = Readonly<{
@@ -14,6 +15,7 @@ export const AskUserCard = ({
   onSelect,
   request,
 }: AskUserCardProps) => {
+  const { theme } = useUnistyles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const select = async (id: string, label: string): Promise<void> => {
@@ -37,23 +39,19 @@ export const AskUserCard = ({
           const optionDisabled = disabled || selectedId !== null;
           const selected = selectedId === option.id;
           return (
-            <Pressable
-              accessibilityRole="button"
+            <GlassButton
               accessibilityState={{ disabled: optionDisabled, selected }}
               disabled={optionDisabled}
+              fallbackStyle={[styles.optionFallback, selected && styles.selectedFallback]}
               key={option.id}
               onPress={() => void select(option.id, option.label)}
-              style={({ pressed }) => [
-                styles.option,
-                selected && styles.selected,
-                optionDisabled && styles.disabled,
-                pressed && styles.pressed,
-              ]}
+              style={styles.option}
+              tintColor={selected ? theme.colors.surfaceMuted : undefined}
             >
               <Text allowFontScaling maxFontSizeMultiplier={3} style={styles.optionLabel}>
                 {option.label}
               </Text>
-            </Pressable>
+            </GlassButton>
           );
         })}
       </View>
@@ -86,20 +84,17 @@ const styles = StyleSheet.create((theme) => ({
   question: { color: theme.colors.text, fontSize: 16, lineHeight: 24 },
   options: { gap: theme.spacing.sm },
   option: {
-    borderColor: theme.colors.border,
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
   },
-  selected: {
+  optionFallback: { borderColor: theme.colors.border, borderWidth: 1 },
+  selectedFallback: {
     backgroundColor: theme.colors.surfaceMuted,
     borderColor: theme.colors.text,
   },
-  disabled: { opacity: 0.6 },
   optionLabel: { color: theme.colors.text, fontSize: 16, lineHeight: 24 },
   hint: { color: theme.colors.textMuted, fontSize: 14, lineHeight: 21 },
   error: { color: theme.colors.danger, fontSize: 14, lineHeight: 21 },
-  pressed: { opacity: 0.5 },
 }));

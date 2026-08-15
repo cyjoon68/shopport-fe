@@ -3,7 +3,7 @@ import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { useQuery } from '@apollo/client/react';
-import { ActionButton, EmptyState, Screen, SectionTitle } from '@shopport/ui';
+import { EmptyState, Screen, SectionTitle } from '@shopport/ui';
 import { ProductDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { ProductCard } from './product-card';
@@ -12,6 +12,7 @@ import { useOnline } from '@/providers/network-provider';
 import { cacheProducts, readCachedProduct } from '@/shared/storage/database';
 import type { CachedProduct } from '@/shared/storage/database';
 import { productForRoute } from './product-route';
+import { GlassActionButton } from '@/shared/ui/glass-button';
 
 export { productForRoute } from './product-route';
 
@@ -116,12 +117,12 @@ export const ProductDetailScreen = () => {
               : '제휴 수수료가 없는 링크입니다.'}
           </Text>
         </View>
-        <ActionButton
+        <GlassActionButton
           disabled={!online || !product.isInStock}
           onPress={() => void open()}
         >
           {product.isInStock ? `${product.providerName}에서 구매하기` : '현재 품절'}
-        </ActionButton>
+        </GlassActionButton>
       </ScrollView>
     </Screen>
   );

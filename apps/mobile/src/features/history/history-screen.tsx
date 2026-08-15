@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Text, TextInput, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Redirect, router } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
@@ -19,11 +19,13 @@ import {
   sqliteChatPersistence,
 } from '@/shared/storage/database';
 import type { CachedConversation } from '@/shared/storage/database';
+import { GlassButton } from '@/shared/ui/glass-button';
 
 export const HistoryScreen = () => {
   const { status } = useSession();
   const online = useOnline();
   const [cached, setCached] = useState<Array<CachedConversation>>([]);
+  const [query, setQuery] = useState('');
   const { data, fetchMore, refetch } = useQuery(ConversationsDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
@@ -49,6 +51,10 @@ export const HistoryScreen = () => {
   }, [conversations]);
 
   if (status === 'guest') return <Redirect href="/auth" />;
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleConversations = (conversations ?? cached).filter(({ title }) =>
+    normalizedQuery ? title.toLowerCase().includes(normalizedQuery) : true,
+  );
   const remove = (conversation: CachedConversation): void => {
     if (!online) {
       Alert.alert('오프라인', '대화 삭제는 온라인에서 할 수 있습니다.');
@@ -87,14 +93,26 @@ export const HistoryScreen = () => {
           오프라인 캐시
         </Text>
       ) : null}
+      <TextInput
+        accessibilityLabel="대화 기록 검색"
+        onChangeText={setQuery}
+        placeholder="대화 기록 검색"
+        placeholderTextColor={styles.placeholder.color}
+        style={styles.search}
+        value={query}
+      />
       <FlashList
         contentContainerStyle={styles.list}
-        data={conversations ?? cached}
+        data={visibleConversations}
         keyExtractor={({ id }) => id}
         ListEmptyComponent={
           <EmptyState
-            description="새 대화를 시작하면 여기에 저장됩니다."
-            title="대화 기록이 없습니다"
+            description={
+              normalizedQuery
+                ? '다른 검색어로 다시 찾아보세요.'
+                : '새 대화를 시작하면 여기에 저장됩니다.'
+            }
+            title={normalizedQuery ? '검색 결과가 없습니다' : '대화 기록이 없습니다'}
           />
         }
         onEndReached={() => {
@@ -105,9 +123,8 @@ export const HistoryScreen = () => {
         }}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Pressable
+            <GlassButton
               accessibilityHint="대화를 엽니다"
-              accessibilityRole="button"
               onPress={() =>
                 router.push({ pathname: '/chat/[id]', params: { id: item.id } })
               }
@@ -122,17 +139,16 @@ export const HistoryScreen = () => {
                   timeStyle: 'short',
                 }).format(new Date(item.updatedAt))}
               </Text>
-            </Pressable>
-            <Pressable
+            </GlassButton>
+            <GlassButton
               accessibilityLabel={`${item.title} 삭제`}
-              accessibilityRole="button"
               onPress={() => remove(item)}
               style={styles.deleteButton}
             >
               <Text allowFontScaling style={styles.deleteLabel}>
                 삭제
               </Text>
-            </Pressable>
+            </GlassButton>
           </View>
         )}
       />
@@ -142,6 +158,18 @@ export const HistoryScreen = () => {
 
 const styles = StyleSheet.create((theme) => ({
   list: { padding: theme.spacing.lg },
+  search: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.md,
+    borderWidth: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+    margin: theme.spacing.lg,
+    minHeight: 44,
+    paddingHorizontal: theme.spacing.md,
+  },
+  placeholder: { color: theme.colors.textMuted },
   offline: {
     backgroundColor: theme.colors.surfaceMuted,
     color: theme.colors.textMuted,
