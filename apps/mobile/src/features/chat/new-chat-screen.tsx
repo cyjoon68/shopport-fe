@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
@@ -126,9 +120,7 @@ export const NewChatScreen = () => {
         fallbackStyle={styles.composerButtonFallback}
         onPress={() => void create(text.trim())}
         style={styles.composerButton}
-        tintColor={
-          sendDisabled ? theme.colors.surfaceMuted : theme.colors.background
-        }
+        tintColor={sendDisabled ? theme.colors.surfaceMuted : theme.colors.background}
       >
         <Image
           contentFit="contain"

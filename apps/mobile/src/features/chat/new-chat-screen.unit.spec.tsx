@@ -1,14 +1,15 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Text as mockNativeText } from 'react-native';
+import { createElement as mockCreateElement } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { NewChatScreen } from './new-chat-screen';
 
-const mockPush = jest.fn();
-const mockOpenDrawer = jest.fn();
+const mockPush = jest.fn<void, [unknown]>();
+const mockOpenDrawer = jest.fn<void, []>();
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
-  router: { push: (...args: Array<unknown>) => mockPush(...args) },
+  router: { push: (argument: unknown) => mockPush(argument) },
   useNavigation: () => ({ openDrawer: mockOpenDrawer }),
 }));
 
@@ -22,10 +23,9 @@ jest.mock('./chat-segmented-control', () => ({
 }));
 
 jest.mock('@/features/catalog/found-products-screen', () => {
-  const React = require('react');
   return {
     FoundProductsContent: () =>
-      React.createElement('Text', { testID: 'found-products-content' }, '상품'),
+      mockCreateElement(mockNativeText, { testID: 'found-products-content' }, '상품'),
   };
 });
 

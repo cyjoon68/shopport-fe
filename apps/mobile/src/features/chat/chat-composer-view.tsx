@@ -1,10 +1,4 @@
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { GlassButton } from '@/shared/ui/glass-button';
 import type { Attachment } from './chat-composer-types';
@@ -62,10 +56,7 @@ export const ChatComposerView = ({
           source={asset.uri}
           style={styles.thumbnail}
         />
-        <GlassButton
-          onPress={() => void remove()}
-          style={styles.removeButton}
-        >
+        <GlassButton onPress={() => void remove()} style={styles.removeButton}>
           <Text allowFontScaling style={styles.removeLabel}>
             이미지 제거
           </Text>

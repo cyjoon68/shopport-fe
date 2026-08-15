@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { View as mockNativeView } from 'react-native';
 import type { ReactNode } from 'react';
 
 jest.mock('react-native-gesture-handler', () => ({
@@ -18,12 +19,10 @@ jest.mock('react-native-gesture-handler', () => ({
 }));
 
 jest.mock('react-native-reanimated', () => {
-  const { View } = jest.requireActual('react-native');
-
   return {
     __esModule: true,
     cancelAnimation: jest.fn(),
-    default: { View },
+    default: { View: mockNativeView },
     runOnJS: (callback: (...args: Array<unknown>) => unknown) => callback,
     useAnimatedStyle: (updater: () => object) => updater(),
     useSharedValue: (value: number) => ({ value }),

@@ -63,7 +63,10 @@ export const SettingsScreen = () => {
         <GlassActionButton onPress={() => router.push('/favorites')} variant="secondary">
           찜한 상품
         </GlassActionButton>
-        <GlassActionButton onPress={() => router.push('/subscription')} variant="secondary">
+        <GlassActionButton
+          onPress={() => router.push('/subscription')}
+          variant="secondary"
+        >
           구독 관리
         </GlassActionButton>
         <GlassActionButton onPress={() => void logout()} variant="secondary">

@@ -57,28 +57,26 @@ export const ChatSegmentedControl = ({
       );
     })
     .onEnd(() => {
-      const nextValue =
-        activePillOffset.value >= activePillWidth / 2 ? '상품' : '채팅';
-      activePillOffset.value = withTiming(
-        nextValue === '상품' ? activePillWidth : 0,
-        {
-          duration: animationDuration,
-        },
-      );
+      const nextValue = activePillOffset.value >= activePillWidth / 2 ? '상품' : '채팅';
+      activePillOffset.value = withTiming(nextValue === '상품' ? activePillWidth : 0, {
+        duration: animationDuration,
+      });
       runOnJS(onValueChange)(nextValue);
     })
     .onFinalize((_, success) => {
       if (success) return;
-      activePillOffset.value = withTiming(
-        value === '상품' ? activePillWidth : 0,
-        { duration: animationDuration },
-      );
+      activePillOffset.value = withTiming(value === '상품' ? activePillWidth : 0, {
+        duration: animationDuration,
+      });
     });
 
   return (
     <GestureDetector gesture={panGesture}>
       <View style={styles.control} testID={testID}>
-        <Animated.View pointerEvents="none" style={[styles.activePill, activePillStyle]} />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.activePill, activePillStyle]}
+        />
         {tabs.map((tab) => {
           const selected = tab === value;
 
