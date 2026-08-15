@@ -4,4 +4,5 @@ import '@/theme/unistyles';
 jest.mock('expo-glass-effect', () => ({
   GlassView: 'GlassView',
   isGlassEffectAPIAvailable: () => false,
+  isLiquidGlassAvailable: () => false,
 }));
