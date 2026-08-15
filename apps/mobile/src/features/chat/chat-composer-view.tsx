@@ -1,12 +1,6 @@
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
+import { GlassButton } from '@/shared/ui/glass-button';
 import type { Attachment } from './chat-composer-types';
 import { styles } from './chat-composer-styles';
 
@@ -62,15 +56,11 @@ export const ChatComposerView = ({
           source={asset.uri}
           style={styles.thumbnail}
         />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void remove()}
-          style={styles.removeButton}
-        >
+        <GlassButton onPress={() => void remove()} style={styles.removeButton}>
           <Text allowFontScaling style={styles.removeLabel}>
             이미지 제거
           </Text>
-        </Pressable>
+        </GlassButton>
         {asset.state !== 'ready' ? (
           <View style={styles.assetStatus}>
             <Text
@@ -83,33 +73,32 @@ export const ChatComposerView = ({
                 : '이미지 처리 중'}
             </Text>
             {asset.state === 'timeout' ? (
-              <Pressable
-                accessibilityRole="button"
+              <GlassButton
                 onPress={() => void verifyAsset(asset)}
                 style={styles.retryButton}
               >
                 <Text allowFontScaling style={styles.retryLabel}>
                   상태 다시 확인
                 </Text>
-              </Pressable>
+              </GlassButton>
             ) : null}
           </View>
         ) : null}
       </View>
     ) : null}
     <View style={styles.root}>
-      <Pressable
+      <GlassButton
         accessibilityLabel="이미지 첨부"
-        accessibilityRole="button"
         disabled={loading || uploading || !draftReady || !allowFreeText}
         hitSlop={4}
         onPress={() => void attach()}
+        fallbackStyle={styles.iconButtonFallback}
         style={styles.iconButton}
       >
         <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.iconLabel}>
           {uploading ? '첨부 중' : '첨부'}
         </Text>
-      </Pressable>
+      </GlassButton>
       <TextInput
         accessibilityLabel="쇼핑 질문"
         editable={!loading && draftReady && allowFreeText}
@@ -124,18 +113,18 @@ export const ChatComposerView = ({
         style={styles.input}
         value={text}
       />
-      <Pressable
+      <GlassButton
         accessibilityLabel={loading ? '응답 중지' : '메시지 보내기'}
-        accessibilityRole="button"
         accessibilityState={{ disabled: sendDisabled }}
         disabled={sendDisabled}
         onPress={() => void (loading ? onStop() : send())}
-        style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
+        fallbackStyle={styles.sendButtonFallback}
+        style={styles.sendButton}
       >
         <Text allowFontScaling style={styles.sendLabel}>
           {loading ? '중지' : '전송'}
         </Text>
-      </Pressable>
+      </GlassButton>
     </View>
   </KeyboardAvoidingView>
 );

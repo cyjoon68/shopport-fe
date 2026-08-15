@@ -50,6 +50,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           cameraPermission: '상품을 촬영해 찾기 위해 카메라 접근이 필요합니다.',
         },
       ],
+      'expo-image',
       [
         'expo-build-properties',
         {
