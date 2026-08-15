@@ -18,16 +18,16 @@ import {
   rotateTokens,
   writeRefreshToken,
 } from './auth-http';
-import type { AuthProviderName, TokenPair } from './auth-http';
+import type { TokenPair } from './auth-http';
 import { setAccessToken } from './auth-token';
-import { appleIdentity, kakaoIdentity } from './native-auth';
+import { kakaoIdentity } from './native-auth';
 import { resetRevenueCat } from '@/features/subscription/revenuecat';
 import { SessionBoundaryContext } from './session-boundary';
 import type { SessionStatus } from './session-boundary';
 
 type SessionContextValue = Readonly<{
   error: string | null;
-  login: (provider: AuthProviderName) => Promise<void>;
+  login: () => Promise<void>;
   loginDemo: () => Promise<void>;
   logout: () => Promise<void>;
   sessionVersion: number;
@@ -89,27 +89,16 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
     return () => clearTimeout(timeout);
   }, [expiry, refresh]);
 
-  const login = useCallback(
-    async (provider: AuthProviderName): Promise<void> => {
-      setError(null);
-      try {
-        const identity =
-          provider === 'apple' ? await appleIdentity() : await kakaoIdentity();
-        await install(
-          await authenticate(
-            provider,
-            identity.identityToken,
-            identity.nonce,
-            identity.displayName,
-          ),
-        );
-        setSessionVersion((current) => current + 1);
-      } catch (loginError) {
-        setError(messageFrom(loginError));
-      }
-    },
-    [install],
-  );
+  const login = useCallback(async (): Promise<void> => {
+    setError(null);
+    try {
+      const identity = await kakaoIdentity();
+      await install(await authenticate('kakao', identity.identityToken, identity.nonce));
+      setSessionVersion((current) => current + 1);
+    } catch (loginError) {
+      setError(messageFrom(loginError));
+    }
+  }, [install]);
 
   const loginDemo = useCallback(async (): Promise<void> => {
     if (!__DEV__) return;

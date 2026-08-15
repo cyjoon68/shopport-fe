@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton, Screen } from '@shopport/ui';
 import { useSession } from './session-provider';
 
 export const AuthScreen = () => {
-  const { error, login, loginDemo, status } = useSession();
+  const { error, login, status } = useSession();
   const [busy, setBusy] = useState(false);
   if (status === 'authenticated') return <Redirect href="/" />;
   if (status === 'booting') {
@@ -19,9 +18,9 @@ export const AuthScreen = () => {
       </Screen>
     );
   }
-  const run = async (provider: 'apple' | 'kakao'): Promise<void> => {
+  const run = async (): Promise<void> => {
     setBusy(true);
-    await login(provider);
+    await login();
     setBusy(false);
   };
   return (
@@ -39,42 +38,9 @@ export const AuthScreen = () => {
           </Text>
         </View>
         <View style={styles.actions}>
-          {Platform.OS === 'ios' ? (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              cornerRadius={14}
-              onPress={() => void run('apple')}
-              style={styles.appleButton}
-            />
-          ) : (
-            <ActionButton
-              disabled={busy}
-              onPress={() => void run('apple')}
-              variant="secondary"
-            >
-              Apple로 계속
-            </ActionButton>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => void run('kakao')}
-            style={({ pressed }) => [styles.kakaoButton, pressed && styles.pressed]}
-          >
-            <Text allowFontScaling style={styles.kakaoLabel}>
-              카카오로 계속
-            </Text>
-          </Pressable>
-          {__DEV__ ? (
-            <ActionButton
-              disabled={busy}
-              onPress={() => void loginDemo()}
-              variant="secondary"
-            >
-              로컬 데모로 시작
-            </ActionButton>
-          ) : null}
+          <ActionButton disabled={busy} onPress={() => void run()} variant="kakao">
+            카카오로 시작하기
+          </ActionButton>
           {error ? (
             <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.error}>
               {error}
@@ -92,7 +58,7 @@ export const AuthScreen = () => {
 const styles = StyleSheet.create((theme) => ({
   root: {
     flex: 1,
-    justifyContent: 'space-between',
+    gap: theme.spacing.xxl,
     padding: theme.spacing.xl,
     paddingVertical: theme.spacing.xxl,
   },
@@ -108,16 +74,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   description: { color: theme.colors.textMuted, fontSize: 17, lineHeight: 26 },
   actions: { gap: theme.spacing.md },
-  appleButton: { height: 52, width: '100%' },
-  kakaoButton: {
-    alignItems: 'center',
-    backgroundColor: '#FEE500',
-    borderRadius: theme.radii.md,
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  pressed: { opacity: 0.72 },
-  kakaoLabel: { color: '#191919', fontSize: 16, fontWeight: '700' },
   error: {
     color: theme.colors.danger,
     fontSize: 14,
@@ -128,6 +84,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
+    marginTop: 'auto',
     textAlign: 'center',
   },
 }));

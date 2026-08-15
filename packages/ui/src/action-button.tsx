@@ -8,7 +8,7 @@ type ActionButtonProps = Readonly<{
   disabled?: boolean;
   loading?: boolean;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'kakao';
 }>;
 
 export const ActionButton = ({
@@ -51,6 +51,7 @@ const styles = StyleSheet.create((theme) => ({
     variants: {
       variant: {
         primary: { backgroundColor: theme.colors.primary },
+        kakao: { backgroundColor: '#FEE500' },
         secondary: {
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.border,
@@ -78,10 +79,18 @@ const styles = StyleSheet.create((theme) => ({
     variants: {
       variant: {
         primary: { color: theme.colors.primaryText },
+        kakao: { color: '#191919' },
         secondary: { color: theme.colors.text },
         danger: { color: '#FFFFFF' },
       },
     },
   },
-  indicator: { color: theme.colors.primaryText },
+  indicator: {
+    color: theme.colors.primaryText,
+    variants: {
+      variant: {
+        kakao: { color: '#191919' },
+      },
+    },
+  },
 }));

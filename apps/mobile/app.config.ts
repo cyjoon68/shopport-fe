@@ -28,7 +28,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: 'com.cyjoon68.shopport',
       supportsTablet: true,
-      usesAppleSignIn: true,
       infoPlist: {
         CFBundleDevelopmentRegion: 'ko',
         CFBundleLocalizations: ['ko'],
@@ -42,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       'expo-router',
-      'expo-apple-authentication',
+      ['expo-dev-client', { toolsButton: false }],
       'expo-secure-store',
       [
         'expo-image-picker',
@@ -73,9 +72,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     experiments: { typedRoutes: true },
     extra: {
       apiUrl: environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:4000',
-      appleAndroidClientId: environmentValue('EXPO_PUBLIC_APPLE_ANDROID_CLIENT_ID') ?? '',
-      appleAndroidRedirectUri:
-        environmentValue('EXPO_PUBLIC_APPLE_ANDROID_REDIRECT_URI') ?? '',
       revenueCatAppleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_APPLE_KEY') ?? '',
       revenueCatGoogleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY') ?? '',
       sentryDsn: environmentValue('EXPO_PUBLIC_SENTRY_DSN') ?? '',
