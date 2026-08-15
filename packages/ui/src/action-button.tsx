@@ -43,7 +43,7 @@ export const ActionButton = ({
 const styles = StyleSheet.create((theme) => ({
   root: {
     alignItems: 'center',
-    borderRadius: theme.radii.sm,
+    borderRadius: theme.radii.md,
     justifyContent: 'center',
     minHeight: 52,
     paddingHorizontal: 18,
@@ -73,10 +73,8 @@ const styles = StyleSheet.create((theme) => ({
   pressed: { opacity: 0.72 },
   label: {
     color: theme.colors.primaryText,
-    fontFamily: 'monospace',
     fontSize: 14,
-    fontWeight: '400',
-    letterSpacing: 1.4,
+    fontWeight: '600',
     variants: {
       variant: {
         primary: { color: theme.colors.primaryText },
