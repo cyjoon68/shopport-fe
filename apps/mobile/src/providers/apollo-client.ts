@@ -30,7 +30,6 @@ export const apolloClient = new ApolloClient({
       },
     },
   }),
-  dataMasking: true,
   link: ApolloLink.from([
     persistedOperationLink,
     authLink,
