@@ -1,7 +1,10 @@
 import { authenticate } from './auth-http';
 
 describe('authentication HTTP contract', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
 
   it('posts the identity token and nonce and accepts a rotating token pair', async () => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -50,6 +53,33 @@ describe('authentication HTTP contract', () => {
         }),
       }),
     );
+  });
+
+  it('retries a transient Kakao network failure before rejecting login', async () => {
+    jest.useFakeTimers();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            accessToken: 'access',
+            refreshToken: 'session.secret',
+            expiresIn: 900,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const result = authenticate('kakao', 'oidc-token', 'nonce');
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(result).resolves.toEqual({
+      accessToken: 'access',
+      refreshToken: 'session.secret',
+      expiresIn: 900,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a malformed token response', async () => {

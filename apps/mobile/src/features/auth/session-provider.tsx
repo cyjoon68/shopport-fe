@@ -20,6 +20,7 @@ import {
 } from './auth-http';
 import type { TokenPair } from './auth-http';
 import { setAccessToken } from './auth-token';
+import { loginErrorMessage } from './auth-error';
 import { kakaoIdentity } from './native-auth';
 import { resetRevenueCat } from '@/features/subscription/revenuecat';
 import { SessionBoundaryContext } from './session-boundary';
@@ -35,9 +36,6 @@ type SessionContextValue = Readonly<{
 }>;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
-
-const messageFrom = (error: unknown): string =>
-  error instanceof Error ? error.message : '인증 중 오류가 발생했습니다.';
 
 export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
   const [status, setStatus] = useState<SessionStatus>('booting');
@@ -96,7 +94,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
       await install(await authenticate('kakao', identity.identityToken, identity.nonce));
       setSessionVersion((current) => current + 1);
     } catch (loginError) {
-      setError(messageFrom(loginError));
+      setError(loginErrorMessage(loginError));
     }
   }, [install]);
 
@@ -107,7 +105,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
       await install(await authenticate('kakao', 'demo', Crypto.randomUUID()));
       setSessionVersion((current) => current + 1);
     } catch (loginError) {
-      setError(messageFrom(loginError));
+      setError(loginErrorMessage(loginError));
     }
   }, [install]);
 

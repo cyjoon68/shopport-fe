@@ -9,6 +9,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useMutation } from '@apollo/client/react';
 import { Screen } from '@shopport/ui';
 import {
+  ConversationsDocument,
   ConversationSummaryFragmentDoc,
   CreateConversationDocument,
 } from '@/graphql/generated/graphql';
@@ -35,7 +36,10 @@ export const ChatScreen = () => {
   const routeConversationId = typeof routeId === 'string' ? routeId : null;
   const navigation =
     useNavigation<DrawerNavigationProp<Record<string, object | undefined>>>();
-  const [createConversation] = useMutation(CreateConversationDocument);
+  const [createConversation] = useMutation(CreateConversationDocument, {
+    awaitRefetchQueries: true,
+    refetchQueries: [ConversationsDocument],
+  });
   const [conversationId, setConversationId] = useState<string | null>(
     routeConversationId,
   );

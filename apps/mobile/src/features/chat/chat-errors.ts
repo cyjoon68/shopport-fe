@@ -47,7 +47,10 @@ export const chatErrorPresentation = (
       route: '/subscription',
     };
   }
-  if (code === 'QUOTA_EXCEEDED') {
+  if (
+    code === 'QUOTA_EXCEEDED' ||
+    (error instanceof Error && error.message.includes('status: 429'))
+  ) {
     return { message: quotaResetMessage(now), route: null };
   }
   return {

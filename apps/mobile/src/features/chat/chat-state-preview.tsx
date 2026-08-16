@@ -33,7 +33,7 @@ export const ChatStatePreview = ({ state }: Readonly<{ state: ChatPreviewState }
         </View>
       ) : null}
       <View style={styles.composer}>
-        <Text style={styles.placeholder}>원하는 상품과 조건을 알려주세요</Text>
+        <Text style={styles.placeholder}>Shopport에게 추천받기</Text>
         <View style={styles.sendButton}>
           <Text style={styles.sendLabel}>{state === 'loading' ? '중지' : '전송'}</Text>
         </View>

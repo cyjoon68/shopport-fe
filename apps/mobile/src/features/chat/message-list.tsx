@@ -6,7 +6,7 @@ import type { CachedProduct } from '@/shared/storage/database';
 import { AskUserCard } from './ask-user-card';
 import { ChatProductRow } from './chat-product-row';
 import { activeAskUserRequest } from './message-model';
-import type { DisplayMessage, DisplayTool } from './message-model';
+import type { DisplayMessage } from './message-model';
 
 export {
   activeAskUserRequest,
@@ -22,12 +22,6 @@ type MessageListProps = Readonly<{
   onAnswer: (label: string) => Promise<void>;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
-
-const toolStatusLabel = (tool: DisplayTool): string => {
-  if (tool.status === 'COMPLETED') return `${tool.name} 완료`;
-  if (tool.status === 'FAILED') return `${tool.name} 실패`;
-  return `${tool.name} 실행 중`;
-};
 
 const MessageRow = ({
   activeAskUserId,
@@ -83,13 +77,6 @@ const MessageRow = ({
           request={request}
         />
       ))}
-      {message.tools
-        .filter((tool) => !message.askUsers.some(({ id }) => id === tool.id))
-        .map((tool) => (
-          <Text accessibilityLiveRegion="polite" key={tool.id} style={styles.partStatus}>
-            {toolStatusLabel(tool)}
-          </Text>
-        ))}
       {message.products.length ? (
         <View accessibilityLabel="추천 상품" style={styles.products}>
           {message.products.map((product) => (

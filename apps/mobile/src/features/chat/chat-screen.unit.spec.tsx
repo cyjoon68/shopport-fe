@@ -2,6 +2,11 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { Alert, Text as mockNativeText } from 'react-native';
 import { createElement as mockCreateElement } from 'react';
 import { useMutation } from '@apollo/client/react';
+import { print } from 'graphql';
+import {
+  ConversationsDocument,
+  CreateConversationDocument,
+} from '@/graphql/generated/graphql';
 import { ChatScreen } from './chat-screen';
 import type { ChatTab } from './chat-segmented-control';
 import type { DisplayMessage } from './message-list';
@@ -108,7 +113,7 @@ describe('chat screen', () => {
     mockedUseMutation.mockReturnValue([
       createConversation,
       { called: false, client: {}, loading: false, reset: jest.fn() },
-    ] as ReturnType<typeof useMutation>);
+    ]);
     const screen = render(<ChatScreen />);
 
     fireEvent.press(screen.getByLabelText('메뉴 열기'));
@@ -139,6 +144,30 @@ describe('chat screen', () => {
 
     expect(screen.getByLabelText('이미지 첨부')).toBeOnTheScreen();
     expect(screen.getByLabelText('메시지 보내기')).toBeOnTheScreen();
+  });
+
+  it('refreshes Drawer recent conversations after a conversation is created', () => {
+    const createConversation = jest.fn();
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+
+    render(<ChatScreen />);
+
+    expect(mockedUseMutation).toHaveBeenCalledWith(
+      CreateConversationDocument,
+      expect.objectContaining({
+        awaitRefetchQueries: true,
+        refetchQueries: [ConversationsDocument],
+      }),
+    );
+  });
+
+  it('uses a literal recent-conversation page size below the server limit', () => {
+    expect(print(ConversationsDocument)).toContain(
+      'conversations(first: 20, after: $after)',
+    );
   });
 
   it('switches to found products', () => {

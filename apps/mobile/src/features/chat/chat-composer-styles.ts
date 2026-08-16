@@ -1,57 +1,6 @@
 import { StyleSheet } from 'react-native-unistyles';
 
-export const styles = StyleSheet.create((theme, runtime) => ({
-  root: {
-    alignItems: 'flex-end',
-    backgroundColor: theme.colors.background,
-    borderTopColor: theme.colors.border,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    paddingBottom: Math.max(theme.spacing.md, runtime.insets.bottom),
-  },
-  input: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
-    color: theme.colors.text,
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 22,
-    maxHeight: 132,
-    minHeight: 48,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  placeholder: { color: theme.colors.textMuted },
-  iconButton: {
-    alignItems: 'center',
-    borderCurve: 'continuous',
-    borderRadius: theme.radii.pill,
-    height: 48,
-    justifyContent: 'center',
-    minWidth: 48,
-    paddingHorizontal: theme.spacing.sm,
-  },
-  iconButtonFallback: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-  },
-  iconLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '500' },
-  sendButton: {
-    alignItems: 'center',
-    borderCurve: 'continuous',
-    borderRadius: theme.radii.pill,
-    height: 48,
-    justifyContent: 'center',
-    minWidth: 60,
-    paddingHorizontal: theme.spacing.md,
-  },
-  sendButtonFallback: { backgroundColor: theme.colors.primary },
-  sendLabel: { color: theme.colors.primaryText, fontSize: 14, fontWeight: '600' },
+export const styles = StyleSheet.create((theme) => ({
   offline: {
     backgroundColor: theme.colors.surfaceMuted,
     color: theme.colors.textMuted,
