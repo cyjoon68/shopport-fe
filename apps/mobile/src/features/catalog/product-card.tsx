@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Linking, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -16,17 +16,22 @@ import { formatMoney } from './product-model';
 
 type ProductCardProps = Readonly<{
   compact?: boolean;
+  highlighted?: boolean;
   product: CachedProduct;
 }>;
 
-export const ProductCard = ({ compact = false, product }: ProductCardProps) => {
+export const ProductCard = ({
+  compact = false,
+  highlighted = false,
+  product,
+}: ProductCardProps) => {
   const [saved, setSaved] = useState(product.isSaved);
   const [saveProduct] = useMutation(SaveProductDocument);
   const [unsaveProduct] = useMutation(UnsaveProductDocument);
   const { add } = useCompare();
   const online = useOnline();
   const reducedMotion = useReducedMotion();
-  styles.useVariants({ compact });
+  styles.useVariants({ compact, highlighted });
 
   const toggleSaved = async (): Promise<void> => {
     if (!online) {
@@ -79,16 +84,28 @@ export const ProductCard = ({ compact = false, product }: ProductCardProps) => {
     router.push('/compare');
   };
 
+  const open = async (): Promise<void> => {
+    if (!online) {
+      Alert.alert('오프라인', '구매 링크는 온라인에서 열 수 있습니다.');
+      return;
+    }
+    const url = new URL(product.outboundUrl);
+    if (url.protocol !== 'https:') {
+      Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
+      return;
+    }
+    await Linking.openURL(url.toString());
+  };
+
   return (
     <View
       accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
       style={styles.card}
     >
       <GlassButton
-        accessibilityHint="상품 상세를 엽니다"
-        onPress={() =>
-          router.push({ pathname: '/product/[id]', params: { id: product.id } })
-        }
+        accessibilityHint="구매 링크를 엽니다"
+        accessibilityLabel={`${product.title} 구매 링크`}
+        onPress={() => void open()}
       >
         <Image
           accessibilityLabel={`${product.title} 상품 이미지`}
@@ -153,6 +170,10 @@ const styles = StyleSheet.create((theme) => ({
       compact: {
         true: { width: 244 },
         false: { width: '100%' },
+      },
+      highlighted: {
+        true: { borderColor: theme.colors.primary, borderWidth: 2 },
+        false: {},
       },
     },
   },

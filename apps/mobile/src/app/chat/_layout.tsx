@@ -14,7 +14,7 @@ const ChatLayout = () => {
         headerTintColor: theme.colors.text,
       }}
     >
-      <Stack.Screen name="[id]" options={{ title: '쇼핑 대화' }} />
+      <Stack.Screen name="[id]" options={{ headerShown: false }} />
     </Stack>
   );
 };

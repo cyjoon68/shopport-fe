@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { useQuery } from '@apollo/client/react';
@@ -9,6 +10,11 @@ import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import { ProductCard } from './product-card';
 import { productFromFragment } from './product-model';
+import type { CachedProduct } from '@/shared/storage/database';
+
+type FoundProductsContentProps = Readonly<{
+  focusProductId?: string | null;
+}>;
 
 export const FoundProductsScreen = () => {
   const { status } = useSession();
@@ -22,7 +28,9 @@ export const FoundProductsScreen = () => {
   );
 };
 
-export const FoundProductsContent = () => {
+export const FoundProductsContent = ({
+  focusProductId = null,
+}: FoundProductsContentProps = {}) => {
   const { status } = useSession();
   const online = useOnline();
   const { data, fetchMore } = useQuery(FoundProductsDocument, {
@@ -30,17 +38,31 @@ export const FoundProductsContent = () => {
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated' || !online,
   });
-  const results =
-    data?.conversations.edges.flatMap(({ node }) =>
-      node.messages.flatMap(({ parts }) =>
-        parts.flatMap((part) =>
-          part.__typename === 'ProductReferenceMessagePart'
-            ? [productFromFragment(part.product)]
-            : [],
+  const products = useMemo(() => {
+    const results =
+      data?.conversations.edges.flatMap(({ node }) =>
+        node.messages.flatMap(({ parts }) =>
+          parts.flatMap((part) =>
+            part.__typename === 'ProductReferenceMessagePart'
+              ? [productFromFragment(part.product)]
+              : [],
+          ),
         ),
-      ),
-    ) ?? [];
-  const products = [...new Map(results.map((product) => [product.id, product])).values()];
+      ) ?? [];
+    return [...new Map(results.map((product) => [product.id, product])).values()];
+  }, [data]);
+  const listRef = useRef<FlashListRef<CachedProduct> | null>(null);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusProductId) return;
+    const index = products.findIndex(({ id }) => id === focusProductId);
+    if (index < 0) return;
+    void listRef.current?.scrollToIndex({ index, animated: true });
+    setHighlightedProductId(focusProductId);
+    const timeout = setTimeout(() => setHighlightedProductId(null), 1_600);
+    return () => clearTimeout(timeout);
+  }, [focusProductId, products]);
 
   return (
     <View style={styles.content} testID="found-products-content">
@@ -64,7 +86,10 @@ export const FoundProductsContent = () => {
           if (pageInfo?.hasNextPage)
             void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
         }}
-        renderItem={({ item }) => <ProductCard product={item} />}
+        ref={listRef}
+        renderItem={({ item }) => (
+          <ProductCard highlighted={item.id === highlightedProductId} product={item} />
+        )}
         style={styles.listView}
       />
     </View>

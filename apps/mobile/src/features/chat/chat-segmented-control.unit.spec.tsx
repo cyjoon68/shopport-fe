@@ -43,4 +43,16 @@ describe('chat segmented control', () => {
 
     expect(onValueChange).toHaveBeenCalledWith('상품');
   });
+
+  it('announces an unread state for a tab', () => {
+    const screen = render(
+      <ChatSegmentedControl
+        onValueChange={jest.fn()}
+        unread={{ 채팅: false, 상품: true }}
+        value="채팅"
+      />,
+    );
+
+    expect(screen.getByLabelText('상품 읽지 않음')).toBeOnTheScreen();
+  });
 });
