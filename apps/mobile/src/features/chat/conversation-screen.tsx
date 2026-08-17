@@ -152,10 +152,7 @@ export const ConversationScreen = ({
     } catch (error) {
       skipAskUserRef.current = false;
       setAskSheetOpen(true);
-      Alert.alert(
-        '질문을 건너뛰지 못했어요',
-        chatErrorPresentation(error).message,
-      );
+      Alert.alert('질문을 건너뛰지 못했어요', chatErrorPresentation(error).message);
     }
   };
 

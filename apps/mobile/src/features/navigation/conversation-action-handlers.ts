@@ -68,7 +68,14 @@ export const useConversationActionHandlers = ({
                   Alert.alert('이름 변경 실패', message);
                   return;
                 }
-                await onRefresh();
+                try {
+                  await onRefresh();
+                } catch {
+                  Alert.alert(
+                    '이름 변경 완료',
+                    '서버에서 이름은 변경됐지만 목록을 새로 고치지 못했습니다.',
+                  );
+                }
               })
               .catch(() => Alert.alert('이름 변경 실패', '다시 시도해 주세요.'));
           },
