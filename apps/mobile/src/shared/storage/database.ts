@@ -64,6 +64,10 @@ const initialize = async (): Promise<SQLiteDatabase> => {
       title TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS conversation_pin (
+      conversation_id TEXT PRIMARY KEY NOT NULL,
+      pinned_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS product_cache (
       id TEXT PRIMARY KEY NOT NULL,
       payload TEXT NOT NULL,
@@ -118,6 +122,33 @@ export const readCachedConversations = async (): Promise<Array<CachedConversatio
   const db = await database();
   return db.getAllAsync<CachedConversation>(
     'SELECT id, title, updated_at AS updatedAt FROM conversation_cache ORDER BY updated_at DESC LIMIT 50',
+  );
+};
+
+export const readPinnedConversationIds = async (): Promise<Array<string>> => {
+  const db = await database();
+  const rows = await db.getAllAsync<{ conversationId: string }>(
+    'SELECT conversation_id AS conversationId FROM conversation_pin ORDER BY pinned_at DESC',
+  );
+  return rows.map(({ conversationId }) => conversationId);
+};
+
+export const setConversationPinned = async (
+  conversationId: string,
+  pinned: boolean,
+): Promise<void> => {
+  const db = await database();
+  if (pinned) {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO conversation_pin (conversation_id, pinned_at) VALUES (?, ?)',
+      conversationId,
+      Date.now(),
+    );
+    return;
+  }
+  await db.runAsync(
+    'DELETE FROM conversation_pin WHERE conversation_id = ?',
+    conversationId,
   );
 };
 
@@ -202,6 +233,7 @@ export const clearPrivateStorage = async (): Promise<void> => {
   const db = await database();
   await db.execAsync(`
     DELETE FROM conversation_cache;
+    DELETE FROM conversation_pin;
     DELETE FROM product_cache;
     DELETE FROM draft;
     DELETE FROM chat_cache;

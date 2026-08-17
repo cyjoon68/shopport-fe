@@ -12,6 +12,23 @@ Shopport is a Korean shopping comparison assistant. Its interface should help pe
 - Use a small, intentional corner scale: 4px for compact elements, 8px for controls and media, and 12px for larger cards and message surfaces. Pills are limited to controls whose shape communicates their behavior.
 - Keep surfaces solid and borders quiet. Do not use gradients, glass effects, decorative shadows, or simulated depth.
 
+### Product card type tokens
+
+- `productCard.title`: regular 17/23, compact 14/19
+- `productCard.provider`: regular 13
+- `productCard.price`: regular 19, compact 16
+- `productCard.status`: regular 13
+- `productCard.action`: regular 14, compact 13
+
+### Conversation type tokens
+
+- `conversation.body`: 16/24
+- `conversation.hint`: 14/21
+- `conversation.sheetTitle`: 18/24
+- `conversation.sheetAction`: 14/21
+- `interaction.minTouchTarget`: 44pt
+- `layout.conversationSheet`: 78% max height, 40pt handle
+
 ## Components
 
 ### Conversation
@@ -22,6 +39,7 @@ Shopport is a Korean shopping comparison assistant. Its interface should help pe
 - Present attachment processing and recovery next to the attachment. Status text must remain understandable without color.
 - Product results may scroll horizontally when space is constrained, but product names, prices, availability, and seller context take priority over imagery.
 - Clarifying questions should expose a focused set of useful choices. Do not add badges, fake confidence scores, fake activity, or decorative metadata.
+- Keep clarifying questions in the transcript as one assistant question line; present answer choices in a dismissible bottom sheet. Dismissing skips that question and continues without calling `chat.stop`.
 
 ### Actions and inputs
 

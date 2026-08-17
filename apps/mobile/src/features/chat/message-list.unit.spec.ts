@@ -1,5 +1,6 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
+import { ASK_USER_SKIP_MESSAGE } from './ask-user';
 import {
   activeAskUserRequest,
   fromHistoricalMessage,
@@ -139,5 +140,21 @@ describe('historical message parts', () => {
     expect(messageIdentity('live', v4)).toBe(`live:${v4}`);
     expect(messageIdentity('server', id)).toBe(id);
     expect(messageIdentity('live', id)).toBe(id);
+  });
+
+  it('hides the internal askUser skip message from the transcript', () => {
+    const skipMessage = fromHistoricalMessage({
+      ...historical,
+      id: '0198a122-0c00-7000-8000-000000000002',
+      role: 'USER',
+      parts: [
+        { __typename: 'TextMessagePart', id: 'skip-text', text: ASK_USER_SKIP_MESSAGE },
+      ],
+    });
+
+    expect(skipMessage.text).toBe('');
+    expect(
+      activeAskUserRequest([fromHistoricalMessage(historical), skipMessage]),
+    ).toBeNull();
   });
 });

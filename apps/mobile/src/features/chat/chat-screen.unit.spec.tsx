@@ -283,9 +283,19 @@ describe('chat screen', () => {
     } satisfies DisplayMessage;
 
     act(() => mockConversationOnMessagesChange?.([assistant]));
+    expect(mockUnread?.상품).toBe(false);
     act(() => mockConversationOnProductSelect?.(product));
-
     expect(screen.getByTestId('found-products-content')).toHaveTextContent(product.title);
+
+    const nextAssistant = {
+      ...assistant,
+      id: 'assistant-2',
+      products: [{ ...product, id: 'product-2', title: '다음 상품' }],
+    } satisfies DisplayMessage;
+    act(() => mockTabChange?.('채팅'));
+    act(() => mockConversationOnMessagesChange?.([assistant, nextAssistant]));
+
+    expect(mockUnread?.상품).toBe(true);
   });
 
   it('shows a recoverable error when conversation creation rejects', async () => {
@@ -373,9 +383,10 @@ describe('chat screen', () => {
       tools: [],
     } satisfies DisplayMessage;
 
-    act(() => mockConversationOnMessagesChange?.([]));
+    const initialAssistant = { ...assistant, id: 'assistant-initial' };
+    act(() => mockConversationOnMessagesChange?.([initialAssistant]));
     act(() => mockTabChange?.('상품'));
-    act(() => mockConversationOnMessagesChange?.([assistant]));
+    act(() => mockConversationOnMessagesChange?.([initialAssistant, assistant]));
 
     expect(mockUnread?.채팅).toBe(true);
     act(() => mockTabChange?.('채팅'));

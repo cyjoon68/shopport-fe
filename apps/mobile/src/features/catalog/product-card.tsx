@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Linking, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { StyleSheet } from 'react-native-unistyles';
@@ -9,7 +9,6 @@ import type { CachedProduct } from '@/shared/storage/database';
 import { cacheProducts } from '@/shared/storage/database';
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
-import { GlassButton } from '@/shared/ui/glass-button';
 import { formatMoney } from './product-model';
 
 type ProductCardProps = Readonly<{
@@ -80,12 +79,14 @@ export const ProductCard = ({
   return (
     <View
       accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
-      style={styles.card}
+      style={[styles.card, compact ? styles.compactCard : undefined]}
     >
-      <GlassButton
+      <Pressable
         accessibilityHint="구매 링크를 엽니다"
         accessibilityLabel={`${product.title} 구매 링크`}
+        accessibilityRole="button"
         onPress={() => void open()}
+        style={styles.imageButton}
       >
         <Image
           accessibilityLabel={`${product.title} 상품 이미지`}
@@ -94,13 +95,15 @@ export const ProductCard = ({
           style={styles.image}
           transition={reducedMotion ? 0 : 150}
         />
-      </GlassButton>
+      </Pressable>
       <View style={styles.body}>
         <Text
           allowFontScaling
+          lineBreakStrategyIOS="hangul-word"
           maxFontSizeMultiplier={2}
           numberOfLines={compact ? 2 : 3}
           style={styles.title}
+          textBreakStrategy="balanced"
         >
           {product.title}
         </Text>
@@ -115,15 +118,16 @@ export const ProductCard = ({
           {product.isInStock ? '구매 가능' : '품절'}
         </Text>
         <View style={styles.actions}>
-          <GlassButton
-            fallbackStyle={styles.smallButtonFallback}
+          <Pressable
+            accessibilityLabel={`${product.title} ${saved ? '찜 해제' : '찜'}`}
+            accessibilityRole="button"
             onPress={() => void toggleSaved()}
-            style={styles.smallButton}
+            style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
           >
             <Text allowFontScaling style={styles.smallButtonLabel}>
               {saved ? '찜 해제' : '찜'}
             </Text>
-          </GlassButton>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -137,37 +141,109 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radii.md,
     borderWidth: 1,
     overflow: 'hidden',
+    width: '100%',
     variants: {
-      compact: {
-        true: { width: 244 },
-        false: { width: '100%' },
-      },
       highlighted: {
         true: { borderColor: theme.colors.primary, borderWidth: 2 },
         false: {},
       },
     },
   },
+  compactCard: { alignSelf: 'stretch', flex: 1, width: 'auto' },
+  imageButton: { alignSelf: 'stretch' },
   image: {
     aspectRatio: 1.45,
     backgroundColor: theme.colors.surfaceMuted,
     width: '100%',
+    variants: {
+      compact: {
+        true: { aspectRatio: 1 },
+      },
+    },
   },
-  body: { gap: 6, padding: theme.spacing.md },
-  title: { color: theme.colors.text, fontSize: 17, fontWeight: '700', lineHeight: 23 },
-  provider: { color: theme.colors.textMuted, fontSize: 13 },
-  price: { color: theme.colors.text, fontSize: 19, fontWeight: '800' },
-  stock: { color: theme.colors.primary, fontSize: 13, fontWeight: '600' },
-  soldOut: { color: theme.colors.danger, fontSize: 13, fontWeight: '600' },
-  actions: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.xs },
+  body: {
+    gap: theme.spacing.xs,
+    padding: theme.spacing.md,
+    variants: {
+      compact: {
+        true: { gap: theme.spacing.xs, padding: theme.spacing.sm },
+      },
+    },
+  },
+  title: {
+    color: theme.colors.text,
+    fontSize: theme.typography.productCard.title.regular.fontSize,
+    fontWeight: '700',
+    lineHeight: theme.typography.productCard.title.regular.lineHeight,
+    variants: {
+      compact: {
+        true: {
+          fontSize: theme.typography.productCard.title.compact.fontSize,
+          lineHeight: theme.typography.productCard.title.compact.lineHeight,
+        },
+      },
+    },
+  },
+  provider: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.productCard.provider.regular,
+  },
+  price: {
+    color: theme.colors.text,
+    fontSize: theme.typography.productCard.price.regular,
+    fontWeight: '800',
+    variants: {
+      compact: {
+        true: { fontSize: theme.typography.productCard.price.compact },
+      },
+    },
+  },
+  stock: {
+    color: theme.colors.primary,
+    fontSize: theme.typography.productCard.status.regular,
+    fontWeight: '600',
+  },
+  soldOut: {
+    color: theme.colors.danger,
+    fontSize: theme.typography.productCard.status.regular,
+    fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+    variants: {
+      compact: {
+        true: { marginTop: 0 },
+      },
+    },
+  },
   smallButton: {
     alignItems: 'center',
+    backgroundColor: theme.colors.surface,
     borderCurve: 'continuous',
+    borderColor: theme.colors.border,
     borderRadius: theme.radii.pill,
+    borderWidth: 1,
     justifyContent: 'center',
     minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: theme.spacing.lg,
+    variants: {
+      compact: {
+        true: { paddingHorizontal: theme.spacing.md },
+      },
+    },
   },
-  smallButtonFallback: { borderColor: theme.colors.border, borderWidth: 1 },
-  smallButtonLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
+  pressed: { opacity: 0.72 },
+  smallButtonLabel: {
+    color: theme.colors.text,
+    fontSize: theme.typography.productCard.action.regular,
+    fontWeight: '700',
+    variants: {
+      compact: {
+        true: { fontSize: theme.typography.productCard.action.compact },
+      },
+    },
+  },
 }));

@@ -1,8 +1,7 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native-unistyles';
 import type { CachedProduct } from '@/shared/storage/database';
-import { GlassButton } from '@/shared/ui/glass-button';
 import { formatMoney } from '@/features/catalog/product-model';
 
 export const ChatProductRow = ({
@@ -26,47 +25,59 @@ export const ChatProductRow = ({
       <Text allowFontScaling style={styles.productPrice}>
         {formatMoney(product.totalMinor, product.currency)}
       </Text>
-      <GlassButton
+      <Pressable
         accessibilityLabel={`${product.title} 자세히 보기`}
+        accessibilityRole="button"
         onPress={() => onProductSelect?.(product)}
-        style={styles.productAction}
+        style={({ pressed }) => [
+          styles.productAction,
+          pressed && styles.productActionPressed,
+        ]}
       >
         <Text allowFontScaling style={styles.productActionLabel}>
           자세히 보기
         </Text>
-      </GlassButton>
+      </Pressable>
     </View>
   </View>
 );
 
 const styles = StyleSheet.create((theme) => ({
   productRow: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
     borderRadius: theme.radii.md,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    maxWidth: '100%',
-    padding: theme.spacing.sm,
+    overflow: 'hidden',
+    width: 148,
   },
   productImage: {
     backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.radii.sm,
-    height: 84,
-    width: 84,
+    height: 108,
+    width: '100%',
   },
-  productInfo: { flex: 1, gap: theme.spacing.xs },
-  productTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
-  productPrice: { color: theme.colors.text, fontSize: 16, fontWeight: '800' },
+  productInfo: { gap: theme.spacing.xs, padding: theme.spacing.sm },
+  productTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  productPrice: { color: theme.colors.text, fontSize: 15, fontWeight: '800' },
   productAction: {
-    alignSelf: 'flex-start',
-    borderColor: theme.colors.border,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.radii.sm,
-    borderWidth: 1,
-    minHeight: 44,
-    paddingHorizontal: theme.spacing.md,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: theme.spacing.sm,
   },
-  productActionLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },
+  productActionPressed: { opacity: 0.72 },
+  productActionLabel: {
+    color: theme.colors.primaryText,
+    fontSize: 13,
+    fontWeight: '700',
+  },
 }));

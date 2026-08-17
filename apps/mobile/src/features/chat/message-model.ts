@@ -6,7 +6,7 @@ import {
 } from '@/features/catalog/product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 import { messageIdentity } from './message-id';
-import { askUserArgsFromToolPart } from './ask-user';
+import { ASK_USER_SKIP_MESSAGE, askUserArgsFromToolPart } from './ask-user';
 import type { AskUserRequest } from './types';
 
 type HistoricalMessage = NonNullable<
@@ -35,6 +35,9 @@ export type DisplayMessage = Readonly<{
   text: string;
   tools: ReadonlyArray<DisplayTool>;
 }>;
+
+const visibleMessageText = (text: string): string =>
+  text.trim() === ASK_USER_SKIP_MESSAGE ? '' : text;
 
 const uniqueById = <T extends Readonly<{ id: string }>>(
   values: ReadonlyArray<T>,
@@ -73,6 +76,10 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
       });
     }
   }
+  const text = message.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => part.content)
+    .join('');
   return {
     askUsers: message.parts.flatMap((part) => {
       const request = askUserArgsFromToolPart(part);
@@ -85,10 +92,7 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
       : tools.some(({ status }) => status === 'STARTED')
         ? 'PENDING'
         : 'COMPLETED',
-    text: message.parts
-      .filter((part) => part.type === 'text')
-      .map((part) => part.content)
-      .join(''),
+    text: visibleMessageText(text),
     images: message.parts.flatMap((part, index) =>
       part.type === 'image'
         ? [
@@ -107,49 +111,52 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
   };
 };
 
-export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessage => ({
-  askUsers: message.parts.flatMap((part) =>
-    part.__typename === 'AskUserMessagePart'
-      ? [
-          {
-            id: part.id,
-            request: {
-              allowFreeText: part.allowFreeText,
-              options: part.options,
-              question: part.question,
-            },
-          },
-        ]
-      : [],
-  ),
-  id: messageIdentity('server', message.id),
-  role: message.role === 'USER' ? 'user' : 'assistant',
-  status: message.status,
-  text: message.parts
+export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessage => {
+  const text = message.parts
     .flatMap((part) => (part.__typename === 'TextMessagePart' ? [part.text] : []))
-    .join(''),
-  images: message.parts.flatMap((part) =>
-    part.__typename === 'ImageMessagePart'
-      ? [
-          {
-            id: part.id,
-            status: part.asset.status,
-            url: part.asset.url ?? null,
-          },
-        ]
-      : [],
-  ),
-  products: message.parts.flatMap((part) =>
-    part.__typename === 'ProductReferenceMessagePart'
-      ? [productFromFragment(part.product)]
-      : [],
-  ),
-  tools: message.parts.flatMap((part) =>
-    part.__typename === 'ToolStatusMessagePart'
-      ? [{ id: part.id, name: part.toolName, status: part.status }]
-      : [],
-  ),
-});
+    .join('');
+  return {
+    askUsers: message.parts.flatMap((part) =>
+      part.__typename === 'AskUserMessagePart'
+        ? [
+            {
+              id: part.id,
+              request: {
+                allowFreeText: part.allowFreeText,
+                options: part.options,
+                question: part.question,
+              },
+            },
+          ]
+        : [],
+    ),
+    id: messageIdentity('server', message.id),
+    role: message.role === 'USER' ? 'user' : 'assistant',
+    status: message.status,
+    text: visibleMessageText(text),
+    images: message.parts.flatMap((part) =>
+      part.__typename === 'ImageMessagePart'
+        ? [
+            {
+              id: part.id,
+              status: part.asset.status,
+              url: part.asset.url ?? null,
+            },
+          ]
+        : [],
+    ),
+    products: message.parts.flatMap((part) =>
+      part.__typename === 'ProductReferenceMessagePart'
+        ? [productFromFragment(part.product)]
+        : [],
+    ),
+    tools: message.parts.flatMap((part) =>
+      part.__typename === 'ToolStatusMessagePart'
+        ? [{ id: part.id, name: part.toolName, status: part.status }]
+        : [],
+    ),
+  };
+};
 
 const mergeDisplayMessage = (
   historical: DisplayMessage,

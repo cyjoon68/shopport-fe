@@ -9,6 +9,7 @@ export const colors = {
     primary: '#1F2228',
     primaryText: '#FFFFFF',
     danger: '#B42318',
+    scrim: 'rgba(23, 26, 22, 0.32)',
   },
   dark: {
     background: '#1F2228',
@@ -20,6 +21,7 @@ export const colors = {
     primary: '#FFFFFF',
     primaryText: '#1F2228',
     danger: '#FF8A80',
+    scrim: 'rgba(0, 0, 0, 0.48)',
   },
 } as const;
 
@@ -32,6 +34,10 @@ export const spacing = {
   xxl: 32,
 } as const;
 
+export const interaction = {
+  minTouchTarget: 44,
+} as const;
+
 export const radii = {
   sm: 4,
   md: 8,
@@ -39,9 +45,35 @@ export const radii = {
   pill: 999,
 } as const;
 
+export const typography = {
+  conversation: {
+    body: { fontSize: 16, lineHeight: 24 },
+    hint: { fontSize: 14, lineHeight: 21 },
+    sheetAction: { fontSize: 14, lineHeight: 21 },
+    sheetTitle: { fontSize: 18, lineHeight: 24 },
+  },
+  productCard: {
+    action: { compact: 13, regular: 14 },
+    price: { compact: 16, regular: 19 },
+    provider: { regular: 13 },
+    status: { regular: 13 },
+    title: {
+      compact: { fontSize: 14, lineHeight: 19 },
+      regular: { fontSize: 17, lineHeight: 23 },
+    },
+  },
+} as const;
+
+export const layout = {
+  conversationSheet: {
+    handleWidth: 40,
+    maxHeight: '78%',
+  },
+} as const;
+
 export const themes = {
-  light: { colors: colors.light, spacing, radii },
-  dark: { colors: colors.dark, spacing, radii },
+  light: { colors: colors.light, interaction, layout, spacing, radii, typography },
+  dark: { colors: colors.dark, interaction, layout, spacing, radii, typography },
 } as const;
 
 export const breakpoints = {

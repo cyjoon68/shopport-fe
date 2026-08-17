@@ -1,5 +1,7 @@
 import type { AskUserRequest } from './types';
 
+export const ASK_USER_SKIP_MESSAGE = '질문을 건너뛰고 현재 정보로 계속 진행해줘.';
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 

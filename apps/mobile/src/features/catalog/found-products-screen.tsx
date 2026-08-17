@@ -92,9 +92,16 @@ export const FoundProductsContent = ({
           if (pageInfo?.hasNextPage)
             void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
         }}
+        numColumns={2}
         ref={listRef}
         renderItem={({ item }) => (
-          <ProductCard highlighted={item.id === highlightedProductId} product={item} />
+          <View style={styles.gridCell}>
+            <ProductCard
+              compact
+              highlighted={item.id === highlightedProductId}
+              product={item}
+            />
+          </View>
         )}
         style={styles.listView}
       />
@@ -104,6 +111,7 @@ export const FoundProductsContent = ({
 
 const styles = StyleSheet.create((theme) => ({
   content: { flex: 1 },
+  gridCell: { flex: 1, margin: theme.spacing.xs },
   list: { gap: theme.spacing.lg, padding: theme.spacing.lg },
   listView: { flex: 1 },
   offline: {
