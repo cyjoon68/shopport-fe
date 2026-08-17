@@ -12,9 +12,7 @@ export const AppProviders = ({ children }: Readonly<{ children: ReactNode }>) =>
     <SafeAreaProvider>
       <ApolloProvider client={apolloClient}>
         <NetworkProvider>
-          <SessionProvider>
-            {children}
-          </SessionProvider>
+          <SessionProvider>{children}</SessionProvider>
         </NetworkProvider>
       </ApolloProvider>
     </SafeAreaProvider>
