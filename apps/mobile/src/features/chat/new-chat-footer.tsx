@@ -88,7 +88,13 @@ export const NewChatFooter = ({
   );
 
   return (
-    <Animated.View style={fill ? [styles.keyboard, { paddingBottom: keyboardPad }] : { paddingBottom: keyboardPad }}>
+    <Animated.View
+      style={
+        fill
+          ? [styles.keyboard, { paddingBottom: keyboardPad }]
+          : { paddingBottom: keyboardPad }
+      }
+    >
       {glassAvailable ? (
         <GlassView glassEffectStyle="regular" isInteractive style={styles.glassComposer}>
           {content}
@@ -137,9 +143,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     borderCurve: 'continuous',
     borderRadius: theme.radii.pill,
-    height: 40,
+    height: theme.interaction.minTouchTarget,
     justifyContent: 'center',
-    width: 40,
+    width: theme.interaction.minTouchTarget,
   },
   composerButtonFallback: { backgroundColor: theme.colors.surfaceMuted },
   composerSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },

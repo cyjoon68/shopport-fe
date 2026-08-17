@@ -246,7 +246,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radii.md,
     flexDirection: 'row',
     gap: theme.spacing.md,
-    minHeight: 40,
+    minHeight: 48,
     paddingHorizontal: theme.spacing.sm,
   },
   linkSymbol: { height: 20, width: 20 },

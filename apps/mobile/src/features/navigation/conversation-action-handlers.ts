@@ -97,9 +97,28 @@ export const useConversationActionHandlers = ({
                 );
                 return;
               }
-              await sqliteChatPersistence.removeItem(conversation.id);
-              await setConversationPinned(conversation.id, false);
-              await onRefresh();
+              let cacheCleanupFailed = false;
+              try {
+                await sqliteChatPersistence.removeItem(conversation.id);
+                await setConversationPinned(conversation.id, false);
+              } catch {
+                cacheCleanupFailed = true;
+              }
+              try {
+                await onRefresh();
+              } catch {
+                Alert.alert(
+                  '삭제 완료',
+                  '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+                );
+                return;
+              }
+              if (cacheCleanupFailed) {
+                Alert.alert(
+                  '삭제 완료',
+                  '서버에서 삭제되었지만 기기 캐시를 정리하지 못했습니다.',
+                );
+              }
             })
             .catch(() => Alert.alert('삭제 실패', '다시 시도해 주세요.'));
         },
