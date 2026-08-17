@@ -1,9 +1,10 @@
-import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { Animated, Platform, TextInput, View } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useReducedTransparency } from '@/shared/accessibility/use-reduced-transparency';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+import { useKeyboardLift } from './use-keyboard-lift';
 
 type NewChatFooterProps = Readonly<{
   attachDisabled: boolean;
@@ -32,6 +33,7 @@ export const NewChatFooter = ({
 }: NewChatFooterProps) => {
   const { theme } = useUnistyles();
   const reducedTransparency = useReducedTransparency();
+  const keyboardPad = useKeyboardLift();
   const showStop = loading && Boolean(onStop);
   const glassAvailable =
     Platform.OS === 'ios' && !reducedTransparency && isGlassEffectAPIAvailable();
@@ -86,9 +88,12 @@ export const NewChatFooter = ({
   );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={fill ? styles.keyboard : undefined}
+    <Animated.View
+      style={
+        fill
+          ? [styles.keyboard, { paddingBottom: keyboardPad }]
+          : { paddingBottom: keyboardPad }
+      }
     >
       {glassAvailable ? (
         <GlassView glassEffectStyle="regular" isInteractive style={styles.glassComposer}>
@@ -97,7 +102,7 @@ export const NewChatFooter = ({
       ) : (
         <View style={styles.fallbackComposer}>{content}</View>
       )}
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 };
 
@@ -138,9 +143,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     borderCurve: 'continuous',
     borderRadius: theme.radii.pill,
-    height: 40,
+    height: theme.interaction.minTouchTarget,
     justifyContent: 'center',
-    width: 40,
+    width: theme.interaction.minTouchTarget,
   },
   composerButtonFallback: { backgroundColor: theme.colors.surfaceMuted },
   composerSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },

@@ -49,6 +49,7 @@ export const ChatScreen = () => {
   const [focusedProductId, setFocusedProductId] = useState<string | null>(null);
   const [unread, setUnread] = useState<UnreadState>({ chat: false, products: false });
   const [loading, setLoading] = useState(false);
+  const trackedConversationId = useRef<string | null>(null);
   const seenMessageIds = useRef<Set<string> | null>(null);
   const seenProductIds = useRef<Set<string> | null>(null);
 
@@ -58,6 +59,7 @@ export const ChatScreen = () => {
   }, [routeConversationId]);
 
   useEffect(() => {
+    trackedConversationId.current = null;
     seenMessageIds.current = null;
     seenProductIds.current = null;
     setMessages([]);
@@ -67,6 +69,13 @@ export const ChatScreen = () => {
 
   useEffect(() => {
     if (!conversationId) return;
+    if (trackedConversationId.current !== conversationId) {
+      trackedConversationId.current = conversationId;
+      seenMessageIds.current = null;
+      seenProductIds.current = null;
+      return;
+    }
+    if (messages.length === 0) return;
     const messageIds = new Set(messages.map(({ id }) => id));
     const productIds = new Set(
       messages.flatMap(({ products }) => products.map(({ id }) => id)),

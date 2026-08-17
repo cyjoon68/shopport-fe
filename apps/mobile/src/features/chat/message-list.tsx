@@ -1,9 +1,8 @@
-import { Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import { StyleSheet } from 'react-native-unistyles';
 import type { CachedProduct } from '@/shared/storage/database';
-import { AskUserCard } from './ask-user-card';
 import { ChatProductRow } from './chat-product-row';
 import { activeAskUserRequest } from './message-model';
 import type { DisplayMessage } from './message-model';
@@ -17,32 +16,40 @@ export {
 export type { DisplayMessage } from './message-model';
 
 type MessageListProps = Readonly<{
-  answerDisabled: boolean;
   messages: ReadonlyArray<DisplayMessage>;
-  onAnswer: (label: string) => Promise<void>;
+  onAskUserPress?: (() => void) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
 
 const MessageRow = ({
   activeAskUserId,
-  answerDisabled,
   message,
-  onAnswer,
+  onAskUserPress,
   onProductSelect,
 }: Readonly<{
   activeAskUserId: string | null;
-  answerDisabled: boolean;
   message: DisplayMessage;
-  onAnswer: (label: string) => Promise<void>;
+  onAskUserPress?: (() => void) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>) => {
   styles.useVariants({ role: message.role });
+  const transcriptText = message.askUsers.reduce(
+    (text, { request }) => text.replace(request.question, '').trim(),
+    message.text,
+  );
+  if (
+    !transcriptText &&
+    !message.askUsers.length &&
+    !message.images.length &&
+    !message.products.length
+  )
+    return null;
   return (
     <View
       accessibilityLabel={message.role === 'user' ? '내 메시지' : 'Shopport 답변'}
       style={styles.row}
     >
-      {message.text ? (
+      {transcriptText ? (
         <View style={styles.bubble}>
           <Text
             allowFontScaling
@@ -50,10 +57,37 @@ const MessageRow = ({
             selectable
             style={styles.text}
           >
-            {message.text}
+            {transcriptText}
           </Text>
         </View>
       ) : null}
+      {message.askUsers.map(({ id, request }) => {
+        const question = (
+          <View style={styles.bubble}>
+            <Text
+              allowFontScaling
+              maxFontSizeMultiplier={2.5}
+              selectable
+              style={styles.text}
+            >
+              {request.question}
+            </Text>
+          </View>
+        );
+        return id === activeAskUserId && onAskUserPress ? (
+          <Pressable
+            accessibilityLabel={`추가 질문 열기: ${request.question}`}
+            accessibilityRole="button"
+            key={id}
+            onPress={onAskUserPress}
+            style={styles.askQuestion}
+          >
+            {question}
+          </Pressable>
+        ) : (
+          <View key={id}>{question}</View>
+        );
+      })}
       {message.images.map((image) =>
         image.status === 'READY' && image.url ? (
           <Image
@@ -69,16 +103,14 @@ const MessageRow = ({
           </Text>
         ),
       )}
-      {message.askUsers.map(({ id, request }) => (
-        <AskUserCard
-          disabled={answerDisabled || id !== activeAskUserId}
-          key={id}
-          onSelect={onAnswer}
-          request={request}
-        />
-      ))}
       {message.products.length ? (
-        <View accessibilityLabel="추천 상품" style={styles.products}>
+        <ScrollView
+          accessibilityLabel="추천 상품"
+          contentContainerStyle={styles.productsContent}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.products}
+        >
           {message.products.map((product) => (
             <ChatProductRow
               key={product.id}
@@ -86,16 +118,15 @@ const MessageRow = ({
               product={product}
             />
           ))}
-        </View>
+        </ScrollView>
       ) : null}
     </View>
   );
 };
 
 export const MessageList = ({
-  answerDisabled,
   messages,
-  onAnswer,
+  onAskUserPress,
   onProductSelect,
 }: MessageListProps) => {
   const activeAskUserId = activeAskUserRequest(messages)?.id ?? null;
@@ -106,12 +137,12 @@ export const MessageList = ({
       keyExtractor={(message) => message.id}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
+      style={styles.flex}
       renderItem={({ item }) => (
         <MessageRow
           activeAskUserId={activeAskUserId}
-          answerDisabled={answerDisabled}
           message={item}
-          onAnswer={onAnswer}
+          onAskUserPress={onAskUserPress}
           onProductSelect={onProductSelect}
         />
       )}
@@ -120,6 +151,7 @@ export const MessageList = ({
 };
 
 const styles = StyleSheet.create((theme) => ({
+  flex: { flex: 1 },
   list: {
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
@@ -146,6 +178,7 @@ const styles = StyleSheet.create((theme) => ({
       },
     },
   },
+  askQuestion: { alignSelf: 'flex-start' },
   text: {
     fontSize: 16,
     lineHeight: 24,
@@ -165,5 +198,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
-  products: { gap: theme.spacing.md, width: '100%' },
+  products: { marginHorizontal: -theme.spacing.lg, width: 'auto' },
+  productsContent: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
 }));

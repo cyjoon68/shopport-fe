@@ -16,7 +16,10 @@ import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import {
   cacheConversations,
+  deleteCachedConversation,
+  deleteDraft,
   readCachedConversations,
+  setConversationPinned,
   sqliteChatPersistence,
 } from '@/shared/storage/database';
 import type { CachedConversation } from '@/shared/storage/database';
@@ -82,9 +85,35 @@ export const HistoryScreen = () => {
               );
               return;
             }
-            await sqliteChatPersistence.removeItem(conversation.id);
-            await refetch();
-          })();
+            const cleanupResults = await Promise.allSettled([
+              deleteCachedConversation(conversation.id),
+              sqliteChatPersistence.removeItem(conversation.id),
+              setConversationPinned(conversation.id, false),
+              deleteDraft(conversation.id),
+            ]);
+            const cacheCleanupFailed = cleanupResults.some(
+              ({ status }) => status === 'rejected',
+            );
+            try {
+              await refetch();
+            } catch {
+              Alert.alert(
+                '삭제 완료',
+                cacheCleanupFailed
+                  ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
+                  : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+              );
+              return;
+            }
+            if (cacheCleanupFailed) {
+              Alert.alert(
+                '삭제 완료',
+                '서버에서 삭제되었지만 기기 캐시를 정리하지 못했습니다.',
+              );
+            }
+          })().catch(() => {
+            Alert.alert('삭제 실패', '다시 시도해 주세요.');
+          });
         },
       },
     ]);

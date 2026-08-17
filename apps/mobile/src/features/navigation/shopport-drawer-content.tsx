@@ -1,6 +1,7 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import type { Href } from 'expo-router';
 import {
   DrawerContentScrollView,
@@ -15,7 +16,13 @@ import {
 } from '@/graphql/generated/graphql';
 import { conversationHref } from '@/features/chat';
 import { useSession } from '@/features/auth/session-provider';
+import { useOnline } from '@/providers/network-provider';
+import { readPinnedConversationIds } from '@/shared/storage/database';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+import {
+  useConversationActionHandlers,
+  type DrawerConversation,
+} from './conversation-action-handlers';
 
 type DrawerLinkProps = Readonly<{
   label: string;
@@ -45,20 +52,110 @@ const DrawerLink = ({ label, onPress, symbol }: DrawerLinkProps) => {
   );
 };
 
+type ConversationLinkProps = Readonly<{
+  conversation: DrawerConversation;
+  online: boolean;
+  pinned: boolean;
+  onPinnedChange: (conversationId: string, pinned: boolean) => void;
+  onOpen: () => void;
+  onRefresh: () => Promise<unknown>;
+}>;
+
+const ConversationLink = ({
+  conversation,
+  online,
+  pinned,
+  onPinnedChange,
+  onOpen,
+  onRefresh,
+}: ConversationLinkProps) => {
+  const { theme } = useUnistyles();
+  const { remove, rename, togglePin } = useConversationActionHandlers({
+    conversation,
+    onPinnedChange,
+    onRefresh,
+    online,
+    pinned,
+  });
+
+  return (
+    <Link asChild href={conversationHref(conversation.id)}>
+      <Link.Trigger>
+        <Pressable
+          accessible
+          accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
+          accessibilityLabel={conversation.title}
+          accessibilityRole="button"
+          onPress={onOpen}
+          style={styles.conversation}
+        >
+          <View style={styles.conversationContent}>
+            <Text allowFontScaling numberOfLines={2} style={styles.conversationTitle}>
+              {conversation.title}
+            </Text>
+            {pinned ? (
+              <Image
+                contentFit="contain"
+                source="sf:pin.fill"
+                style={styles.pinSymbol}
+                tintColor={theme.colors.textMuted}
+              />
+            ) : null}
+          </View>
+        </Pressable>
+      </Link.Trigger>
+      <Link.Preview />
+      <Link.Menu>
+        <Link.MenuAction
+          icon={pinned ? 'pin.slash' : 'pin.fill'}
+          onPress={togglePin}
+          title={pinned ? '고정 해제' : '고정'}
+        />
+        <Link.MenuAction icon="pencil" onPress={rename} title="이름 바꾸기" />
+        <Link.MenuAction destructive icon="trash" onPress={remove} title="삭제" />
+      </Link.Menu>
+    </Link>
+  );
+};
+
 export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProps) => {
   const { theme } = useUnistyles();
   const { status } = useSession();
-  const { data } = useQuery(ConversationsDocument, {
+  const online = useOnline();
+  const [pinnedIds, setPinnedIds] = useState<ReadonlySet<string>>(new Set());
+  const { data, refetch } = useQuery(ConversationsDocument, {
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated',
   });
-  const conversations = data?.conversations.edges.map(({ node }) => {
-    const conversation = readFragment(ConversationSummaryFragmentDoc, node);
-    return { id: conversation.id, title: conversation.title };
-  });
+  const conversations = useMemo<ReadonlyArray<DrawerConversation>>(() => {
+    const items =
+      data?.conversations.edges.map(({ node }) => {
+        const conversation = readFragment(ConversationSummaryFragmentDoc, node);
+        return { id: conversation.id, title: conversation.title };
+      }) ?? [];
+    return [...items].sort(
+      (left, right) => Number(pinnedIds.has(right.id)) - Number(pinnedIds.has(left.id)),
+    );
+  }, [data?.conversations.edges, pinnedIds]);
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    void readPinnedConversationIds()
+      .then((ids) => setPinnedIds(new Set(ids)))
+      .catch(() => undefined);
+  }, [status]);
+
   const navigate = (href: Href): void => {
     navigation.closeDrawer();
     router.push(href);
+  };
+
+  const updatePinned = (conversationId: string, pinned: boolean): void => {
+    setPinnedIds((current) => {
+      const next = new Set(current);
+      if (pinned) next.add(conversationId);
+      else next.delete(conversationId);
+      return next;
+    });
   };
 
   if (status !== 'authenticated') return null;
@@ -111,18 +208,15 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
         </Text>
         {conversations?.length ? (
           conversations.map((conversation) => (
-            <Pressable
-              accessibilityHint="대화를 엽니다"
-              accessibilityLabel={conversation.title}
-              accessibilityRole="button"
+            <ConversationLink
               key={conversation.id}
-              onPress={() => navigate(conversationHref(conversation.id))}
-              style={({ pressed }) => [styles.conversation, pressed && styles.pressed]}
-            >
-              <Text allowFontScaling numberOfLines={2} style={styles.conversationTitle}>
-                {conversation.title}
-              </Text>
-            </Pressable>
+              conversation={conversation}
+              online={online}
+              onPinnedChange={updatePinned}
+              onOpen={() => navigation.closeDrawer()}
+              onRefresh={refetch}
+              pinned={pinnedIds.has(conversation.id)}
+            />
           ))
         ) : (
           <Text allowFontScaling style={styles.empty}>
@@ -169,12 +263,22 @@ const styles = StyleSheet.create((theme) => ({
   },
   recentTitle: { color: theme.colors.textMuted, fontSize: 13, fontWeight: '800' },
   conversation: {
+    alignSelf: 'stretch',
     borderRadius: theme.radii.sm,
-    minHeight: 44,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
     paddingHorizontal: theme.spacing.sm,
+    width: '100%',
+  },
+  conversationContent: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
   },
   conversationTitle: { color: theme.colors.text, fontSize: 15, lineHeight: 21 },
+  pinSymbol: { height: 16, width: 16 },
   empty: { color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 },
   pressed: { opacity: 0.58 },
 }));

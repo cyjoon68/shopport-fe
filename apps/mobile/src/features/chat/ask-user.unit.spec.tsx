@@ -77,5 +77,6 @@ describe('askUser', () => {
     fireEvent.press(screen.getByText('검정'));
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '검정' })).toBeDisabled();
+    expect(screen.getByText('답변을 보내는 중이에요')).toBeTruthy();
   });
 });

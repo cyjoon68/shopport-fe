@@ -1,12 +1,8 @@
-import { fireEvent, render } from '@testing-library/react-native';
-import { createElement as mockCreateElement, type ReactNode } from 'react';
-import {
-  Alert,
-  Linking,
-  Pressable as mockPressable,
-  Text as mockNativeText,
-} from 'react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { createElement as mockCreateElement } from 'react';
+import { Alert, Linking, Text as mockNativeText } from 'react-native';
 import { useMutation } from '@apollo/client/react';
+import { cacheProducts } from '@/shared/storage/database';
 import type { CachedProduct } from '@/shared/storage/database';
 import { ProductCard } from './product-card';
 
@@ -38,31 +34,16 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => mockOnline,
 }));
 
+jest.mock('@/shared/storage/database', () => ({
+  cacheProducts: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('@/shared/accessibility/use-reduced-motion', () => ({
   useReducedMotion: () => false,
 }));
 
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(() => Promise.resolve()),
-}));
-
-jest.mock('@/shared/ui/glass-button', () => ({
-  GlassButton: ({
-    accessibilityHint,
-    accessibilityLabel,
-    children,
-    onPress,
-  }: {
-    accessibilityHint?: string;
-    accessibilityLabel?: string;
-    children: ReactNode;
-    onPress?: () => void;
-  }) =>
-    mockCreateElement(
-      mockPressable,
-      { accessibilityHint, accessibilityLabel, onPress },
-      children,
-    ),
 }));
 
 jest.mock('expo-image', () => ({
@@ -108,6 +89,46 @@ describe('product card links', () => {
     expect(alertSpy).toHaveBeenCalledWith(
       '안전하지 않은 링크',
       '구매 링크를 열 수 없습니다.',
+    );
+  });
+
+  it('saves a product and updates the action state', async () => {
+    const saveProduct = jest.fn().mockResolvedValue({
+      data: { saveProduct: { userErrors: [] } },
+    });
+    const mutationState = {
+      called: false,
+      client: {},
+      loading: false,
+      reset: jest.fn(),
+    };
+    mockedUseMutation.mockReset();
+    mockedUseMutation.mockReturnValue([saveProduct, mutationState] as ReturnType<
+      typeof useMutation
+    >);
+    const screen = render(<ProductCard product={product} />);
+
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+
+    await waitFor(() => expect(screen.getByText('찜 해제')).toBeOnTheScreen());
+    expect(saveProduct).toHaveBeenCalledWith({
+      variables: { input: { productId: 'product-1' } },
+    });
+    expect(jest.mocked(cacheProducts)).toHaveBeenCalledWith([
+      { ...product, isSaved: true },
+    ]);
+  });
+
+  it('explains why saving is unavailable offline', () => {
+    mockOnline = false;
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ProductCard product={product} />);
+
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      '오프라인',
+      '온라인에서 찜을 변경할 수 있습니다.',
     );
   });
 });
