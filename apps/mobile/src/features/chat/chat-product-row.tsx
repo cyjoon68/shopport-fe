@@ -71,7 +71,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radii.sm,
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: theme.interaction.minTouchTarget,
     paddingHorizontal: theme.spacing.sm,
   },
   productActionPressed: { opacity: 0.72 },

@@ -263,7 +263,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radii.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: 40,
     paddingHorizontal: theme.spacing.sm,
     width: '100%',
   },
