@@ -16,6 +16,7 @@ import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import {
   cacheConversations,
+  deleteCachedConversation,
   readCachedConversations,
   sqliteChatPersistence,
 } from '@/shared/storage/database';
@@ -82,7 +83,10 @@ export const HistoryScreen = () => {
               );
               return;
             }
-            await sqliteChatPersistence.removeItem(conversation.id);
+            await Promise.all([
+              deleteCachedConversation(conversation.id),
+              sqliteChatPersistence.removeItem(conversation.id),
+            ]);
             await refetch();
           })();
         },

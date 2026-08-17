@@ -16,6 +16,7 @@ jest.mock('expo-sqlite', () => ({
 
 import {
   clearPrivateStorage,
+  deleteCachedConversation,
   readCachedProduct,
   readPinnedConversationIds,
   setConversationPinned,
@@ -60,6 +61,14 @@ describe('offline product detail and private storage', () => {
       expect.stringContaining('INSERT OR REPLACE INTO conversation_pin'),
       'conversation-1',
       expect.any(Number),
+    );
+  });
+
+  it('removes a deleted conversation from the local list cache', async () => {
+    await deleteCachedConversation('conversation-1');
+    expect(mockRunAsync).toHaveBeenCalledWith(
+      'DELETE FROM conversation_cache WHERE id = ?',
+      'conversation-1',
     );
   });
 });

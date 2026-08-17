@@ -125,6 +125,11 @@ export const readCachedConversations = async (): Promise<Array<CachedConversatio
   );
 };
 
+export const deleteCachedConversation = async (conversationId: string): Promise<void> => {
+  const db = await database();
+  await db.runAsync('DELETE FROM conversation_cache WHERE id = ?', conversationId);
+};
+
 export const readPinnedConversationIds = async (): Promise<Array<string>> => {
   const db = await database();
   const rows = await db.getAllAsync<{ conversationId: string }>(

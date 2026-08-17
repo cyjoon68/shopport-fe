@@ -62,6 +62,7 @@ jest.mock('@/shared/storage/database', () => ({
     mockCacheConversations(conversations);
     return Promise.resolve();
   },
+  deleteCachedConversation: jest.fn(() => Promise.resolve()),
   readCachedConversations: () => Promise.resolve([]),
   sqliteChatPersistence: { removeItem: jest.fn(() => Promise.resolve()) },
 }));
