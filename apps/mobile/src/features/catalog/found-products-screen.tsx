@@ -13,6 +13,7 @@ import { productFromFragment } from './product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 
 type FoundProductsContentProps = Readonly<{
+  conversationProducts?: ReadonlyArray<CachedProduct>;
   focusProductId?: string | null;
 }>;
 
@@ -29,6 +30,7 @@ export const FoundProductsScreen = () => {
 };
 
 export const FoundProductsContent = ({
+  conversationProducts = [],
   focusProductId = null,
 }: FoundProductsContentProps = {}) => {
   const { status } = useSession();
@@ -49,8 +51,12 @@ export const FoundProductsContent = ({
           ),
         ),
       ) ?? [];
-    return [...new Map(results.map((product) => [product.id, product])).values()];
-  }, [data]);
+    return [
+      ...new Map(
+        [...conversationProducts, ...results].map((product) => [product.id, product]),
+      ).values(),
+    ];
+  }, [conversationProducts, data]);
   const listRef = useRef<FlashListRef<CachedProduct> | null>(null);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 

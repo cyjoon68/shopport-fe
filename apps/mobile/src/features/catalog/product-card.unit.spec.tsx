@@ -38,10 +38,6 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => mockOnline,
 }));
 
-jest.mock('@/features/catalog/compare-provider', () => ({
-  useCompare: () => ({ add: () => 'duplicate' }),
-}));
-
 jest.mock('@/shared/accessibility/use-reduced-motion', () => ({
   useReducedMotion: () => false,
 }));

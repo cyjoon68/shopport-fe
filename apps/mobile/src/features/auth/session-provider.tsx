@@ -7,7 +7,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import * as Crypto from 'expo-crypto';
 import { apolloClient } from '@/providers/apollo-client';
 import { clearPrivateStorage } from '@/shared/storage/database';
 import {
@@ -29,7 +28,6 @@ import type { SessionStatus } from './session-boundary';
 type SessionContextValue = Readonly<{
   error: string | null;
   login: () => Promise<void>;
-  loginDemo: () => Promise<void>;
   logout: () => Promise<void>;
   sessionVersion: number;
   status: SessionStatus;
@@ -98,17 +96,6 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
     }
   }, [install]);
 
-  const loginDemo = useCallback(async (): Promise<void> => {
-    if (!__DEV__) return;
-    setError(null);
-    try {
-      await install(await authenticate('kakao', 'demo', Crypto.randomUUID()));
-      setSessionVersion((current) => current + 1);
-    } catch (loginError) {
-      setError(loginErrorMessage(loginError));
-    }
-  }, [install]);
-
   const logout = useCallback(async (): Promise<void> => {
     const refreshToken = await readRefreshToken();
     if (refreshToken) {
@@ -122,8 +109,8 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
   }, [clear]);
 
   const value = useMemo(
-    () => ({ error, login, loginDemo, logout, sessionVersion, status }),
-    [error, login, loginDemo, logout, sessionVersion, status],
+    () => ({ error, login, logout, sessionVersion, status }),
+    [error, login, logout, sessionVersion, status],
   );
   return (
     <SessionContext.Provider value={value}>

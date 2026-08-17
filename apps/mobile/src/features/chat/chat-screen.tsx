@@ -211,7 +211,10 @@ export const ChatScreen = () => {
             )}
           </View>
           <View style={selectedTab === '상품' ? styles.visible : styles.hidden}>
-            <FoundProductsContent focusProductId={focusedProductId} />
+            <FoundProductsContent
+              conversationProducts={messages.flatMap(({ products }) => products)}
+              focusProductId={focusedProductId}
+            />
           </View>
         </View>
       </View>

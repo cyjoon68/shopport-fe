@@ -18,6 +18,25 @@ let mockUnread: Readonly<Record<ChatTab, boolean>> | undefined;
 let mockConversationOnMessagesChange:
   | ((messages: ReadonlyArray<DisplayMessage>) => void)
   | undefined;
+let mockConversationOnProductSelect:
+  | ((product: {
+      id: string;
+      title: string;
+      imageUrl: string;
+      providerId: string;
+      providerName: string;
+      amountMinor: string;
+      shippingMinor: string;
+      totalMinor: string;
+      currency: string;
+      isAffiliate: boolean;
+      isInStock: boolean;
+      outboundUrl: string;
+      deliveryExpectedAt: string | null;
+      observedAt: string;
+      isSaved: boolean;
+    }) => void)
+  | undefined;
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -50,10 +69,29 @@ jest.mock('./chat-segmented-control', () => ({
 jest.mock('./conversation-screen', () => ({
   ConversationScreen: ({
     onMessagesChange,
+    onProductSelect,
   }: {
     onMessagesChange?: (messages: ReadonlyArray<DisplayMessage>) => void;
+    onProductSelect?: (product: {
+      id: string;
+      title: string;
+      imageUrl: string;
+      providerId: string;
+      providerName: string;
+      amountMinor: string;
+      shippingMinor: string;
+      totalMinor: string;
+      currency: string;
+      isAffiliate: boolean;
+      isInStock: boolean;
+      outboundUrl: string;
+      deliveryExpectedAt: string | null;
+      observedAt: string;
+      isSaved: boolean;
+    }) => void;
   }) => {
     mockConversationOnMessagesChange = onMessagesChange;
+    mockConversationOnProductSelect = onProductSelect;
     return mockCreateElement(
       mockNativeText,
       { testID: 'conversation-screen' },
@@ -64,8 +102,16 @@ jest.mock('./conversation-screen', () => ({
 
 jest.mock('@/features/catalog/found-products-screen', () => {
   return {
-    FoundProductsContent: () =>
-      mockCreateElement(mockNativeText, { testID: 'found-products-content' }, '상품'),
+    FoundProductsContent: ({
+      conversationProducts,
+    }: {
+      conversationProducts?: ReadonlyArray<{ id: string; title: string }>;
+    }) =>
+      mockCreateElement(
+        mockNativeText,
+        { testID: 'found-products-content' },
+        conversationProducts?.[0]?.title ?? '상품',
+      ),
   };
 });
 
@@ -106,6 +152,7 @@ describe('chat screen', () => {
     mockTabChange = undefined;
     mockUnread = undefined;
     mockConversationOnMessagesChange = undefined;
+    mockConversationOnProductSelect = undefined;
   });
 
   it('opens the drawer from the top-left menu button', () => {
@@ -181,6 +228,64 @@ describe('chat screen', () => {
     act(() => mockTabChange?.('상품'));
 
     expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
+  });
+
+  it('shows conversation products on the products tab when FoundProducts query is empty', async () => {
+    const createConversation = jest.fn().mockResolvedValue({
+      data: {
+        createConversation: {
+          conversation: {
+            id: 'conversation-1',
+            title: '새 대화',
+            createdAt: '2026-08-16T00:00:00.000Z',
+            updatedAt: '2026-08-16T00:00:00.000Z',
+          },
+          userErrors: [],
+        },
+      },
+    });
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const screen = render(<ChatScreen />);
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '립밤');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('메시지 보내기'));
+      await Promise.resolve();
+    });
+    const product = {
+      id: 'product-1',
+      title: '오릭스 립밤(무향)4.8 g',
+      imageUrl: 'https://example.com/lipbalm.jpg',
+      providerId: 'oliveyoung',
+      providerName: '올리브영',
+      amountMinor: '1000',
+      shippingMinor: '0',
+      totalMinor: '1000',
+      currency: 'KRW',
+      isAffiliate: false,
+      isInStock: true,
+      outboundUrl: 'https://www.oliveyoung.co.kr/product',
+      deliveryExpectedAt: null,
+      observedAt: '2026-08-17T00:00:00.000Z',
+      isSaved: false,
+    };
+    const assistant = {
+      askUsers: [],
+      id: 'assistant-1',
+      images: [],
+      products: [product],
+      role: 'assistant',
+      status: 'COMPLETED',
+      text: '립밤 추천',
+      tools: [],
+    } satisfies DisplayMessage;
+
+    act(() => mockConversationOnMessagesChange?.([assistant]));
+    act(() => mockConversationOnProductSelect?.(product));
+
+    expect(screen.getByTestId('found-products-content')).toHaveTextContent(product.title);
   });
 
   it('shows a recoverable error when conversation creation rejects', async () => {

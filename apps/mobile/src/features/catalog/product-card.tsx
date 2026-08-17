@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { useMutation } from '@apollo/client/react';
 import { SaveProductDocument, UnsaveProductDocument } from '@/graphql/generated/graphql';
@@ -11,7 +10,6 @@ import { cacheProducts } from '@/shared/storage/database';
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
 import { GlassButton } from '@/shared/ui/glass-button';
-import { useCompare } from './compare-provider';
 import { formatMoney } from './product-model';
 
 type ProductCardProps = Readonly<{
@@ -28,7 +26,6 @@ export const ProductCard = ({
   const [saved, setSaved] = useState(product.isSaved);
   const [saveProduct] = useMutation(SaveProductDocument);
   const [unsaveProduct] = useMutation(UnsaveProductDocument);
-  const { add } = useCompare();
   const online = useOnline();
   const reducedMotion = useReducedMotion();
   styles.useVariants({ compact, highlighted });
@@ -65,23 +62,6 @@ export const ProductCard = ({
     setSaved(next);
     await cacheProducts([{ ...product, isSaved: next }]);
     await Haptics.selectionAsync();
-  };
-
-  const addToCompare = (): void => {
-    const result = add({ ...product, isSaved: saved });
-    if (result === 'full') {
-      Alert.alert(
-        '비교는 최대 4개',
-        '비교 화면에서 상품을 제거한 뒤 다시 선택해 주세요.',
-      );
-      return;
-    }
-    if (result === 'duplicate') {
-      router.push('/compare');
-      return;
-    }
-    void Haptics.selectionAsync();
-    router.push('/compare');
   };
 
   const open = async (): Promise<void> => {
@@ -142,15 +122,6 @@ export const ProductCard = ({
           >
             <Text allowFontScaling style={styles.smallButtonLabel}>
               {saved ? '찜 해제' : '찜'}
-            </Text>
-          </GlassButton>
-          <GlassButton
-            fallbackStyle={styles.smallButtonFallback}
-            onPress={addToCompare}
-            style={styles.smallButton}
-          >
-            <Text allowFontScaling style={styles.smallButtonLabel}>
-              비교
             </Text>
           </GlassButton>
         </View>

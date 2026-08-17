@@ -4,7 +4,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
 import { SessionProvider } from '@/features/auth/session-provider';
-import { CompareProvider } from '@/features/catalog/compare-provider';
 import { apolloClient } from './apollo-client';
 import { NetworkProvider } from './network-provider';
 
@@ -14,7 +13,7 @@ export const AppProviders = ({ children }: Readonly<{ children: ReactNode }>) =>
       <ApolloProvider client={apolloClient}>
         <NetworkProvider>
           <SessionProvider>
-            <CompareProvider>{children}</CompareProvider>
+            {children}
           </SessionProvider>
         </NetworkProvider>
       </ApolloProvider>
