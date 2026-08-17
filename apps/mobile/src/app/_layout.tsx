@@ -30,8 +30,6 @@ const RootStack = () => {
         />
         <Stack.Screen name="auth" options={{ animation: 'none', headerShown: false }} />
         <Stack.Screen name="chat" options={{ headerShown: false }} />
-        <Stack.Screen name="product" options={{ headerShown: false }} />
-        <Stack.Screen name="compare" options={{ headerShown: false }} />
         <Stack.Screen name="products" options={{ title: '상품 리스트' }} />
         <Stack.Screen name="favorites" options={{ title: '저장된 상품' }} />
         <Stack.Screen name="images" options={{ title: '업로드한 이미지' }} />

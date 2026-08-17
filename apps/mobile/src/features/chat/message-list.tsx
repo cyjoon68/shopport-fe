@@ -1,11 +1,12 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import { StyleSheet } from 'react-native-unistyles';
-import { ProductCard } from '@/features/catalog/product-card';
+import type { CachedProduct } from '@/shared/storage/database';
 import { AskUserCard } from './ask-user-card';
+import { ChatProductRow } from './chat-product-row';
 import { activeAskUserRequest } from './message-model';
-import type { DisplayMessage, DisplayTool } from './message-model';
+import type { DisplayMessage } from './message-model';
 
 export {
   activeAskUserRequest,
@@ -19,24 +20,21 @@ type MessageListProps = Readonly<{
   answerDisabled: boolean;
   messages: ReadonlyArray<DisplayMessage>;
   onAnswer: (label: string) => Promise<void>;
+  onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
-
-const toolStatusLabel = (tool: DisplayTool): string => {
-  if (tool.status === 'COMPLETED') return `${tool.name} 완료`;
-  if (tool.status === 'FAILED') return `${tool.name} 실패`;
-  return `${tool.name} 실행 중`;
-};
 
 const MessageRow = ({
   activeAskUserId,
   answerDisabled,
   message,
   onAnswer,
+  onProductSelect,
 }: Readonly<{
   activeAskUserId: string | null;
   answerDisabled: boolean;
   message: DisplayMessage;
   onAnswer: (label: string) => Promise<void>;
+  onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>) => {
   styles.useVariants({ role: message.role });
   return (
@@ -79,30 +77,27 @@ const MessageRow = ({
           request={request}
         />
       ))}
-      {message.tools
-        .filter((tool) => !message.askUsers.some(({ id }) => id === tool.id))
-        .map((tool) => (
-          <Text accessibilityLiveRegion="polite" key={tool.id} style={styles.partStatus}>
-            {toolStatusLabel(tool)}
-          </Text>
-        ))}
       {message.products.length ? (
-        <ScrollView
-          accessibilityLabel="추천 상품"
-          contentContainerStyle={styles.products}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        >
+        <View accessibilityLabel="추천 상품" style={styles.products}>
           {message.products.map((product) => (
-            <ProductCard compact key={product.id} product={product} />
+            <ChatProductRow
+              key={product.id}
+              onProductSelect={onProductSelect}
+              product={product}
+            />
           ))}
-        </ScrollView>
+        </View>
       ) : null}
     </View>
   );
 };
 
-export const MessageList = ({ answerDisabled, messages, onAnswer }: MessageListProps) => {
+export const MessageList = ({
+  answerDisabled,
+  messages,
+  onAnswer,
+  onProductSelect,
+}: MessageListProps) => {
   const activeAskUserId = activeAskUserRequest(messages)?.id ?? null;
   return (
     <FlashList
@@ -117,6 +112,7 @@ export const MessageList = ({ answerDisabled, messages, onAnswer }: MessageListP
           answerDisabled={answerDisabled}
           message={item}
           onAnswer={onAnswer}
+          onProductSelect={onProductSelect}
         />
       )}
     />
@@ -169,5 +165,5 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
-  products: { gap: theme.spacing.md, paddingRight: theme.spacing.lg },
+  products: { gap: theme.spacing.md, width: '100%' },
 }));

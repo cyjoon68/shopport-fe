@@ -1,8 +1,9 @@
-import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { GlassButton } from '@/shared/ui/glass-button';
 import type { Attachment } from './chat-composer-types';
 import { styles } from './chat-composer-styles';
+import { NewChatFooter } from './new-chat-footer';
 
 type Props = Readonly<{
   allowFreeText: boolean;
@@ -37,7 +38,7 @@ export const ChatComposerView = ({
   uploading,
   verifyAsset,
 }: Props) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  <>
     {!online ? (
       <Text accessibilityLiveRegion="polite" allowFontScaling style={styles.offline}>
         오프라인 · 초안은 이 기기에 저장됩니다
@@ -86,45 +87,16 @@ export const ChatComposerView = ({
         ) : null}
       </View>
     ) : null}
-    <View style={styles.root}>
-      <GlassButton
-        accessibilityLabel="이미지 첨부"
-        disabled={loading || uploading || !draftReady || !allowFreeText}
-        hitSlop={4}
-        onPress={() => void attach()}
-        fallbackStyle={styles.iconButtonFallback}
-        style={styles.iconButton}
-      >
-        <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.iconLabel}>
-          {uploading ? '첨부 중' : '첨부'}
-        </Text>
-      </GlassButton>
-      <TextInput
-        accessibilityLabel="쇼핑 질문"
-        editable={!loading && draftReady && allowFreeText}
-        maxLength={2_000}
-        multiline
-        blurOnSubmit={false}
-        onChangeText={setText}
-        placeholder="원하는 상품과 조건을 알려주세요"
-        placeholderTextColor={styles.placeholder.color}
-        returnKeyType="default"
-        scrollEnabled
-        style={styles.input}
-        value={text}
-      />
-      <GlassButton
-        accessibilityLabel={loading ? '응답 중지' : '메시지 보내기'}
-        accessibilityState={{ disabled: sendDisabled }}
-        disabled={sendDisabled}
-        onPress={() => void (loading ? onStop() : send())}
-        fallbackStyle={styles.sendButtonFallback}
-        style={styles.sendButton}
-      >
-        <Text allowFontScaling style={styles.sendLabel}>
-          {loading ? '중지' : '전송'}
-        </Text>
-      </GlassButton>
-    </View>
-  </KeyboardAvoidingView>
+    <NewChatFooter
+      attachDisabled={loading || uploading || !draftReady || !allowFreeText}
+      inputEditable={!loading && draftReady && allowFreeText}
+      loading={loading}
+      onAttach={attach}
+      onSend={send}
+      onStop={onStop}
+      sendDisabled={sendDisabled}
+      setText={setText}
+      text={text}
+    />
+  </>
 );

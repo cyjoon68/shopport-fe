@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Text, TextInput, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Redirect, router } from 'expo-router';
@@ -11,6 +11,7 @@ import {
   ConversationsDocument,
   DeleteConversationDocument,
 } from '@/graphql/generated/graphql';
+import { conversationHref } from '@/features/chat';
 import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import {
@@ -27,19 +28,22 @@ export const HistoryScreen = () => {
   const [cached, setCached] = useState<Array<CachedConversation>>([]);
   const [query, setQuery] = useState('');
   const { data, fetchMore, refetch } = useQuery(ConversationsDocument, {
-    variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated' || !online,
   });
   const [deleteConversation] = useMutation(DeleteConversationDocument);
-  const conversations = data?.conversations.edges.map(({ node }) => {
-    const conversation = readFragment(ConversationSummaryFragmentDoc, node);
-    return {
-      id: conversation.id,
-      title: conversation.title,
-      updatedAt: conversation.updatedAt,
-    };
-  });
+  const conversations = useMemo(
+    () =>
+      data?.conversations.edges.map(({ node }) => {
+        const conversation = readFragment(ConversationSummaryFragmentDoc, node);
+        return {
+          id: conversation.id,
+          title: conversation.title,
+          updatedAt: conversation.updatedAt,
+        };
+      }),
+    [data?.conversations.edges],
+  );
 
   useEffect(() => {
     if (conversations?.length) {
@@ -118,16 +122,14 @@ export const HistoryScreen = () => {
         onEndReached={() => {
           const pageInfo = data?.conversations.pageInfo;
           if (pageInfo?.hasNextPage) {
-            void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
+            void fetchMore({ variables: { after: pageInfo.endCursor } });
           }
         }}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <GlassButton
               accessibilityHint="대화를 엽니다"
-              onPress={() =>
-                router.push({ pathname: '/chat/[id]', params: { id: item.id } })
-              }
+              onPress={() => router.push(conversationHref(item.id))}
               style={styles.rowMain}
             >
               <Text allowFontScaling numberOfLines={2} style={styles.title}>

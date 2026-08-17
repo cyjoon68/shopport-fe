@@ -18,6 +18,7 @@ Shopport is a Korean shopping comparison assistant. Its interface should help pe
 
 - Distinguish user and Shopport messages with surface and alignment, not novelty typography or ornamental avatars.
 - Keep the composer visually stable across draft loading, offline mode, upload processing, and response streaming.
+- Use the NewChat footer as the shared composer surface for new and existing conversations.
 - Present attachment processing and recovery next to the attachment. Status text must remain understandable without color.
 - Product results may scroll horizontally when space is constrained, but product names, prices, availability, and seller context take priority over imagery.
 - Clarifying questions should expose a focused set of useful choices. Do not add badges, fake confidence scores, fake activity, or decorative metadata.

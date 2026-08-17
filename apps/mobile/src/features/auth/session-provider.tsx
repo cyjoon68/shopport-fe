@@ -7,7 +7,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import * as Crypto from 'expo-crypto';
 import { apolloClient } from '@/providers/apollo-client';
 import { clearPrivateStorage } from '@/shared/storage/database';
 import {
@@ -20,6 +19,7 @@ import {
 } from './auth-http';
 import type { TokenPair } from './auth-http';
 import { setAccessToken } from './auth-token';
+import { loginErrorMessage } from './auth-error';
 import { kakaoIdentity } from './native-auth';
 import { resetRevenueCat } from '@/features/subscription/revenuecat';
 import { SessionBoundaryContext } from './session-boundary';
@@ -28,16 +28,12 @@ import type { SessionStatus } from './session-boundary';
 type SessionContextValue = Readonly<{
   error: string | null;
   login: () => Promise<void>;
-  loginDemo: () => Promise<void>;
   logout: () => Promise<void>;
   sessionVersion: number;
   status: SessionStatus;
 }>;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
-
-const messageFrom = (error: unknown): string =>
-  error instanceof Error ? error.message : '인증 중 오류가 발생했습니다.';
 
 export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
   const [status, setStatus] = useState<SessionStatus>('booting');
@@ -96,18 +92,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
       await install(await authenticate('kakao', identity.identityToken, identity.nonce));
       setSessionVersion((current) => current + 1);
     } catch (loginError) {
-      setError(messageFrom(loginError));
-    }
-  }, [install]);
-
-  const loginDemo = useCallback(async (): Promise<void> => {
-    if (!__DEV__) return;
-    setError(null);
-    try {
-      await install(await authenticate('kakao', 'demo', Crypto.randomUUID()));
-      setSessionVersion((current) => current + 1);
-    } catch (loginError) {
-      setError(messageFrom(loginError));
+      setError(loginErrorMessage(loginError));
     }
   }, [install]);
 
@@ -124,8 +109,8 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
   }, [clear]);
 
   const value = useMemo(
-    () => ({ error, login, loginDemo, logout, sessionVersion, status }),
-    [error, login, loginDemo, logout, sessionVersion, status],
+    () => ({ error, login, logout, sessionVersion, status }),
+    [error, login, logout, sessionVersion, status],
   );
   return (
     <SessionContext.Provider value={value}>

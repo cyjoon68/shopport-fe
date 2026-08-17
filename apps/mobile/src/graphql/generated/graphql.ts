@@ -249,7 +249,6 @@ export type ConversationSummaryFragment = {
 } & { ' $fragmentName'?: 'ConversationSummaryFragment' };
 
 export type ConversationsQueryVariables = Exact<{
-  first: number;
   after?: string | null | undefined;
 }>;
 
@@ -1606,7 +1605,7 @@ export const UnsaveProductDocument = {
   ],
 } as unknown as DocumentNode<UnsaveProductMutation, UnsaveProductMutationVariables>;
 export const ConversationsDocument = {
-  __meta__: { hash: 'aea313be0a5c7afd3c63a46552e9cab21faea5eae0a2c091756b4dc3799478ed' },
+  __meta__: { hash: '63738b98ccb33339271ea0e113418bb689e6e59c5f4ccc5cf622dee4ae3f8885' },
   kind: 'Document',
   definitions: [
     {
@@ -1614,14 +1613,6 @@ export const ConversationsDocument = {
       operation: 'query',
       name: { kind: 'Name', value: 'Conversations' },
       variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'first' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
-          },
-        },
         {
           kind: 'VariableDefinition',
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'after' } },
@@ -1639,7 +1630,7 @@ export const ConversationsDocument = {
               {
                 kind: 'Argument',
                 name: { kind: 'Name', value: 'first' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'first' } },
+                value: { kind: 'IntValue', value: '20' },
               },
               {
                 kind: 'Argument',

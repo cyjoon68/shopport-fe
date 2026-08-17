@@ -24,6 +24,7 @@ describe('chat composer draft isolation', () => {
       id === 'A' ? draftA.promise : draftB.promise,
     );
     const screen = render(composer('A'));
+    expect(screen.getByPlaceholderText('Shopport에게 추천받기')).toBeOnTheScreen();
     expect(screen.getByLabelText('쇼핑 질문').props.editable).toBe(false);
     expect(accessibilityDisabled(screen, '이미지 첨부')).toBe(true);
     expect(accessibilityDisabled(screen, '메시지 보내기')).toBe(true);
@@ -80,6 +81,31 @@ describe('chat composer draft isolation', () => {
     expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
   });
 
+  it('clears the sent text while the chat response is pending', async () => {
+    const response = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '전송할 문장',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => response.promise);
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledWith('전송할 문장', null);
+    expect(inputValue(screen)).toBe('');
+  });
+
   it('blocks direct input when a clarification requires an option', async () => {
     mockedReadDraft.mockResolvedValue({
       text: '직접 쓴 답',
@@ -102,6 +128,23 @@ describe('chat composer draft isolation', () => {
     expect(accessibilityDisabled(screen, '메시지 보내기')).toBe(true);
     fireEvent.press(screen.getByLabelText('메시지 보내기'));
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stop action in the NewChat footer while streaming', async () => {
+    const onStop = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading
+        onSend={jest.fn(() => Promise.resolve())}
+        onStop={onStop}
+      />,
+    );
+
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('응답 중지'));
+
+    expect(onStop).toHaveBeenCalledTimes(1);
   });
 
   it('ignores an out-of-order A read after switching to B', async () => {

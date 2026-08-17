@@ -5,8 +5,8 @@ fragment ConversationSummary on Conversation {
   updatedAt
 }
 
-query Conversations($first: Int!, $after: String) {
-  conversations(first: $first, after: $after) {
+query Conversations($after: String) {
+  conversations(first: 20, after: $after) {
     edges {
       cursor
       node {

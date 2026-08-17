@@ -13,6 +13,7 @@ import {
   ConversationSummaryFragmentDoc,
   ConversationsDocument,
 } from '@/graphql/generated/graphql';
+import { conversationHref } from '@/features/chat';
 import { useSession } from '@/features/auth/session-provider';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 
@@ -48,7 +49,6 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
   const { theme } = useUnistyles();
   const { status } = useSession();
   const { data } = useQuery(ConversationsDocument, {
-    variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated',
   });
@@ -116,9 +116,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
               accessibilityLabel={conversation.title}
               accessibilityRole="button"
               key={conversation.id}
-              onPress={() =>
-                navigate({ pathname: '/chat/[id]', params: { id: conversation.id } })
-              }
+              onPress={() => navigate(conversationHref(conversation.id))}
               style={({ pressed }) => [styles.conversation, pressed && styles.pressed]}
             >
               <Text allowFontScaling numberOfLines={2} style={styles.conversationTitle}>

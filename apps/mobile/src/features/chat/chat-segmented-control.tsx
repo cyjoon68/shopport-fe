@@ -19,6 +19,7 @@ export type ChatTab = (typeof tabs)[number];
 
 type ChatSegmentedControlProps = Readonly<{
   onValueChange: (value: ChatTab) => void;
+  unread?: Readonly<Record<ChatTab, boolean>>;
   testID?: string | undefined;
   value: ChatTab;
 }>;
@@ -28,6 +29,7 @@ const getActivePillOffset = (value: ChatTab): number =>
 
 export const ChatSegmentedControl = ({
   onValueChange,
+  unread,
   testID,
   value,
 }: ChatSegmentedControlProps) => {
@@ -83,6 +85,7 @@ export const ChatSegmentedControl = ({
           return (
             <Pressable
               accessibilityLabel={tab}
+              accessibilityHint={unread?.[tab] ? `${tab} 읽지 않음` : undefined}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={tab}
@@ -90,12 +93,20 @@ export const ChatSegmentedControl = ({
               style={styles.tab}
               testID={`new-chat-segment-${tab}`}
             >
-              <Text
-                allowFontScaling={false}
-                style={selected ? styles.activeText : styles.text}
-              >
-                {tab}
-              </Text>
+              <View style={styles.tabContent}>
+                <Text
+                  allowFontScaling={false}
+                  style={selected ? styles.activeText : styles.text}
+                >
+                  {tab}
+                </Text>
+                {unread?.[tab] ? (
+                  <View
+                    accessibilityLabel={`${tab} 읽지 않음`}
+                    style={styles.unreadDot}
+                  />
+                ) : null}
+              </View>
             </Pressable>
           );
         })}
@@ -137,6 +148,13 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  tabContent: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  unreadDot: {
+    backgroundColor: theme.colors.danger,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   text: {
     color: theme.colors.textMuted,

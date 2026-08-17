@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { environment } from '@/shared/config/environment';
 
-export type AuthProviderName = 'apple' | 'kakao';
+export type AuthProviderName = 'kakao';
 
 export type TokenPair = Readonly<{
   accessToken: string;
@@ -10,6 +10,8 @@ export type TokenPair = Readonly<{
 }>;
 
 const refreshTokenKey = 'shopport.refresh-token';
+const authenticationRetryLimit = 8;
+const authenticationRetryDelayMilliseconds = 1_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -38,16 +40,31 @@ const post = async (path: string, body: unknown): Promise<Response> =>
     body: JSON.stringify(body),
   });
 
+const postAuthentication = async (path: string, body: unknown): Promise<Response> => {
+  for (let attempt = 0; attempt <= authenticationRetryLimit; attempt += 1) {
+    try {
+      return await post(path, body);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      if (attempt === authenticationRetryLimit) {
+        throw new Error('로그인 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+      }
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, authenticationRetryDelayMilliseconds),
+      );
+    }
+  }
+  throw new Error('로그인 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+};
+
 export const authenticate = async (
   provider: AuthProviderName,
   identityToken: string,
   nonce: string,
-  displayName?: string,
 ): Promise<TokenPair> => {
-  const response = await post(`/v1/auth/${provider}`, {
+  const response = await postAuthentication(`/v1/auth/${provider}`, {
     identityToken,
     nonce,
-    ...(provider === 'apple' && displayName ? { displayName } : {}),
   });
   if (!response.ok) throw new Error('로그인에 실패했습니다. 다시 시도해 주세요.');
   return parseTokenPair(await response.json());
