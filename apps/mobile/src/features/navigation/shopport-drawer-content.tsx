@@ -213,7 +213,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
               conversation={conversation}
               online={online}
               onPinnedChange={updatePinned}
-              onOpen={navigation.closeDrawer}
+              onOpen={() => navigation.closeDrawer()}
               onRefresh={refetch}
               pinned={pinnedIds.has(conversation.id)}
             />
