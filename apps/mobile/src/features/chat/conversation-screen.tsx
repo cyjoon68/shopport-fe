@@ -154,7 +154,7 @@ export const ConversationScreen = ({
       setAskSheetOpen(true);
       Alert.alert(
         '질문을 건너뛰지 못했어요',
-        error instanceof Error ? error.message : '다시 시도해 주세요.',
+        chatErrorPresentation(error).message,
       );
     }
   };
