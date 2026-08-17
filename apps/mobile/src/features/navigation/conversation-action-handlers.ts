@@ -4,7 +4,11 @@ import {
   DeleteConversationDocument,
   RenameConversationDocument,
 } from '@/graphql/generated/graphql';
-import { setConversationPinned, sqliteChatPersistence } from '@/shared/storage/database';
+import {
+  deleteDraft,
+  setConversationPinned,
+  sqliteChatPersistence,
+} from '@/shared/storage/database';
 
 export type DrawerConversation = Readonly<{
   id: string;
@@ -98,18 +102,22 @@ export const useConversationActionHandlers = ({
                 return;
               }
               let cacheCleanupFailed = false;
-              try {
-                await sqliteChatPersistence.removeItem(conversation.id);
-                await setConversationPinned(conversation.id, false);
-              } catch {
-                cacheCleanupFailed = true;
-              }
+              const cleanupResults = await Promise.allSettled([
+                sqliteChatPersistence.removeItem(conversation.id),
+                setConversationPinned(conversation.id, false),
+                deleteDraft(conversation.id),
+              ]);
+              cacheCleanupFailed = cleanupResults.some(
+                ({ status }) => status === 'rejected',
+              );
               try {
                 await onRefresh();
               } catch {
                 Alert.alert(
                   '삭제 완료',
-                  '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+                  cacheCleanupFailed
+                    ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
+                    : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
                 );
                 return;
               }

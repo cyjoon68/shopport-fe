@@ -57,6 +57,7 @@ type ConversationLinkProps = Readonly<{
   online: boolean;
   pinned: boolean;
   onPinnedChange: (conversationId: string, pinned: boolean) => void;
+  onOpen: () => void;
   onRefresh: () => Promise<unknown>;
 }>;
 
@@ -65,6 +66,7 @@ const ConversationLink = ({
   online,
   pinned,
   onPinnedChange,
+  onOpen,
   onRefresh,
 }: ConversationLinkProps) => {
   const { theme } = useUnistyles();
@@ -84,6 +86,7 @@ const ConversationLink = ({
           accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
           accessibilityLabel={conversation.title}
           accessibilityRole="button"
+          onPress={onOpen}
           style={styles.conversation}
         >
           <View style={styles.conversationContent}>
@@ -210,6 +213,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
               conversation={conversation}
               online={online}
               onPinnedChange={updatePinned}
+              onOpen={navigation.closeDrawer}
               onRefresh={refetch}
               pinned={pinnedIds.has(conversation.id)}
             />

@@ -33,8 +33,12 @@ const MessageRow = ({
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>) => {
   styles.useVariants({ role: message.role });
+  const transcriptText = message.askUsers.reduce(
+    (text, { request }) => text.replace(request.question, '').trim(),
+    message.text,
+  );
   if (
-    !message.text &&
+    !transcriptText &&
     !message.askUsers.length &&
     !message.images.length &&
     !message.products.length
@@ -45,7 +49,7 @@ const MessageRow = ({
       accessibilityLabel={message.role === 'user' ? '내 메시지' : 'Shopport 답변'}
       style={styles.row}
     >
-      {message.text ? (
+      {transcriptText ? (
         <View style={styles.bubble}>
           <Text
             allowFontScaling
@@ -53,7 +57,7 @@ const MessageRow = ({
             selectable
             style={styles.text}
           >
-            {message.text}
+            {transcriptText}
           </Text>
         </View>
       ) : null}

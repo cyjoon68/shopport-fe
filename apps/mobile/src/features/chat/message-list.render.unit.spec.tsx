@@ -81,13 +81,13 @@ describe('chat message list', () => {
               },
             ],
             products: [],
-            text: '',
+            text: '어떤 색이 좋아요?',
           },
         ]}
       />,
     );
 
-    expect(screen.getByText('어떤 색이 좋아요?')).toBeOnTheScreen();
+    expect(screen.getAllByText('어떤 색이 좋아요?')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: '검정' })).toBeNull();
   });
 });
