@@ -1,9 +1,11 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import type { ConversationQuery } from '@/graphql/generated/graphql';
 import {
-  productFromFragment,
+  productRecommendationSummariesFromToolResult,
   productsFromToolResult,
+  recommendedProductFromFragment,
 } from '@/features/catalog/product-model';
+import type { RecommendedProduct } from '@/features/catalog/product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 import { messageIdentity } from './message-id';
 import { ASK_USER_SKIP_MESSAGE, askUserArgsFromToolPart } from './ask-user';
@@ -30,6 +32,7 @@ export type DisplayMessage = Readonly<{
   id: string;
   images: ReadonlyArray<DisplayImage>;
   products: ReadonlyArray<CachedProduct>;
+  recommendations: ReadonlyArray<RecommendedProduct>;
   role: 'user' | 'assistant';
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   text: string;
@@ -42,6 +45,21 @@ const visibleMessageText = (text: string): string =>
 const uniqueById = <T extends Readonly<{ id: string }>>(
   values: ReadonlyArray<T>,
 ): Array<T> => Array.from(new Map(values.map((value) => [value.id, value])).values());
+
+const mergeRecommendations = (
+  historical: ReadonlyArray<RecommendedProduct>,
+  live: ReadonlyArray<RecommendedProduct>,
+): Array<RecommendedProduct> => {
+  const recommendations = new Map(
+    historical.map((recommendation) => [recommendation.product.id, recommendation]),
+  );
+  live.forEach((recommendation) => {
+    const current = recommendations.get(recommendation.product.id);
+    if (recommendation.aiSummary || !current)
+      recommendations.set(recommendation.product.id, recommendation);
+  });
+  return [...recommendations.values()];
+};
 
 const imageUrl = (part: Extract<UIMessage['parts'][number], { type: 'image' }>) =>
   part.source.type === 'url'
@@ -80,6 +98,20 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
     .filter((part) => part.type === 'text')
     .map((part) => part.content)
     .join('');
+  const products = uniqueById(
+    message.parts.flatMap((part) =>
+      part.type === 'tool-result' ? productsFromToolResult(part.content) : [],
+    ),
+  );
+  const aiSummaries = new Map(
+    message.parts
+      .flatMap((part) =>
+        part.type === 'tool-result'
+          ? productRecommendationSummariesFromToolResult(part.content)
+          : [],
+      )
+      .map(({ productId, aiSummary }) => [productId, aiSummary]),
+  );
   return {
     askUsers: message.parts.flatMap((part) => {
       const request = askUserArgsFromToolPart(part);
@@ -104,9 +136,11 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
           ]
         : [],
     ),
-    products: message.parts.flatMap((part) =>
-      part.type === 'tool-result' ? productsFromToolResult(part.content) : [],
-    ),
+    products,
+    recommendations: products.map((product) => ({
+      product,
+      aiSummary: aiSummaries.get(product.id) ?? null,
+    })),
     tools,
   };
 };
@@ -115,6 +149,11 @@ export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessag
   const text = message.parts
     .flatMap((part) => (part.__typename === 'TextMessagePart' ? [part.text] : []))
     .join('');
+  const recommendations = message.parts.flatMap((part) =>
+    part.__typename === 'ProductReferenceMessagePart'
+      ? [recommendedProductFromFragment(part.product, part.aiSummary)]
+      : [],
+  );
   return {
     askUsers: message.parts.flatMap((part) =>
       part.__typename === 'AskUserMessagePart'
@@ -145,11 +184,8 @@ export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessag
           ]
         : [],
     ),
-    products: message.parts.flatMap((part) =>
-      part.__typename === 'ProductReferenceMessagePart'
-        ? [productFromFragment(part.product)]
-        : [],
-    ),
+    products: recommendations.map(({ product }) => product),
+    recommendations,
     tools: message.parts.flatMap((part) =>
       part.__typename === 'ToolStatusMessagePart'
         ? [{ id: part.id, name: part.toolName, status: part.status }]
@@ -167,6 +203,7 @@ const mergeDisplayMessage = (
   text: live.text || historical.text,
   images: uniqueById([...historical.images, ...live.images]),
   products: uniqueById([...historical.products, ...live.products]),
+  recommendations: mergeRecommendations(historical.recommendations, live.recommendations),
   tools: uniqueById([...historical.tools, ...live.tools]),
   askUsers: live.askUsers.length ? live.askUsers : historical.askUsers,
 });

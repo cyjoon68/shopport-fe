@@ -32,8 +32,13 @@ export const ChatScreen = () => {
   const { theme } = useUnistyles();
   const { status } = useSession();
   const online = useOnline();
-  const { id: routeId } = useLocalSearchParams<{ id?: string }>();
+  const { deletedConversationId, id: routeId } = useLocalSearchParams<{
+    deletedConversationId?: string;
+    id?: string;
+  }>();
   const routeConversationId = typeof routeId === 'string' ? routeId : null;
+  const deletedConversation =
+    typeof deletedConversationId === 'string' ? deletedConversationId : null;
   const navigation =
     useNavigation<DrawerNavigationProp<Record<string, object | undefined>>>();
   const [createConversation] = useMutation(CreateConversationDocument, {
@@ -57,6 +62,18 @@ export const ChatScreen = () => {
     setConversationId(routeConversationId);
     setSendInitialDraft(false);
   }, [routeConversationId]);
+
+  useEffect(() => {
+    if (!deletedConversation) return;
+    if (deletedConversation === conversationId) {
+      setConversationId(null);
+      setSendInitialDraft(false);
+      setSelectedTab('채팅');
+      router.setParams({ deletedConversationId: undefined, id: undefined });
+      return;
+    }
+    router.setParams({ deletedConversationId: undefined });
+  }, [conversationId, deletedConversation]);
 
   useEffect(() => {
     trackedConversationId.current = null;
@@ -221,8 +238,11 @@ export const ChatScreen = () => {
           </View>
           <View style={selectedTab === '상품' ? styles.visible : styles.hidden}>
             <FoundProductsContent
-              conversationProducts={messages.flatMap(({ products }) => products)}
+              conversationRecommendations={messages.flatMap(
+                ({ recommendations }) => recommendations,
+              )}
               focusProductId={focusedProductId}
+              presentation="recommendations"
             />
           </View>
         </View>

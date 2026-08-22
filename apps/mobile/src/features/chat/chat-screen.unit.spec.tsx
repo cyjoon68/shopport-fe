@@ -12,7 +12,9 @@ import type { ChatTab } from './chat-segmented-control';
 import type { DisplayMessage } from './message-list';
 
 const mockPush = jest.fn<void, [unknown]>();
+const mockSetParams = jest.fn<void, [Record<string, string | undefined>]>();
 const mockOpenDrawer = jest.fn<void, []>();
+let mockSearchParams: { deletedConversationId?: string; id?: string } = {};
 let mockTabChange: ((value: ChatTab) => void) | undefined;
 let mockUnread: Readonly<Record<ChatTab, boolean>> | undefined;
 let mockConversationOnMessagesChange:
@@ -37,11 +39,16 @@ let mockConversationOnProductSelect:
       isSaved: boolean;
     }) => void)
   | undefined;
+let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
+let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
-  router: { push: (argument: unknown) => mockPush(argument) },
-  useLocalSearchParams: () => ({}),
+  router: {
+    push: (argument: unknown) => mockPush(argument),
+    setParams: (params: Record<string, string | undefined>) => mockSetParams(params),
+  },
+  useLocalSearchParams: () => mockSearchParams,
   useNavigation: () => ({ openDrawer: mockOpenDrawer }),
 }));
 
@@ -103,15 +110,20 @@ jest.mock('./conversation-screen', () => ({
 jest.mock('@/features/catalog/found-products-screen', () => {
   return {
     FoundProductsContent: ({
-      conversationProducts,
+      conversationRecommendations,
+      presentation,
     }: {
-      conversationProducts?: ReadonlyArray<{ id: string; title: string }>;
-    }) =>
-      mockCreateElement(
+      conversationRecommendations?: DisplayMessage['recommendations'];
+      presentation?: 'catalog' | 'recommendations';
+    }) => {
+      mockFoundProductsRecommendations = conversationRecommendations;
+      mockFoundProductsPresentation = presentation;
+      return mockCreateElement(
         mockNativeText,
         { testID: 'found-products-content' },
-        conversationProducts?.[0]?.title ?? '상품',
-      ),
+        conversationRecommendations?.[0]?.product.title ?? '상품',
+      );
+    },
   };
 });
 
@@ -149,10 +161,13 @@ const mockedUseMutation = useMutation as jest.MockedFunction<typeof useMutation>
 describe('chat screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
     mockTabChange = undefined;
     mockUnread = undefined;
     mockConversationOnMessagesChange = undefined;
     mockConversationOnProductSelect = undefined;
+    mockFoundProductsRecommendations = undefined;
+    mockFoundProductsPresentation = undefined;
   });
 
   it('opens the drawer from the top-left menu button', () => {
@@ -276,6 +291,12 @@ describe('chat screen', () => {
       id: 'assistant-1',
       images: [],
       products: [product],
+      recommendations: [
+        {
+          product,
+          aiSummary: '무향이라 향에 민감한 입술에도 편하게 사용할 수 있습니다.',
+        },
+      ],
       role: 'assistant',
       status: 'COMPLETED',
       text: '립밤 추천',
@@ -286,11 +307,21 @@ describe('chat screen', () => {
     expect(mockUnread?.상품).toBe(false);
     act(() => mockConversationOnProductSelect?.(product));
     expect(screen.getByTestId('found-products-content')).toHaveTextContent(product.title);
+    expect(mockFoundProductsPresentation).toBe('recommendations');
+    expect(mockFoundProductsRecommendations?.[0]?.aiSummary).toBe(
+      '무향이라 향에 민감한 입술에도 편하게 사용할 수 있습니다.',
+    );
 
     const nextAssistant = {
       ...assistant,
       id: 'assistant-2',
       products: [{ ...product, id: 'product-2', title: '다음 상품' }],
+      recommendations: [
+        {
+          product: { ...product, id: 'product-2', title: '다음 상품' },
+          aiSummary: '다음 추천 요약',
+        },
+      ],
     } satisfies DisplayMessage;
     act(() => mockTabChange?.('채팅'));
     act(() => mockConversationOnMessagesChange?.([assistant, nextAssistant]));
@@ -348,6 +379,31 @@ describe('chat screen', () => {
     expect(screen.getByTestId('conversation-screen')).toBeOnTheScreen();
   });
 
+  it('resets a deleted active conversation to the default chat state', () => {
+    const createConversation = jest.fn();
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockSearchParams = { id: 'conversation-1' };
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('conversation-screen')).toBeOnTheScreen();
+
+    mockSearchParams = {
+      deletedConversationId: 'conversation-1',
+      id: 'conversation-1',
+    };
+    act(() => screen.rerender(<ChatScreen />));
+
+    expect(screen.queryByTestId('conversation-screen')).toBeNull();
+    expect(screen.getByLabelText('쇼핑 질문')).toBeOnTheScreen();
+    expect(mockSetParams).toHaveBeenCalledWith({
+      deletedConversationId: undefined,
+      id: undefined,
+    });
+  });
+
   it('marks the inactive tab unread when new assistant content arrives', async () => {
     const createConversation = jest.fn().mockResolvedValue({
       data: {
@@ -377,6 +433,7 @@ describe('chat screen', () => {
       id: 'assistant-1',
       images: [],
       products: [],
+      recommendations: [],
       role: 'assistant',
       status: 'COMPLETED',
       text: '추천 결과',

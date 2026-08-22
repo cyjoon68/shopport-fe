@@ -53,6 +53,7 @@ query Conversation($id: UUID!) {
         }
         ... on ProductReferenceMessagePart {
           id
+          aiSummary
           product {
             ...ProductCard
           }
@@ -77,6 +78,7 @@ query FoundProducts($first: Int!, $after: String) {
             __typename
             ... on ProductReferenceMessagePart {
               id
+              aiSummary
               product {
                 ...ProductCard
               }

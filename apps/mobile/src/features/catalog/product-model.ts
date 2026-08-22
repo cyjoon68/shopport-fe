@@ -3,6 +3,16 @@ import { readFragment } from '@/graphql/generated';
 import { ProductCardFragmentDoc } from '@/graphql/generated/graphql';
 import type { CachedProduct } from '@/shared/storage/database';
 
+export type RecommendedProduct = Readonly<{
+  product: CachedProduct;
+  aiSummary: string | null;
+}>;
+
+type ProductRecommendationSummary = Readonly<{
+  productId: string;
+  aiSummary: string;
+}>;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -33,6 +43,11 @@ export const productFromFragment = (
     isSaved: product.isSaved,
   };
 };
+
+export const recommendedProductFromFragment = (
+  fragment: FragmentType<typeof ProductCardFragmentDoc>,
+  aiSummary: string | null,
+): RecommendedProduct => ({ product: productFromFragment(fragment), aiSummary });
 
 const parseProduct = (value: unknown): CachedProduct | null => {
   if (!isRecord(value) || !isRecord(value.provider) || !isRecord(value.offer))
@@ -108,6 +123,30 @@ export const productsFromToolResult = (content: unknown): Array<CachedProduct> =
   return parsed.products.flatMap((product) => {
     const result = parseProduct(product);
     return result ? [result] : [];
+  });
+};
+
+export const productRecommendationSummariesFromToolResult = (
+  content: unknown,
+): Array<ProductRecommendationSummary> => {
+  let parsed: unknown;
+  try {
+    parsed = typeof content === 'string' ? JSON.parse(content) : content;
+  } catch {
+    return [];
+  }
+  if (
+    !isRecord(parsed) ||
+    parsed.kind !== 'product_recommendations' ||
+    !Array.isArray(parsed.recommendations)
+  ) {
+    return [];
+  }
+  return parsed.recommendations.flatMap((recommendation) => {
+    if (!isRecord(recommendation)) return [];
+    const productId = stringField(recommendation, 'productId');
+    const aiSummary = stringField(recommendation, 'aiSummary');
+    return productId && aiSummary ? [{ productId, aiSummary }] : [];
   });
 };
 

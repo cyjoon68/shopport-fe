@@ -9,13 +9,32 @@ import { FoundProductsDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import { ProductCard } from './product-card';
-import { productFromFragment } from './product-model';
-import type { CachedProduct } from '@/shared/storage/database';
+import { recommendedProductFromFragment } from './product-model';
+import type { RecommendedProduct } from './product-model';
+
+type ProductPresentation = 'catalog' | 'recommendations';
 
 type FoundProductsContentProps = Readonly<{
-  conversationProducts?: ReadonlyArray<CachedProduct>;
+  conversationRecommendations?: ReadonlyArray<RecommendedProduct>;
   focusProductId?: string | null;
+  presentation?: ProductPresentation;
 }>;
+
+const RecommendationSummary = ({ aiSummary }: Readonly<{ aiSummary: string }>) => (
+  <View style={styles.summaryCard}>
+    <Text allowFontScaling style={styles.summaryTitle}>
+      AI 요약
+    </Text>
+    <Text
+      allowFontScaling
+      maxFontSizeMultiplier={2}
+      numberOfLines={3}
+      style={styles.summaryBody}
+    >
+      {aiSummary}
+    </Text>
+  </View>
+);
 
 export const FoundProductsScreen = () => {
   const { status } = useSession();
@@ -30,8 +49,9 @@ export const FoundProductsScreen = () => {
 };
 
 export const FoundProductsContent = ({
-  conversationProducts = [],
+  conversationRecommendations = [],
   focusProductId = null,
+  presentation = 'catalog',
 }: FoundProductsContentProps = {}) => {
   const { status } = useSession();
   const online = useOnline();
@@ -40,35 +60,45 @@ export const FoundProductsContent = ({
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated' || !online,
   });
-  const products = useMemo(() => {
+  const queryRecommendations = useMemo(() => {
     const results =
       data?.conversations.edges.flatMap(({ node }) =>
         node.messages.flatMap(({ parts }) =>
           parts.flatMap((part) =>
             part.__typename === 'ProductReferenceMessagePart'
-              ? [productFromFragment(part.product)]
+              ? [recommendedProductFromFragment(part.product, part.aiSummary)]
               : [],
           ),
         ),
       ) ?? [];
-    return [
-      ...new Map(
-        [...conversationProducts, ...results].map((product) => [product.id, product]),
-      ).values(),
-    ];
-  }, [conversationProducts, data]);
-  const listRef = useRef<FlashListRef<CachedProduct> | null>(null);
+    return results;
+  }, [data]);
+  const recommendations = useMemo(() => {
+    const byProductId = new Map<string, RecommendedProduct>();
+    [...conversationRecommendations].reverse().forEach((recommendation) => {
+      if (!byProductId.has(recommendation.product.id))
+        byProductId.set(recommendation.product.id, recommendation);
+    });
+    queryRecommendations.forEach((recommendation) => {
+      if (!byProductId.has(recommendation.product.id))
+        byProductId.set(recommendation.product.id, recommendation);
+    });
+    return [...byProductId.values()];
+  }, [conversationRecommendations, queryRecommendations]);
+  const listRef = useRef<FlashListRef<RecommendedProduct> | null>(null);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!focusProductId) return;
-    const index = products.findIndex(({ id }) => id === focusProductId);
+    const index = recommendations.findIndex(
+      ({ product }) => product.id === focusProductId,
+    );
     if (index < 0) return;
     void listRef.current?.scrollToIndex({ index, animated: true });
     setHighlightedProductId(focusProductId);
     const timeout = setTimeout(() => setHighlightedProductId(null), 1_600);
     return () => clearTimeout(timeout);
-  }, [focusProductId, products]);
+  }, [focusProductId, recommendations]);
 
   return (
     <View style={styles.content} testID="found-products-content">
@@ -79,8 +109,8 @@ export const FoundProductsContent = ({
       ) : null}
       <FlashList
         contentContainerStyle={styles.list}
-        data={products}
-        keyExtractor={({ id }) => id}
+        data={recommendations}
+        keyExtractor={({ product }) => product.id}
         ListEmptyComponent={
           <EmptyState
             description="대화에서 찾은 상품이 여기에 모입니다."
@@ -92,15 +122,19 @@ export const FoundProductsContent = ({
           if (pageInfo?.hasNextPage)
             void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
         }}
-        numColumns={2}
+        numColumns={1}
         ref={listRef}
         renderItem={({ item }) => (
           <View style={styles.gridCell}>
             <ProductCard
               compact
-              highlighted={item.id === highlightedProductId}
-              product={item}
+              highlighted={item.product.id === highlightedProductId}
+              horizontal={presentation === 'recommendations'}
+              product={item.product}
             />
+            {presentation === 'recommendations' && item.aiSummary ? (
+              <RecommendationSummary aiSummary={item.aiSummary} />
+            ) : null}
           </View>
         )}
         style={styles.listView}
@@ -111,7 +145,7 @@ export const FoundProductsContent = ({
 
 const styles = StyleSheet.create((theme) => ({
   content: { flex: 1 },
-  gridCell: { flex: 1, margin: theme.spacing.xs },
+  gridCell: { flex: 1, gap: theme.spacing.sm, margin: theme.spacing.xs },
   list: { gap: theme.spacing.lg, padding: theme.spacing.lg },
   listView: { flex: 1 },
   offline: {
@@ -119,5 +153,19 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textMuted,
     padding: theme.spacing.sm,
     textAlign: 'center',
+  },
+  summaryBody: {
+    color: theme.colors.text,
+    fontSize: theme.typography.productCard.provider.regular,
+    lineHeight: theme.typography.productCard.provider.regular * 1.4,
+  },
+  summaryCard: {
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  summaryTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.productCard.provider.regular,
+    fontWeight: '700',
   },
 }));

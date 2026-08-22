@@ -54,6 +54,7 @@ const DrawerLink = ({ label, onPress, symbol }: DrawerLinkProps) => {
 
 type ConversationLinkProps = Readonly<{
   conversation: DrawerConversation;
+  onDeleted: (conversationId: string) => void;
   online: boolean;
   pinned: boolean;
   onPinnedChange: (conversationId: string, pinned: boolean) => void;
@@ -63,6 +64,7 @@ type ConversationLinkProps = Readonly<{
 
 const ConversationLink = ({
   conversation,
+  onDeleted,
   online,
   pinned,
   onPinnedChange,
@@ -72,6 +74,7 @@ const ConversationLink = ({
   const { theme } = useUnistyles();
   const { remove, rename, togglePin } = useConversationActionHandlers({
     conversation,
+    onDeleted,
     onPinnedChange,
     onRefresh,
     online,
@@ -158,6 +161,11 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
     });
   };
 
+  const signalDeletedConversation = (conversationId: string): void => {
+    navigation.closeDrawer();
+    router.setParams({ deletedConversationId: conversationId });
+  };
+
   if (status !== 'authenticated') return null;
 
   return (
@@ -212,6 +220,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
               key={conversation.id}
               conversation={conversation}
               online={online}
+              onDeleted={signalDeletedConversation}
               onPinnedChange={updatePinned}
               onOpen={() => navigation.closeDrawer()}
               onRefresh={refetch}

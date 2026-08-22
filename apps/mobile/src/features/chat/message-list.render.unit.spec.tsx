@@ -45,6 +45,7 @@ const message = {
       totalMinor: '3000',
     },
   ],
+  recommendations: [],
   role: 'assistant',
   status: 'COMPLETED',
   text: '상품을 찾았어요.',
