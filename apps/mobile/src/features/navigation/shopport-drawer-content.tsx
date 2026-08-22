@@ -152,6 +152,14 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
     router.push(href);
   };
 
+  const openNewConversation = (): void => {
+    navigation.closeDrawer();
+    router.replace({
+      pathname: '/',
+      params: { deletedConversationId: '', id: '' },
+    });
+  };
+
   const updatePinned = (conversationId: string, pinned: boolean): void => {
     setPinnedIds((current) => {
       const next = new Set(current);
@@ -191,7 +199,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
       <View style={styles.links}>
         <DrawerLink
           label="새로운 대화 열기"
-          onPress={() => navigate('/')}
+          onPress={openNewConversation}
           symbol="square.and.pencil"
         />
         <DrawerLink

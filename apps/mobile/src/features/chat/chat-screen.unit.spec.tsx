@@ -404,6 +404,19 @@ describe('chat screen', () => {
     });
   });
 
+  it('shows the default chat state for an empty conversation route id', () => {
+    const createConversation = jest.fn();
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockSearchParams = { id: '' };
+    const screen = render(<ChatScreen />);
+
+    expect(screen.queryByTestId('conversation-screen')).toBeNull();
+    expect(screen.getByLabelText('쇼핑 질문')).toBeOnTheScreen();
+  });
+
   it('marks the inactive tab unread when new assistant content arrives', async () => {
     const createConversation = jest.fn().mockResolvedValue({
       data: {

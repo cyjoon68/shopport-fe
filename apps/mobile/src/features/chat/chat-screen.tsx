@@ -36,7 +36,8 @@ export const ChatScreen = () => {
     deletedConversationId?: string;
     id?: string;
   }>();
-  const routeConversationId = typeof routeId === 'string' ? routeId : null;
+  const routeConversationId =
+    typeof routeId === 'string' && routeId.length > 0 ? routeId : null;
   const deletedConversation =
     typeof deletedConversationId === 'string' ? deletedConversationId : null;
   const navigation =
