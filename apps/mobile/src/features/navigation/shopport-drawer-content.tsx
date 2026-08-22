@@ -54,6 +54,7 @@ const DrawerLink = ({ label, onPress, symbol }: DrawerLinkProps) => {
 
 type ConversationLinkProps = Readonly<{
   conversation: DrawerConversation;
+  onDeleted: (conversationId: string) => void;
   online: boolean;
   pinned: boolean;
   onPinnedChange: (conversationId: string, pinned: boolean) => void;
@@ -63,6 +64,7 @@ type ConversationLinkProps = Readonly<{
 
 const ConversationLink = ({
   conversation,
+  onDeleted,
   online,
   pinned,
   onPinnedChange,
@@ -72,6 +74,7 @@ const ConversationLink = ({
   const { theme } = useUnistyles();
   const { remove, rename, togglePin } = useConversationActionHandlers({
     conversation,
+    onDeleted,
     onPinnedChange,
     onRefresh,
     online,
@@ -149,6 +152,14 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
     router.push(href);
   };
 
+  const openNewConversation = (): void => {
+    navigation.closeDrawer();
+    router.replace({
+      pathname: '/',
+      params: { deletedConversationId: '', id: '' },
+    });
+  };
+
   const updatePinned = (conversationId: string, pinned: boolean): void => {
     setPinnedIds((current) => {
       const next = new Set(current);
@@ -156,6 +167,11 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
       else next.delete(conversationId);
       return next;
     });
+  };
+
+  const signalDeletedConversation = (conversationId: string): void => {
+    navigation.closeDrawer();
+    router.setParams({ deletedConversationId: conversationId });
   };
 
   if (status !== 'authenticated') return null;
@@ -183,7 +199,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
       <View style={styles.links}>
         <DrawerLink
           label="새로운 대화 열기"
-          onPress={() => navigate('/')}
+          onPress={openNewConversation}
           symbol="square.and.pencil"
         />
         <DrawerLink
@@ -212,6 +228,7 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
               key={conversation.id}
               conversation={conversation}
               online={online}
+              onDeleted={signalDeletedConversation}
               onPinnedChange={updatePinned}
               onOpen={() => navigation.closeDrawer()}
               onRefresh={refetch}

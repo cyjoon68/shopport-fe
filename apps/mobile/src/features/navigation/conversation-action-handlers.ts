@@ -18,6 +18,7 @@ export type DrawerConversation = Readonly<{
 
 type ConversationActionHandlersProps = Readonly<{
   conversation: DrawerConversation | null;
+  onDeleted: (conversationId: string) => void;
   online: boolean;
   pinned: boolean;
   onPinnedChange: (conversationId: string, pinned: boolean) => void;
@@ -26,6 +27,7 @@ type ConversationActionHandlersProps = Readonly<{
 
 export const useConversationActionHandlers = ({
   conversation,
+  onDeleted,
   online,
   pinned,
   onPinnedChange,
@@ -109,6 +111,7 @@ export const useConversationActionHandlers = ({
                 );
                 return;
               }
+              onDeleted(conversation.id);
               let cacheCleanupFailed = false;
               const cleanupResults = await Promise.allSettled([
                 deleteCachedConversation(conversation.id),

@@ -1,6 +1,12 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { createElement as mockCreateElement } from 'react';
-import { Alert, Linking, Text as mockNativeText } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Text as mockNativeText,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
 import { useMutation } from '@apollo/client/react';
 import { cacheProducts } from '@/shared/storage/database';
 import type { CachedProduct } from '@/shared/storage/database';
@@ -47,8 +53,20 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('expo-image', () => ({
-  Image: ({ accessibilityLabel }: { accessibilityLabel?: string }) =>
-    mockCreateElement(mockNativeText, { accessibilityLabel }, 'image'),
+  Image: ({
+    accessibilityLabel,
+    source,
+    style,
+  }: {
+    accessibilityLabel?: string;
+    source?: string;
+    style?: unknown;
+  }) =>
+    mockCreateElement(
+      mockNativeText,
+      { accessibilityLabel, style: style as StyleProp<TextStyle>, testID: source },
+      'image',
+    ),
 }));
 
 const mockedUseMutation = useMutation as jest.MockedFunction<typeof useMutation>;
@@ -110,13 +128,38 @@ describe('product card links', () => {
 
     fireEvent.press(screen.getByLabelText('텀블러 찜'));
 
-    await waitFor(() => expect(screen.getByText('찜 해제')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByTestId('sf:bookmark.fill')).toBeOnTheScreen());
     expect(saveProduct).toHaveBeenCalledWith({
       variables: { input: { productId: 'product-1' } },
     });
     expect(jest.mocked(cacheProducts)).toHaveBeenCalledWith([
       { ...product, isSaved: true },
     ]);
+  });
+
+  it('uses a bookmark icon instead of a text label', () => {
+    const screen = render(<ProductCard product={product} />);
+
+    expect(screen.getByTestId('sf:bookmark')).toBeOnTheScreen();
+    expect(screen.queryByText('찜')).not.toBeOnTheScreen();
+  });
+
+  it('renders a horizontal recommendation card with a 112pt image and compact round bookmark', () => {
+    const screen = render(<ProductCard horizontal product={product} />);
+
+    expect(screen.getByLabelText('텀블러 상품 이미지')).toHaveStyle({
+      height: 112,
+      width: 112,
+    });
+    expect(screen.getByLabelText('텀블러 찜')).toHaveStyle({
+      height: 44,
+      width: 44,
+    });
+    expect(screen.getByTestId('product-card-bookmark-surface')).toHaveStyle({
+      borderRadius: 18,
+      height: 36,
+      width: 36,
+    });
   });
 
   it('explains why saving is unavailable offline', () => {

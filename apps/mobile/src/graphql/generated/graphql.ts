@@ -307,6 +307,7 @@ export type ConversationQuery = {
             | {
                 __typename: 'ProductReferenceMessagePart';
                 id: string;
+                aiSummary: string | null;
                 product: { __typename: 'Product' } & {
                   ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
                 };
@@ -348,6 +349,7 @@ export type FoundProductsQuery = {
             | {
                 __typename: 'ProductReferenceMessagePart';
                 id: string;
+                aiSummary: string | null;
                 product: { __typename: 'Product' } & {
                   ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
                 };
@@ -1706,7 +1708,7 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
-  __meta__: { hash: 'c1534fb75481215be8735816256dd9b2cc6eaba1ac5182420c84f7bd52177e19' },
+  __meta__: { hash: 'f74b49a2e4e66ac29bc1092a56331ffd8d6746621fc0dd12ff1273e26dfc8a5c' },
   kind: 'Document',
   definitions: [
     {
@@ -1894,6 +1896,10 @@ export const ConversationDocument = {
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   {
                                     kind: 'Field',
+                                    name: { kind: 'Name', value: 'aiSummary' },
+                                  },
+                                  {
+                                    kind: 'Field',
                                     name: { kind: 'Name', value: 'product' },
                                     selectionSet: {
                                       kind: 'SelectionSet',
@@ -2046,7 +2052,7 @@ export const ConversationDocument = {
   ],
 } as unknown as DocumentNode<ConversationQuery, ConversationQueryVariables>;
 export const FoundProductsDocument = {
-  __meta__: { hash: '1774184f0275425a88d338ee7d3004b8552a9217f6dd342e1286b30bebac7c30' },
+  __meta__: { hash: '5247c3cc1b6810567526197b40340f874355295ee7eadf0eafea5dab29b41e98' },
   kind: 'Document',
   definitions: [
     {
@@ -2151,6 +2157,13 @@ export const FoundProductsDocument = {
                                               {
                                                 kind: 'Field',
                                                 name: { kind: 'Name', value: 'id' },
+                                              },
+                                              {
+                                                kind: 'Field',
+                                                name: {
+                                                  kind: 'Name',
+                                                  value: 'aiSummary',
+                                                },
                                               },
                                               {
                                                 kind: 'Field',

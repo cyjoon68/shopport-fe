@@ -4,6 +4,7 @@ import { ASK_USER_SKIP_MESSAGE } from './ask-user';
 import {
   activeAskUserRequest,
   fromHistoricalMessage,
+  fromLiveMessage,
   mergeMessages,
 } from './message-list';
 import {
@@ -58,7 +59,12 @@ const historical = {
       id: 'part-image',
       asset: { id: 'asset-1', status: 'READY', url: 'https://example.com/image.jpg' },
     },
-    { __typename: 'ProductReferenceMessagePart', id: 'part-product', product },
+    {
+      __typename: 'ProductReferenceMessagePart',
+      id: 'part-product',
+      aiSummary: '출근길에 들고 다니기 좋은 보온 텀블러입니다.',
+      product,
+    },
     {
       __typename: 'ToolStatusMessagePart',
       id: 'part-tool',
@@ -77,6 +83,9 @@ describe('historical message parts', () => {
     expect(message.images[0]?.id).toBe('part-image');
     expect(message.images[0]?.status).toBe('READY');
     expect(message.products[0]?.id).toBe('product-1');
+    expect(message.recommendations[0]?.aiSummary).toBe(
+      '출근길에 들고 다니기 좋은 보온 텀블러입니다.',
+    );
     expect(message.tools[0]?.id).toBe('part-tool');
     expect(message.tools[0]?.status).toBe('COMPLETED');
     expect(activeAskUserRequest([message])?.request.allowFreeText).toBe(true);
@@ -86,6 +95,53 @@ describe('historical message parts', () => {
         { ...message, askUsers: [], id: 'next-user', role: 'user' },
       ]),
     ).toBeNull();
+  });
+
+  it('links live product cards to only the structured AI summary', () => {
+    const message = fromLiveMessage({
+      id: '0198a122-0c00-7000-8000-000000000003',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-result',
+          toolCallId: 'search-products',
+          state: 'complete',
+          content: JSON.stringify({ kind: 'product_cards', products: [product] }),
+        },
+        {
+          type: 'tool-result',
+          toolCallId: 'record-recommendations',
+          state: 'complete',
+          content: JSON.stringify({
+            kind: 'product_recommendations',
+            recommendations: [
+              {
+                productId: 'product-1',
+                aiSummary: '가격과 보온 성능이 출근용 조건에 알맞습니다.',
+              },
+            ],
+          }),
+        },
+      ],
+    });
+
+    expect(message.recommendations[0]?.aiSummary).toBe(
+      '가격과 보온 성능이 출근용 조건에 알맞습니다.',
+    );
+    expect(message.recommendations[0]?.product.id).toBe('product-1');
+  });
+
+  it('keeps legacy product references without an AI summary', () => {
+    const legacy = fromHistoricalMessage({
+      ...historical,
+      parts: historical.parts.map((part) =>
+        part.__typename === 'ProductReferenceMessagePart'
+          ? { ...part, aiSummary: null }
+          : part,
+      ),
+    });
+
+    expect(legacy.recommendations[0]?.aiSummary).toBeNull();
   });
 
   it('deduplicates server and persisted live messages by stable ID', () => {

@@ -1,4 +1,8 @@
-import { formatMoney, productsFromToolResult } from './product-model';
+import {
+  formatMoney,
+  productRecommendationSummariesFromToolResult,
+  productsFromToolResult,
+} from './product-model';
 
 const product = {
   id: '0198a122-0c00-7000-8000-000000000001',
@@ -41,6 +45,32 @@ describe('product tool result', () => {
     expect(productsFromToolResult('추천은 텀블러입니다')).toEqual([]);
     expect(
       productsFromToolResult(JSON.stringify({ kind: 'text', products: [product] })),
+    ).toEqual([]);
+  });
+
+  it('reads only valid structured AI summaries', () => {
+    expect(
+      productRecommendationSummariesFromToolResult(
+        JSON.stringify({
+          kind: 'product_recommendations',
+          recommendations: [
+            {
+              productId: product.id,
+              aiSummary: '보온 성능과 용량이 출근용으로 알맞습니다.',
+            },
+          ],
+        }),
+      ),
+    ).toEqual([
+      { productId: product.id, aiSummary: '보온 성능과 용량이 출근용으로 알맞습니다.' },
+    ]);
+    expect(
+      productRecommendationSummariesFromToolResult(
+        JSON.stringify({
+          kind: 'product_recommendations',
+          recommendations: [{ productId: product.id, aiSummary: '' }],
+        }),
+      ),
     ).toEqual([]);
   });
 
