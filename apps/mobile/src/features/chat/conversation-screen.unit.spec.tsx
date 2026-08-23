@@ -1,10 +1,11 @@
 import { act, render } from '@testing-library/react-native';
-import { useQuery } from '@apollo/client/react';
+import { useApolloClient, useQuery } from '@apollo/client/react';
 import { useChat } from '@tanstack/ai-react';
 import { createElement as mockCreateElement, type ComponentProps } from 'react';
 import { Text as mockText } from 'react-native';
 import { ConversationScreen } from './conversation-screen';
 import type { ChatComposer } from './chat-composer';
+import { ConversationsDocument } from '@/graphql/generated/graphql';
 
 let mockComposerProps: ComponentProps<typeof ChatComposer> | undefined;
 let mockConnectionOptions: (() => { body: Record<string, unknown> }) | undefined;
@@ -13,6 +14,7 @@ let mockHistory: ReadonlyArray<unknown> = [];
 let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
 const mockSendMessage = jest.fn<Promise<void>, [unknown]>();
+const mockRefetchQueries = jest.fn();
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -20,7 +22,10 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
 }));
 
-jest.mock('@apollo/client/react', () => ({ useQuery: jest.fn() }));
+jest.mock('@apollo/client/react', () => ({
+  useApolloClient: jest.fn(),
+  useQuery: jest.fn(),
+}));
 
 jest.mock(
   '@tanstack/ai-react',
@@ -61,6 +66,9 @@ jest.mock('./chat-composer', () => ({
 }));
 
 const mockedUseQuery = useQuery as jest.MockedFunction<typeof useQuery>;
+const mockedUseApolloClient = useApolloClient as jest.MockedFunction<
+  typeof useApolloClient
+>;
 const mockedUseChat = useChat as jest.MockedFunction<typeof useChat>;
 
 describe('conversation screen', () => {
@@ -73,6 +81,10 @@ describe('conversation screen', () => {
     mockHistoryLoading = false;
     mockChatMessages = [];
     mockSendMessage.mockReset();
+    mockRefetchQueries.mockReset().mockResolvedValue([]);
+    mockedUseApolloClient.mockReturnValue({
+      refetchQueries: mockRefetchQueries,
+    } as unknown as ReturnType<typeof useApolloClient>);
     mockedUseQuery.mockImplementation(
       () =>
         ({
@@ -149,5 +161,15 @@ describe('conversation screen', () => {
     });
 
     expect(onProviderReset).not.toHaveBeenCalled();
+  });
+
+  it('refreshes recent conversations after the response finishes', () => {
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    act(() => mockFinish?.());
+
+    expect(mockRefetchQueries).toHaveBeenCalledWith({
+      include: [ConversationsDocument],
+    });
   });
 });
