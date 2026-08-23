@@ -154,10 +154,8 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
 
   const openNewConversation = (): void => {
     navigation.closeDrawer();
-    router.replace({
-      pathname: '/',
-      params: { deletedConversationId: '', id: '' },
-    });
+    router.setParams({ deletedConversationId: undefined, id: undefined });
+    router.replace('/');
   };
 
   const updatePinned = (conversationId: string, pinned: boolean): void => {
