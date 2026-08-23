@@ -1,5 +1,6 @@
 import { Drawer } from 'expo-router/drawer';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
 import { ShopportDrawerContent } from '@/features/navigation/shopport-drawer-content';
 
 const DrawerLayout = () => {

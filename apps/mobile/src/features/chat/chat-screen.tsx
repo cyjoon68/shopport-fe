@@ -1,31 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { useMutation } from '@apollo/client/react';
+import { Screen } from '@shopport/ui';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { useMutation } from '@apollo/client/react';
-import { Screen } from '@shopport/ui';
+
+import { useSession } from '@/features/auth/session-provider';
+import { FoundProductsContent } from '@/features/catalog/found-products-screen';
+import { readFragment } from '@/graphql/generated';
 import {
   ConversationsDocument,
   ConversationSummaryFragmentDoc,
   CreateConversationDocument,
 } from '@/graphql/generated/graphql';
-import { readFragment } from '@/graphql/generated';
-import { saveDraft } from '@/shared/storage/database';
-import type { CachedProduct } from '@/shared/storage/database';
-import { useSession } from '@/features/auth/session-provider';
-import { FoundProductsContent } from '@/features/catalog/found-products-screen';
 import { useOnline } from '@/providers/network-provider';
+import type { CachedProduct } from '@/shared/storage/database';
+import { saveDraft } from '@/shared/storage/database';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+
+import { selectAndUploadAsset } from './asset-upload';
+import { type RetailerId, retailerIds } from './chat-composer-types';
+import { ChatNewConversation } from './chat-new-conversation';
 import { ChatSegmentedControl, type ChatTab } from './chat-segmented-control';
 import { ConversationScreen } from './conversation-screen';
-import { ChatNewConversation } from './chat-new-conversation';
-import { retailerIds, type RetailerId } from './chat-composer-types';
 import type { DisplayMessage } from './message-list';
-import { selectAndUploadAsset } from './asset-upload';
 
 type UnreadState = Readonly<{ chat: boolean; products: boolean }>;
 

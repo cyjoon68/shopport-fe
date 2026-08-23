@@ -1,8 +1,10 @@
-import { Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { Text, View } from 'react-native';
+
 import { GlassButton } from '@/shared/ui/glass-button';
-import type { Attachment, RetailerId } from './chat-composer-types';
+
 import { styles } from './chat-composer-styles';
+import type { Attachment, RetailerId } from './chat-composer-types';
 import { NewChatFooter } from './new-chat-footer';
 
 type Props = Readonly<{

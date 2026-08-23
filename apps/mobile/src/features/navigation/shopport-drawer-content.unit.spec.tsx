@@ -1,7 +1,8 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { createElement as mockCreateElement, type ReactNode } from 'react';
 import { Pressable as mockPressable } from 'react-native';
-import type { DrawerContentComponentProps } from 'expo-router/drawer';
+
 import { ShopportDrawerContent } from './shopport-drawer-content';
 
 const mockCloseDrawer = jest.fn();

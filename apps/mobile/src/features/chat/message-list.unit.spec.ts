@@ -1,18 +1,20 @@
 import type { UIMessage } from '@tanstack/ai-react';
+
 import type { ConversationQuery } from '@/graphql/generated/graphql';
+
 import { ASK_USER_SKIP_MESSAGE } from './ask-user';
-import {
-  activeAskUserRequest,
-  fromHistoricalMessage,
-  fromLiveMessage,
-  mergeMessages,
-} from './message-list';
 import {
   createStableChatMessageId,
   createUuidV7,
   isStableChatMessageId,
   messageIdentity,
 } from './message-id';
+import {
+  activeAskUserRequest,
+  fromHistoricalMessage,
+  fromLiveMessage,
+  mergeMessages,
+} from './message-list';
 
 const product = {
   id: 'product-1',

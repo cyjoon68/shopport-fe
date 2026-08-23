@@ -1,6 +1,6 @@
 import type { ChatClientPersistence, ChatPersistedState } from '@tanstack/ai-client';
-import { openDatabaseAsync } from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { openDatabaseAsync } from 'expo-sqlite';
 
 export type CachedProduct = Readonly<{
   id: string;

@@ -253,6 +253,9 @@ importers:
       eslint-config-prettier:
         specifier: 10.1.8
         version: 10.1.8(eslint@9.39.2(jiti@2.7.0)(supports-color@8.1.1))
+      eslint-plugin-simple-import-sort:
+        specifier: 14.0.0
+        version: 14.0.0(eslint@9.39.2(jiti@2.7.0)(supports-color@8.1.1))
       typescript-eslint:
         specifier: 8.67.0
         version: 8.67.0(eslint@9.39.2(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
@@ -5927,6 +5930,14 @@ packages:
     hasBin: true
     peerDependencies:
       eslint: '>=7.0.0'
+
+  eslint-plugin-simple-import-sort@14.0.0:
+    resolution:
+      {
+        integrity: sha512-NUJO0+XFCkk+o5EsAJruTgnfMEpeWrPWeJS15UVF60GgXmqz1BJ9/3hzlvG7lkL8Bubzos5cCLptThbFfPnSMQ==,
+      }
+    peerDependencies:
+      eslint: '>=5.0.0'
 
   eslint-scope@8.4.0:
     resolution:
@@ -14687,6 +14698,10 @@ snapshots:
       source-map: 0.6.1
 
   eslint-config-prettier@10.1.8(eslint@9.39.2(jiti@2.7.0)(supports-color@8.1.1)):
+    dependencies:
+      eslint: 9.39.2(jiti@2.7.0)(supports-color@8.1.1)
+
+  eslint-plugin-simple-import-sort@14.0.0(eslint@9.39.2(jiti@2.7.0)(supports-color@8.1.1)):
     dependencies:
       eslint: 9.39.2(jiti@2.7.0)(supports-color@8.1.1)
 

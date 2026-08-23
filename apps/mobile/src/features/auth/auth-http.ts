@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+
 import { environment } from '@/shared/config/environment';
 
 export type AuthProviderName = 'kakao';

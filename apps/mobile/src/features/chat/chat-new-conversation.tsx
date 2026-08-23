@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+
 import type { RetailerId } from './chat-composer-types';
 import { NewChatFooter } from './new-chat-footer';
 

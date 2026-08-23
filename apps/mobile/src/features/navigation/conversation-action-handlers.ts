@@ -1,5 +1,6 @@
-import { Alert } from 'react-native';
 import { useMutation } from '@apollo/client/react';
+import { Alert } from 'react-native';
+
 import {
   DeleteConversationDocument,
   RenameConversationDocument,

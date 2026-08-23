@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
+
 import type { CodegenConfig } from '@graphql-codegen/cli';
 import { addTypenameSelectionDocumentTransform } from '@graphql-codegen/client-preset';
-import { createHash } from 'node:crypto';
 import { stripIgnoredCharacters } from 'graphql';
 
 const hashPersistedDocument = (document: string): string =>

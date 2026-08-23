@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-native';
+
 import { ChatStatePreview } from './chat-state-preview';
 
 export const chatStateStoryTitle = '채팅/상태';

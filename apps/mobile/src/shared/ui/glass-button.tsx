@@ -1,15 +1,16 @@
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { ReactNode } from 'react';
 import {
+  type AccessibilityState,
   ActivityIndicator,
   Platform,
   Pressable,
-  Text,
-  type AccessibilityState,
   type StyleProp,
+  Text,
   type ViewStyle,
 } from 'react-native';
-import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
 import { useReducedTransparency } from '@/shared/accessibility/use-reduced-transparency';
 
 type GlassButtonProps = Readonly<{

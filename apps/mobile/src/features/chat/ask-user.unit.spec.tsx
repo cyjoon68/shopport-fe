@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
-import { AskUserCard } from './ask-user-card';
+
 import { askUserArgsFromToolPart, parseAskUserArgs } from './ask-user';
+import { AskUserCard } from './ask-user-card';
 
 const request = {
   question: '어떤 색이 좋아요?',

@@ -1,12 +1,13 @@
-import { Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import { FlashList } from '@shopify/flash-list';
-import { Redirect } from 'expo-router';
-import { StyleSheet } from 'react-native-unistyles';
 import { useQuery } from '@apollo/client/react';
+import { FlashList } from '@shopify/flash-list';
 import { EmptyState, Screen } from '@shopport/ui';
-import { UploadedImagesDocument } from '@/graphql/generated/graphql';
+import { Image } from 'expo-image';
+import { Redirect } from 'expo-router';
+import { Text, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
+
 import { useSession } from '@/features/auth/session-provider';
+import { UploadedImagesDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
 
 export const UploadedImagesScreen = () => {

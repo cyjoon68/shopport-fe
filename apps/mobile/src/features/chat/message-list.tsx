@@ -1,12 +1,14 @@
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { StyleSheet } from 'react-native-unistyles';
+
 import type { CachedProduct } from '@/shared/storage/database';
+
 import { ChatProductRow } from './chat-product-row';
-import { activeAskUserRequest } from './message-model';
 import type { DisplayMessage } from './message-model';
+import { activeAskUserRequest } from './message-model';
 
 export {
   activeAskUserRequest,

@@ -1,27 +1,29 @@
+import { useQuery } from '@apollo/client/react';
+import { Image } from 'expo-image';
+import type { Href } from 'expo-router';
+import { Link, router } from 'expo-router';
+import {
+  type DrawerContentComponentProps,
+  DrawerContentScrollView,
+} from 'expo-router/drawer';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
-import type { Href } from 'expo-router';
-import {
-  DrawerContentScrollView,
-  type DrawerContentComponentProps,
-} from 'expo-router/drawer';
-import { useQuery } from '@apollo/client/react';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+import { useSession } from '@/features/auth/session-provider';
+import { conversationHref } from '@/features/chat';
 import { readFragment } from '@/graphql/generated';
 import {
-  ConversationSummaryFragmentDoc,
   ConversationsDocument,
+  ConversationSummaryFragmentDoc,
 } from '@/graphql/generated/graphql';
-import { conversationHref } from '@/features/chat';
-import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import { readPinnedConversationIds } from '@/shared/storage/database';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+
 import {
-  useConversationActionHandlers,
   type DrawerConversation,
+  useConversationActionHandlers,
 } from './conversation-action-handlers';
 
 type DrawerLinkProps = Readonly<{

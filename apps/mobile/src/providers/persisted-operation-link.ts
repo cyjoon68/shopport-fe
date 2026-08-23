@@ -1,6 +1,7 @@
 import { ApolloLink, Observable } from '@apollo/client';
-import persistedDocuments from '@/graphql/generated/persisted-documents.json';
 import type { ASTNode, DocumentNode } from 'graphql';
+
+import persistedDocuments from '@/graphql/generated/persisted-documents.json';
 
 const operationIdHeader = 'x-shopport-operation-id';
 const sha256HashPattern = /^[a-f0-9]{64}$/u;

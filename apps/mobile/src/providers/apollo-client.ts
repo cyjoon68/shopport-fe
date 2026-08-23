@@ -1,7 +1,9 @@
 import { ApolloClient, ApolloLink, HttpLink, InMemoryCache } from '@apollo/client';
 import { relayStylePagination } from '@apollo/client/utilities';
+
 import { getAccessToken } from '@/features/auth/auth-token';
 import { environment } from '@/shared/config/environment';
+
 import {
   persistedOperationLink,
   persistedOperationPrinter,

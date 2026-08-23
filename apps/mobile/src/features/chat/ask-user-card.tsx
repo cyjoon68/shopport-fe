@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
 import type { AskUserRequest } from './types';
 
 type AskUserCardProps = Readonly<{

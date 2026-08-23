@@ -1,12 +1,14 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert, Text as mockNativeText } from 'react-native';
-import { createElement as mockCreateElement } from 'react';
 import { useMutation } from '@apollo/client/react';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { print } from 'graphql';
+import { createElement as mockCreateElement } from 'react';
+import { Alert, Text as mockNativeText } from 'react-native';
+
 import {
   ConversationsDocument,
   CreateConversationDocument,
 } from '@/graphql/generated/graphql';
+
 import { ChatScreen } from './chat-screen';
 import type { ChatTab } from './chat-segmented-control';
 import type { DisplayMessage } from './message-list';

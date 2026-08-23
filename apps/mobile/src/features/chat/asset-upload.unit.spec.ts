@@ -1,5 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
+
 import { apolloClient } from '@/providers/apollo-client';
+
 import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
 
 jest.mock('expo-image-picker', () => ({

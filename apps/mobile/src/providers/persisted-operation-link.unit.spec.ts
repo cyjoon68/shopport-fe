@@ -1,7 +1,8 @@
-import { ApolloClient, ApolloLink, HttpLink, InMemoryCache } from '@apollo/client';
 import { createHash } from 'node:crypto';
+
+import { ApolloClient, ApolloLink, HttpLink, InMemoryCache } from '@apollo/client';
 import { parse, stripIgnoredCharacters } from 'graphql';
-import persistedDocuments from '@/graphql/generated/persisted-documents.json';
+
 import {
   AssetDocument,
   ConversationDocument,
@@ -14,14 +15,16 @@ import {
   FoundProductsDocument,
   ProductDocument,
   RenameConversationDocument,
-  SaveProductDocument,
   SavedProductsDocument,
+  SaveProductDocument,
   SearchProductsDocument,
   UnsaveProductDocument,
   UpdateViewerDocument,
   UploadedImagesDocument,
   ViewerDocument,
 } from '@/graphql/generated/graphql';
+import persistedDocuments from '@/graphql/generated/persisted-documents.json';
+
 import {
   getPersistedOperationHash,
   persistedOperationLink,

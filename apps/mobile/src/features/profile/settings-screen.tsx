@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
-import { Redirect, router } from 'expo-router';
-import { StyleSheet } from 'react-native-unistyles';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Screen, SectionTitle } from '@shopport/ui';
+import { Redirect, router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
+
+import { kakaoAccountEmail } from '@/features/auth/native-auth';
+import { useSession } from '@/features/auth/session-provider';
 import {
   DeleteViewerAccountDocument,
   UpdateViewerDocument,
   ViewerDocument,
 } from '@/graphql/generated/graphql';
-import { kakaoAccountEmail } from '@/features/auth/native-auth';
-import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
 import { environment } from '@/shared/config/environment';
 import { GlassActionButton } from '@/shared/ui/glass-button';

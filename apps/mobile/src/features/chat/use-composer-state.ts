@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
+
 import { deleteDraft, readDraft, saveDraft } from '@/shared/storage/database';
+
 import { pollAssetUntilSettled } from './asset-status';
 import type { Attachment } from './chat-composer-types';
 

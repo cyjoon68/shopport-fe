@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Text, View } from 'react-native';
-import Purchases from 'react-native-purchases';
-import type { PurchasesPackage } from 'react-native-purchases';
-import { Redirect } from 'expo-router';
-import { StyleSheet } from 'react-native-unistyles';
 import { useQuery } from '@apollo/client/react';
 import { Screen, SectionTitle } from '@shopport/ui';
-import { ViewerDocument } from '@/graphql/generated/graphql';
+import { Redirect } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Text, View } from 'react-native';
+import type { PurchasesPackage } from 'react-native-purchases';
+import Purchases from 'react-native-purchases';
+import { StyleSheet } from 'react-native-unistyles';
+
 import { useSession } from '@/features/auth/session-provider';
-import { configureRevenueCat } from './revenuecat';
-import { syncViewerEntitlement } from './subscription-sync';
+import { ViewerDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
 import { GlassActionButton, GlassButton } from '@/shared/ui/glass-button';
+
+import { configureRevenueCat } from './revenuecat';
+import { syncViewerEntitlement } from './subscription-sync';
 
 const productIds = new Set(['shopport_pro_monthly', 'shopport_pro_annual']);
 
