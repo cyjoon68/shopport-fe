@@ -1,9 +1,11 @@
+import { Screen } from '@shopport/ui';
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
-import { Screen } from '@shopport/ui';
+
 import { GlassActionButton } from '@/shared/ui/glass-button';
+
 import { useSession } from './session-provider';
 
 export const AuthScreen = () => {

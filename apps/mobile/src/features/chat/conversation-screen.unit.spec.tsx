@@ -1,11 +1,13 @@
-import { act, render } from '@testing-library/react-native';
 import { useApolloClient, useQuery } from '@apollo/client/react';
 import { useChat } from '@tanstack/ai-react';
-import { createElement as mockCreateElement, type ComponentProps } from 'react';
+import { act, render } from '@testing-library/react-native';
+import { type ComponentProps, createElement as mockCreateElement } from 'react';
 import { Text as mockText } from 'react-native';
-import { ConversationScreen } from './conversation-screen';
-import type { ChatComposer } from './chat-composer';
+
 import { ConversationsDocument } from '@/graphql/generated/graphql';
+
+import type { ChatComposer } from './chat-composer';
+import { ConversationScreen } from './conversation-screen';
 
 let mockComposerProps: ComponentProps<typeof ChatComposer> | undefined;
 let mockConnectionOptions: (() => { body: Record<string, unknown> }) | undefined;

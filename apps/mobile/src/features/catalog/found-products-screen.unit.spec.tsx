@@ -1,15 +1,17 @@
+import { useQuery } from '@apollo/client/react';
+import { render, waitFor } from '@testing-library/react-native';
 import {
-  Fragment as mockFragment,
   createElement as mockCreateElement,
+  Fragment as mockFragment,
   type ReactNode,
 } from 'react';
-import { render, waitFor } from '@testing-library/react-native';
-import { useQuery } from '@apollo/client/react';
-import { FoundProductsContent } from './found-products-screen';
+
 import { FoundProductsDocument } from '@/graphql/generated/graphql';
-import { readCachedChatMessages } from '@/shared/storage/database';
-import type { RecommendedProduct } from './product-model';
 import type { CachedProduct } from '@/shared/storage/database';
+import { readCachedChatMessages } from '@/shared/storage/database';
+
+import { FoundProductsContent } from './found-products-screen';
+import type { RecommendedProduct } from './product-model';
 
 type FlashListProps = Readonly<{
   data?: ReadonlyArray<RecommendedProduct>;

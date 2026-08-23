@@ -1,9 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
-import { apolloClient } from '@/providers/apollo-client';
+
 import {
   CreateAssetUploadDocument,
   DeleteAssetDocument,
 } from '@/graphql/generated/graphql';
+import { apolloClient } from '@/providers/apollo-client';
 
 export type UploadedAsset = Readonly<{ id: string; uri: string }>;
 

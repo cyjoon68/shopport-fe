@@ -1,15 +1,17 @@
+import { useMutation } from '@apollo/client/react';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { useMutation } from '@apollo/client/react';
+
 import { SaveProductDocument, UnsaveProductDocument } from '@/graphql/generated/graphql';
-import type { CachedProduct } from '@/shared/storage/database';
-import { cacheProducts } from '@/shared/storage/database';
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
+import type { CachedProduct } from '@/shared/storage/database';
+import { cacheProducts } from '@/shared/storage/database';
 import { glassButtonIconSize } from '@/shared/ui/glass-button';
+
 import { formatMoney } from './product-model';
 
 type ProductCardProps = Readonly<{

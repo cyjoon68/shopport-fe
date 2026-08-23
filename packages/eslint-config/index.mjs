@@ -1,9 +1,18 @@
 import eslint from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/.expo/**', '**/coverage/**', '**/dist/**', '**/generated/**'] },
+  {
+    ignores: [
+      '**/.expo/**',
+      '**/.rnstorybook/storybook.requires.ts',
+      '**/coverage/**',
+      '**/dist/**',
+      '**/generated/**',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map((configuration) => ({
     ...configuration,
@@ -17,6 +26,9 @@ export default tseslint.config(
         projectService: true,
       },
     },
+    plugins: {
+      'simple-import-sort': simpleImportSort,
+    },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
@@ -24,6 +36,7 @@ export default tseslint.config(
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'simple-import-sort/imports': 'error',
     },
   },
   {

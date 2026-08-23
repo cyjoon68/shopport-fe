@@ -1,8 +1,9 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { ChatComposer } from './chat-composer';
+import { Alert } from 'react-native';
+
 import type { pollAssetUntilSettled } from './asset-status';
+import { ChatComposer } from './chat-composer';
 import {
   composer,
   deferred,

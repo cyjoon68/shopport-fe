@@ -1,9 +1,11 @@
 import type { render } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
+
 import { readDraft, saveDraft } from '@/shared/storage/database';
-import { ChatComposer } from './chat-composer';
-import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
+
 import { pollAssetUntilSettled } from './asset-status';
+import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
+import { ChatComposer } from './chat-composer';
 
 export type DraftValue = Readonly<{
   text: string;

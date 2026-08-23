@@ -1,6 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import { useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
-import * as Haptics from 'expo-haptics';
+
 import { readAssetStatus } from './asset-status';
 import { removeUploadedAsset, selectAndUploadAsset } from './asset-upload';
 import type { Attachment } from './chat-composer-types';

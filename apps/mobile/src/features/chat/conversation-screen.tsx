@@ -1,3 +1,6 @@
+import { useApolloClient, useQuery } from '@apollo/client/react';
+import { useChat, xhrHttpStream } from '@tanstack/ai-react';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,27 +11,26 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { xhrHttpStream, useChat } from '@tanstack/ai-react';
-import { useApolloClient, useQuery } from '@apollo/client/react';
-import { StyleSheet } from 'react-native-unistyles';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
+import { StyleSheet } from 'react-native-unistyles';
+
 import { getAccessToken } from '@/features/auth/auth-token';
 import { useSession } from '@/features/auth/session-provider';
-import { environment } from '@/shared/config/environment';
-import { sqliteChatPersistence } from '@/shared/storage/database';
-import { ChatComposer } from './chat-composer';
-import { activeAskUserRequest, mergeMessages, MessageList } from './message-list';
-import { cancelRunThenStop } from './chat-http';
-import { chatErrorPresentation } from './chat-errors';
-import { ASK_USER_SKIP_MESSAGE } from './ask-user';
+import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
-import { createStableChatMessageId } from './message-id';
-import { AskUserCard } from './ask-user-card';
-import type { RetailerId } from './chat-composer-types';
+import { environment } from '@/shared/config/environment';
 import type { CachedProduct } from '@/shared/storage/database';
+import { sqliteChatPersistence } from '@/shared/storage/database';
+
+import { ASK_USER_SKIP_MESSAGE } from './ask-user';
+import { AskUserCard } from './ask-user-card';
+import { ChatComposer } from './chat-composer';
+import type { RetailerId } from './chat-composer-types';
+import { chatErrorPresentation } from './chat-errors';
+import { cancelRunThenStop } from './chat-http';
+import { createStableChatMessageId } from './message-id';
 import type { DisplayMessage } from './message-list';
+import { activeAskUserRequest, mergeMessages, MessageList } from './message-list';
 
 type ConversationScreenProps = Readonly<{
   conversationId?: string;

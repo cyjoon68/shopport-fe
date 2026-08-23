@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Purchases from 'react-native-purchases';
+
 import { environment } from '@/shared/config/environment';
 
 let configuredUserId: string | null = null;

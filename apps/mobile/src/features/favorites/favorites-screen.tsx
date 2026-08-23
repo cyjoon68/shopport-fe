@@ -1,17 +1,18 @@
+import { useQuery } from '@apollo/client/react';
+import { FlashList } from '@shopify/flash-list';
+import { EmptyState, Screen } from '@shopport/ui';
+import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
-import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
-import { useQuery } from '@apollo/client/react';
-import { EmptyState, Screen } from '@shopport/ui';
-import { SavedProductsDocument } from '@/graphql/generated/graphql';
+
 import { useSession } from '@/features/auth/session-provider';
 import { ProductCard } from '@/features/catalog/product-card';
 import { productFromFragment } from '@/features/catalog/product-model';
+import { SavedProductsDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
-import { cacheProducts, readCachedProducts } from '@/shared/storage/database';
 import type { CachedProduct } from '@/shared/storage/database';
+import { cacheProducts, readCachedProducts } from '@/shared/storage/database';
 
 export const FavoritesScreen = () => {
   const { status } = useSession();

@@ -1,6 +1,7 @@
-import * as Crypto from 'expo-crypto';
 import { initializeKakaoSDK } from '@react-native-kakao/core';
 import { login as kakaoLogin, me as kakaoMe } from '@react-native-kakao/user';
+import * as Crypto from 'expo-crypto';
+
 import { environment } from '@/shared/config/environment';
 
 export type IdentityCredential = Readonly<{

@@ -1,8 +1,9 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { useState } from 'react';
 import { Alert, Text } from 'react-native';
+
+import { type RetailerId, retailerIds } from './chat-composer-types';
 import { ChatQuickActions } from './chat-quick-actions';
-import { retailerIds, type RetailerId } from './chat-composer-types';
 
 const Fixture = () => {
   const [providerIds, setProviderIds] = useState<ReadonlyArray<RetailerId>>([]);

@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+
 import { environment } from '@/shared/config/environment';
 
 Sentry.init({

@@ -1,17 +1,19 @@
+import { useQuery } from '@apollo/client/react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { EmptyState, Screen } from '@shopport/ui';
+import { Redirect } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { Redirect } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
-import { useQuery } from '@apollo/client/react';
-import { EmptyState, Screen } from '@shopport/ui';
-import { FoundProductsDocument } from '@/graphql/generated/graphql';
+
 import { useSession } from '@/features/auth/session-provider';
+import { FoundProductsDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
 import { readCachedChatMessages } from '@/shared/storage/database';
+
 import { ProductCard } from './product-card';
-import { productsFromToolResult, recommendedProductFromFragment } from './product-model';
 import type { RecommendedProduct } from './product-model';
+import { productsFromToolResult, recommendedProductFromFragment } from './product-model';
 
 type ProductPresentation = 'catalog' | 'recommendations';
 type ProductScope = 'all-conversations' | 'conversation';

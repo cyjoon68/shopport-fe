@@ -1,5 +1,5 @@
-import { apolloClient } from '@/providers/apollo-client';
 import { AssetDocument } from '@/graphql/generated/graphql';
+import { apolloClient } from '@/providers/apollo-client';
 
 export type AssetProcessingResult = 'READY' | 'REJECTED' | 'TIMEOUT';
 export type AssetRemoteStatus = 'PENDING_UPLOAD' | 'PROCESSING' | 'READY' | 'REJECTED';

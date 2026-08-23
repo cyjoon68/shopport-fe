@@ -1,5 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+
 import { ChatComposer } from './chat-composer';
+import type { DraftValue } from './chat-composer-test-support';
 import {
   accessibilityDisabled,
   composer,
@@ -11,7 +13,6 @@ import {
   resetComposerMocks,
   restoreComposerTimers,
 } from './chat-composer-test-support';
-import type { DraftValue } from './chat-composer-test-support';
 
 describe('chat composer draft isolation', () => {
   beforeEach(resetComposerMocks);

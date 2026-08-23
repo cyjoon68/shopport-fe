@@ -1,9 +1,11 @@
-import { Animated, Platform, TextInput, View } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
+import { Animated, Platform, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
 import { useReducedTransparency } from '@/shared/accessibility/use-reduced-transparency';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+
 import type { RetailerId } from './chat-composer-types';
 import { ChatQuickActions } from './chat-quick-actions';
 import { useKeyboardLift } from './use-keyboard-lift';

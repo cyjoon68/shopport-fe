@@ -1,8 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
-import type { CachedProduct } from '@/shared/storage/database';
+
 import { formatMoney } from '@/features/catalog/product-model';
+import type { CachedProduct } from '@/shared/storage/database';
 
 export const ChatProductRow = ({
   onProductSelect,

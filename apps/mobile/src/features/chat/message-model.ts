@@ -1,14 +1,16 @@
 import type { UIMessage } from '@tanstack/ai-react';
-import type { ConversationQuery } from '@/graphql/generated/graphql';
+
+import type { RecommendedProduct } from '@/features/catalog/product-model';
 import {
   productRecommendationSummariesFromToolResult,
   productsFromToolResult,
   recommendedProductFromFragment,
 } from '@/features/catalog/product-model';
-import type { RecommendedProduct } from '@/features/catalog/product-model';
+import type { ConversationQuery } from '@/graphql/generated/graphql';
 import type { CachedProduct } from '@/shared/storage/database';
-import { messageIdentity } from './message-id';
+
 import { ASK_USER_SKIP_MESSAGE, askUserArgsFromToolPart } from './ask-user';
+import { messageIdentity } from './message-id';
 import type { AskUserRequest } from './types';
 
 type HistoricalMessage = NonNullable<

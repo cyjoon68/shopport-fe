@@ -6,6 +6,7 @@ import {
   useImperativeHandle as mockUseImperativeHandle,
 } from 'react';
 import { View as mockNativeView } from 'react-native';
+
 import type { DisplayMessage } from './message-list';
 
 type FlashListProps = Readonly<{

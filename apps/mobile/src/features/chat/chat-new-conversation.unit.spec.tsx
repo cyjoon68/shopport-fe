@@ -1,8 +1,9 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { createElement as mockCreateElement, type ReactNode, useState } from 'react';
 import { Pressable as mockPressable } from 'react-native';
+
+import { type RetailerId, retailerIds } from './chat-composer-types';
 import { ChatNewConversation } from './chat-new-conversation';
-import { retailerIds, type RetailerId } from './chat-composer-types';
 
 jest.mock('@/shared/ui/glass-button', () => ({
   GlassButton: ({

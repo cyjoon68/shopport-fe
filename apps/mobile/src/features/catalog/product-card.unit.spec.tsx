@@ -1,15 +1,17 @@
+import { useMutation } from '@apollo/client/react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { createElement as mockCreateElement } from 'react';
 import {
   Alert,
   Linking,
-  Text as mockNativeText,
   type StyleProp,
+  Text as mockNativeText,
   type TextStyle,
 } from 'react-native';
-import { useMutation } from '@apollo/client/react';
-import { cacheProducts } from '@/shared/storage/database';
+
 import type { CachedProduct } from '@/shared/storage/database';
+import { cacheProducts } from '@/shared/storage/database';
+
 import { ProductCard } from './product-card';
 
 const product = {

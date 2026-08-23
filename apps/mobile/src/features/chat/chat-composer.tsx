@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
+
 import { useOnline } from '@/providers/network-provider';
-import { ChatComposerView } from './chat-composer-view';
+
 import type { ChatComposerProps } from './chat-composer-types';
+import { ChatComposerView } from './chat-composer-view';
 import { useComposerActions } from './use-composer-actions';
 import { useComposerState } from './use-composer-state';
 

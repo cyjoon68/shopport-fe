@@ -1,10 +1,11 @@
 import { ActionButtonStories, actionButtonStoryTitle } from '@shopport/storybook';
+
 import chatStateStories, {
+  chatStateStoryTitle,
   Error,
   ImageProcessing,
   LargeDynamicType,
   Loading,
-  chatStateStoryTitle,
 } from '@/features/chat/chat-state.stories';
 
 describe('on-device Storybook catalog', () => {

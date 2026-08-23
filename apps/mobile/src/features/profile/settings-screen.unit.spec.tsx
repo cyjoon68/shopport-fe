@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from '@apollo/client/react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { createElement as mockCreateElement, type ReactNode } from 'react';
 import {
@@ -6,8 +7,9 @@ import {
   Text as mockText,
   View as mockView,
 } from 'react-native';
-import { useMutation, useQuery } from '@apollo/client/react';
+
 import { kakaoAccountEmail } from '@/features/auth/native-auth';
+
 import { SettingsScreen } from './settings-screen';
 
 const mockLogout = jest.fn();
