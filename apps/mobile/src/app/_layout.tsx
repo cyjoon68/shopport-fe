@@ -33,6 +33,7 @@ const RootStack = () => {
         <Stack.Screen name="products" options={{ title: '상품 리스트' }} />
         <Stack.Screen name="favorites" options={{ title: '저장된 상품' }} />
         <Stack.Screen name="images" options={{ title: '업로드한 이미지' }} />
+        <Stack.Screen name="settings" options={{ title: '설정' }} />
         <Stack.Screen name="storybook" options={{ headerShown: false }} />
       </Stack>
     </>

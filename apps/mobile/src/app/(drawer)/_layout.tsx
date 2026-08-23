@@ -15,7 +15,6 @@ const DrawerLayout = () => {
       }}
     >
       <Drawer.Screen name="index" options={{ headerShown: false }} />
-      <Drawer.Screen name="settings" options={{ title: '설정' }} />
     </Drawer>
   );
 };
