@@ -59,6 +59,7 @@ export const ConversationScreen = ({
   const online = useOnline();
   const assetId = useRef<string | null>(null);
   const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
+  const responseFinishedRef = useRef(false);
   const connection = useMemo(
     () =>
       xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
@@ -83,6 +84,9 @@ export const ConversationScreen = ({
   });
   const chat = useChat({
     connection,
+    onFinish: () => {
+      responseFinishedRef.current = true;
+    },
     threadId: id,
     persistence: sqliteChatPersistence,
     queue: 'drop',
@@ -134,12 +138,13 @@ export const ConversationScreen = ({
   const send = async (text: string, nextAssetId: string | null): Promise<void> => {
     assetId.current = nextAssetId;
     providerIdsRef.current = activeAskUser ? undefined : providerIds;
+    responseFinishedRef.current = false;
     try {
       await chat.sendMessage({
         id: createStableChatMessageId(),
         content: text || '이 이미지와 관련된 상품을 찾아줘',
       });
-      onProviderReset?.();
+      if (responseFinishedRef.current) onProviderReset?.();
     } finally {
       assetId.current = null;
       providerIdsRef.current = undefined;
@@ -272,7 +277,9 @@ export const ConversationScreen = ({
         onSend={send}
         onStop={stop}
         providerIds={providerIds}
-        quickActionsEnabled={!activeAskUser}
+        quickActionsEnabled={
+          !historyLoading && !activeAskUser && displayMessages.length === 0
+        }
         sendInitialDraft={initialSend}
       />
     </View>
