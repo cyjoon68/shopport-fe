@@ -41,6 +41,7 @@ let mockConversationOnProductSelect:
   | undefined;
 let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
+let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -112,12 +113,15 @@ jest.mock('@/features/catalog/found-products-screen', () => {
     FoundProductsContent: ({
       conversationRecommendations,
       presentation,
+      scope,
     }: {
       conversationRecommendations?: DisplayMessage['recommendations'];
       presentation?: 'catalog' | 'recommendations';
+      scope?: 'all-conversations' | 'conversation';
     }) => {
       mockFoundProductsRecommendations = conversationRecommendations;
       mockFoundProductsPresentation = presentation;
+      mockFoundProductsScope = scope;
       return mockCreateElement(
         mockNativeText,
         { testID: 'found-products-content' },
@@ -168,6 +172,7 @@ describe('chat screen', () => {
     mockConversationOnProductSelect = undefined;
     mockFoundProductsRecommendations = undefined;
     mockFoundProductsPresentation = undefined;
+    mockFoundProductsScope = undefined;
   });
 
   it('opens the drawer from the top-left menu button', () => {
@@ -308,6 +313,7 @@ describe('chat screen', () => {
     act(() => mockConversationOnProductSelect?.(product));
     expect(screen.getByTestId('found-products-content')).toHaveTextContent(product.title);
     expect(mockFoundProductsPresentation).toBe('recommendations');
+    expect(mockFoundProductsScope).toBe('conversation');
     expect(mockFoundProductsRecommendations?.[0]?.aiSummary).toBe(
       '무향이라 향에 민감한 입술에도 편하게 사용할 수 있습니다.',
     );

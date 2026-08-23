@@ -3,8 +3,11 @@ import {
   createElement as mockCreateElement,
   type ReactNode,
 } from 'react';
-import { render } from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
+import { useQuery } from '@apollo/client/react';
 import { FoundProductsContent } from './found-products-screen';
+import { FoundProductsDocument } from '@/graphql/generated/graphql';
+import { readCachedChatMessages } from '@/shared/storage/database';
 import type { RecommendedProduct } from './product-model';
 import type { CachedProduct } from '@/shared/storage/database';
 
@@ -22,6 +25,10 @@ type ProductCardProps = Readonly<{
 }>;
 
 let mockProductCardProps: ProductCardProps | null = null;
+const mockedUseQuery = useQuery as jest.MockedFunction<typeof useQuery>;
+const mockedReadCachedChatMessages = readCachedChatMessages as jest.MockedFunction<
+  typeof readCachedChatMessages
+>;
 
 const product = {
   id: 'product-1',
@@ -70,6 +77,10 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => true,
 }));
 
+jest.mock('@/shared/storage/database', () => ({
+  readCachedChatMessages: jest.fn(() => Promise.resolve([])),
+}));
+
 jest.mock('@shopport/ui', () => ({
   EmptyState: () => null,
   Screen: ({ children }: { children: ReactNode }) => children,
@@ -91,12 +102,85 @@ describe('found products layout', () => {
   beforeEach(() => {
     mockFlashListProps = null;
     mockProductCardProps = null;
+    mockedReadCachedChatMessages.mockReset();
+    mockedReadCachedChatMessages.mockImplementation(() => new Promise(() => undefined));
   });
 
   it('renders products in a one-column list', () => {
     render(<FoundProductsContent />);
 
     expect(mockFlashListProps?.numColumns).toBe(1);
+  });
+
+  it('loads products from all conversations by default', () => {
+    render(<FoundProductsContent />);
+
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(
+      FoundProductsDocument,
+      expect.objectContaining({ skip: false }),
+    );
+  });
+
+  it('does not load other conversations inside a conversation product tab', () => {
+    render(<FoundProductsContent scope="conversation" />);
+
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(
+      FoundProductsDocument,
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('includes product cards cached from other conversations in the global list', async () => {
+    mockedReadCachedChatMessages.mockResolvedValue([
+      {
+        id: 'message-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-result',
+            content: JSON.stringify({
+              kind: 'product_cards',
+              products: [
+                {
+                  id: product.id,
+                  title: product.title,
+                  imageUrl: product.imageUrl,
+                  isAffiliate: product.isAffiliate,
+                  isSaved: product.isSaved,
+                  provider: {
+                    providerId: product.providerId,
+                    displayName: product.providerName,
+                  },
+                  offer: {
+                    id: product.id,
+                    price: {
+                      amountMinor: product.amountMinor,
+                      currency: product.currency,
+                    },
+                    shipping: {
+                      amountMinor: product.shippingMinor,
+                      currency: product.currency,
+                    },
+                    total: {
+                      amountMinor: product.totalMinor,
+                      currency: product.currency,
+                    },
+                    isInStock: product.isInStock,
+                    deliveryExpectedAt: product.deliveryExpectedAt,
+                    observedAt: product.observedAt,
+                    outboundUrl: product.outboundUrl,
+                  },
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    ] as never);
+
+    render(<FoundProductsContent />);
+
+    await waitFor(() => expect(firstProductCardProps().product).toEqual(product));
   });
 
   it('uses the horizontal card and renders the current summary outside it in Product tab', () => {
@@ -107,6 +191,7 @@ describe('found products layout', () => {
           { product, aiSummary: '가장 최근 요약' },
         ]}
         presentation="recommendations"
+        scope="conversation"
       />,
     );
 
@@ -124,6 +209,7 @@ describe('found products layout', () => {
     const screen = render(
       <FoundProductsContent
         conversationRecommendations={[{ product, aiSummary: '추천 이유' }]}
+        scope="conversation"
       />,
     );
 
