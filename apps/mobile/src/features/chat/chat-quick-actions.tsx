@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
 import type { RetailerId } from './chat-composer-types';
@@ -52,6 +52,17 @@ export const ChatQuickActions = ({
     close();
     setText(prompt);
   };
+  const toggleProvider = (providerId: RetailerId): void => {
+    if (providerId === 'oliveyoung') {
+      Alert.alert(
+        '올리브영 검색을 사용할 수 없어요',
+        '현재 올리브영 연동 서비스 문제로 상품 검색을 사용할 수 없습니다. 복구 전까지 다이소를 이용해 주세요.',
+        [{ text: '확인' }],
+      );
+      return;
+    }
+    onProviderToggle(providerId);
+  };
 
   return (
     <View style={styles.root} testID="chat-quick-actions">
@@ -64,11 +75,14 @@ export const ChatQuickActions = ({
           const selected = providerIds.includes(id);
           return (
             <Pressable
+              accessibilityHint={
+                id === 'oliveyoung' ? '현재 이용 불가 안내를 엽니다' : undefined
+              }
               accessibilityLabel={`${label} 판매처 선택`}
               accessibilityRole="switch"
               accessibilityState={{ checked: selected }}
               key={id}
-              onPress={() => onProviderToggle(id)}
+              onPress={() => toggleProvider(id)}
               style={[
                 styles.action,
                 selected ? styles.selectedAction : styles.actionSurface,
