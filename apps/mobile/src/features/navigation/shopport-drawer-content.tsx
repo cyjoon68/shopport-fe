@@ -93,7 +93,7 @@ const ConversationLink = ({
           style={styles.conversation}
         >
           <View style={styles.conversationContent}>
-            <Text allowFontScaling numberOfLines={2} style={styles.conversationTitle}>
+            <Text allowFontScaling numberOfLines={1} style={styles.conversationTitle}>
               {conversation.title}
             </Text>
             {pinned ? (

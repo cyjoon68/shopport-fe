@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { xhrHttpStream, useChat } from '@tanstack/ai-react';
-import { useQuery } from '@apollo/client/react';
+import { useApolloClient, useQuery } from '@apollo/client/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ConversationDocument } from '@/graphql/generated/graphql';
+import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
 import { getAccessToken } from '@/features/auth/auth-token';
 import { useSession } from '@/features/auth/session-provider';
 import { environment } from '@/shared/config/environment';
@@ -57,6 +57,7 @@ export const ConversationScreen = ({
   const initialSend = initialSendProp ?? routeSend === '1';
   const { status } = useSession();
   const online = useOnline();
+  const client = useApolloClient();
   const assetId = useRef<string | null>(null);
   const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
   const responseFinishedRef = useRef(false);
@@ -86,6 +87,7 @@ export const ConversationScreen = ({
     connection,
     onFinish: () => {
       responseFinishedRef.current = true;
+      void client.refetchQueries({ include: [ConversationsDocument] });
     },
     threadId: id,
     persistence: sqliteChatPersistence,
