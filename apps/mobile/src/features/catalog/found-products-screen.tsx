@@ -8,16 +8,19 @@ import { EmptyState, Screen } from '@shopport/ui';
 import { FoundProductsDocument } from '@/graphql/generated/graphql';
 import { useSession } from '@/features/auth/session-provider';
 import { useOnline } from '@/providers/network-provider';
+import { readCachedChatMessages } from '@/shared/storage/database';
 import { ProductCard } from './product-card';
-import { recommendedProductFromFragment } from './product-model';
+import { productsFromToolResult, recommendedProductFromFragment } from './product-model';
 import type { RecommendedProduct } from './product-model';
 
 type ProductPresentation = 'catalog' | 'recommendations';
+type ProductScope = 'all-conversations' | 'conversation';
 
 type FoundProductsContentProps = Readonly<{
   conversationRecommendations?: ReadonlyArray<RecommendedProduct>;
   focusProductId?: string | null;
   presentation?: ProductPresentation;
+  scope?: ProductScope;
 }>;
 
 const RecommendationSummary = ({ aiSummary }: Readonly<{ aiSummary: string }>) => (
@@ -43,7 +46,7 @@ export const FoundProductsScreen = () => {
 
   return (
     <Screen testID="found-products-screen">
-      <FoundProductsContent />
+      <FoundProductsContent scope="all-conversations" />
     </Screen>
   );
 };
@@ -52,14 +55,48 @@ export const FoundProductsContent = ({
   conversationRecommendations = [],
   focusProductId = null,
   presentation = 'catalog',
+  scope = 'all-conversations',
 }: FoundProductsContentProps = {}) => {
   const { status } = useSession();
   const online = useOnline();
+  const includesAllConversations = scope === 'all-conversations';
   const { data, fetchMore } = useQuery(FoundProductsDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
-    skip: status !== 'authenticated' || !online,
+    skip: !includesAllConversations || status !== 'authenticated' || !online,
   });
+  const [cachedRecommendations, setCachedRecommendations] = useState<
+    Array<RecommendedProduct>
+  >([]);
+  useEffect(() => {
+    let active = true;
+    if (!includesAllConversations) {
+      setCachedRecommendations([]);
+      return;
+    }
+    void readCachedChatMessages()
+      .then((messages) => {
+        if (!active) return;
+        setCachedRecommendations(
+          messages.flatMap(({ parts }) =>
+            parts.flatMap((part) =>
+              part.type === 'tool-result'
+                ? productsFromToolResult(part.content).map((product) => ({
+                    product,
+                    aiSummary: null,
+                  }))
+                : [],
+            ),
+          ),
+        );
+      })
+      .catch(() => {
+        if (active) setCachedRecommendations([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [includesAllConversations]);
   const queryRecommendations = useMemo(() => {
     const results =
       data?.conversations.edges.flatMap(({ node }) =>
@@ -75,7 +112,10 @@ export const FoundProductsContent = ({
   }, [data]);
   const recommendations = useMemo(() => {
     const byProductId = new Map<string, RecommendedProduct>();
-    [...conversationRecommendations].reverse().forEach((recommendation) => {
+    const localRecommendations = includesAllConversations
+      ? cachedRecommendations
+      : conversationRecommendations;
+    [...localRecommendations].reverse().forEach((recommendation) => {
       if (!byProductId.has(recommendation.product.id))
         byProductId.set(recommendation.product.id, recommendation);
     });
@@ -84,7 +124,12 @@ export const FoundProductsContent = ({
         byProductId.set(recommendation.product.id, recommendation);
     });
     return [...byProductId.values()];
-  }, [conversationRecommendations, queryRecommendations]);
+  }, [
+    cachedRecommendations,
+    conversationRecommendations,
+    includesAllConversations,
+    queryRecommendations,
+  ]);
   const listRef = useRef<FlashListRef<RecommendedProduct> | null>(null);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 
@@ -102,7 +147,7 @@ export const FoundProductsContent = ({
 
   return (
     <View style={styles.content} testID="found-products-content">
-      {!online ? (
+      {includesAllConversations && !online ? (
         <Text accessibilityLiveRegion="polite" style={styles.offline}>
           오프라인에서는 최근 상품을 불러올 수 없습니다.
         </Text>
@@ -113,7 +158,11 @@ export const FoundProductsContent = ({
         keyExtractor={({ product }) => product.id}
         ListEmptyComponent={
           <EmptyState
-            description="대화에서 찾은 상품이 여기에 모입니다."
+            description={
+              includesAllConversations
+                ? '모든 대화에서 찾은 상품이 여기에 모입니다.'
+                : '이 대화에서 찾은 상품이 여기에 모입니다.'
+            }
             title="찾은 상품이 없습니다"
           />
         }

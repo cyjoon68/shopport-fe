@@ -17,6 +17,7 @@ jest.mock('expo-sqlite', () => ({
 import {
   clearPrivateStorage,
   deleteCachedConversation,
+  readCachedChatMessages,
   readCachedProduct,
   readPinnedConversationIds,
   setConversationPinned,
@@ -40,6 +41,18 @@ describe('offline product detail and private storage', () => {
     expect(mockGetFirstAsync).toHaveBeenCalledWith(
       'SELECT payload FROM product_cache WHERE id = ? LIMIT 1',
       'product-2',
+    );
+  });
+
+  it('reads messages from every persisted chat', async () => {
+    const messages = [
+      { id: 'message-1', role: 'assistant', parts: [{ type: 'tool-result' }] },
+    ];
+    mockGetAllAsync.mockResolvedValue([{ payload: JSON.stringify({ messages }) }]);
+
+    await expect(readCachedChatMessages()).resolves.toEqual(messages);
+    expect(mockGetAllAsync).toHaveBeenCalledWith(
+      'SELECT payload FROM chat_cache ORDER BY updated_at DESC LIMIT 50',
     );
   });
 

@@ -204,6 +204,23 @@ export const readCachedProduct = async (id: string): Promise<CachedProduct | nul
   return isRecord(parsed) && parsed.id === id ? (parsed as CachedProduct) : null;
 };
 
+export const readCachedChatMessages = async (): Promise<
+  ChatPersistedState['messages']
+> => {
+  const db = await database();
+  const rows = await db.getAllAsync<{ payload: string }>(
+    'SELECT payload FROM chat_cache ORDER BY updated_at DESC LIMIT 50',
+  );
+  return rows.flatMap(({ payload }) => {
+    try {
+      const parsed: unknown = JSON.parse(payload, reviveDates);
+      return isPersistedChat(parsed) ? parsed.messages : [];
+    } catch {
+      return [];
+    }
+  });
+};
+
 export const saveDraft = async (conversationId: string, draft: Draft): Promise<void> => {
   const db = await database();
   await db.runAsync(

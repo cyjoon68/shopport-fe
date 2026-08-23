@@ -267,6 +267,7 @@ export const ChatScreen = () => {
               )}
               focusProductId={focusedProductId}
               presentation="recommendations"
+              scope="conversation"
             />
           </View>
         </View>
