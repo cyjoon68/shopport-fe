@@ -130,6 +130,24 @@ describe('chat composer draft isolation', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it('hides quick actions while an additional question is active', async () => {
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onProviderToggle={jest.fn()}
+        onSend={jest.fn(() => Promise.resolve())}
+        onStop={jest.fn(() => Promise.resolve())}
+        providerIds={[]}
+        quickActionsEnabled={false}
+      />,
+    );
+
+    await act(flushPromises);
+
+    expect(screen.queryByTestId('chat-quick-actions')).toBeNull();
+  });
+
   it('keeps the stop action in the NewChat footer while streaming', async () => {
     const onStop = jest.fn(() => Promise.resolve());
     const screen = render(

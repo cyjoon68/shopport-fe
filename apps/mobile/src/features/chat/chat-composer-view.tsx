@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { GlassButton } from '@/shared/ui/glass-button';
-import type { Attachment } from './chat-composer-types';
+import type { Attachment, RetailerId } from './chat-composer-types';
 import { styles } from './chat-composer-styles';
 import { NewChatFooter } from './new-chat-footer';
 
@@ -12,6 +12,9 @@ type Props = Readonly<{
   loading: boolean;
   online: boolean;
   onStop: () => Promise<void>;
+  onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
+  providerIds?: ReadonlyArray<RetailerId> | undefined;
+  quickActionsEnabled: boolean;
   remove: () => Promise<void>;
   send: () => Promise<void>;
   sendDisabled: boolean;
@@ -30,6 +33,9 @@ export const ChatComposerView = ({
   loading,
   online,
   onStop,
+  onProviderToggle,
+  providerIds,
+  quickActionsEnabled,
   remove,
   send,
   sendDisabled,
@@ -92,8 +98,11 @@ export const ChatComposerView = ({
       inputEditable={!loading && draftReady && allowFreeText}
       loading={loading}
       onAttach={attach}
+      onProviderToggle={onProviderToggle}
       onSend={send}
       onStop={onStop}
+      providerIds={providerIds}
+      quickActionsEnabled={quickActionsEnabled}
       sendDisabled={sendDisabled}
       setText={setText}
       text={text}

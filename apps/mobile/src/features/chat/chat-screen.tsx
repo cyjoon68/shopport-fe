@@ -23,6 +23,7 @@ import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 import { ChatSegmentedControl, type ChatTab } from './chat-segmented-control';
 import { ConversationScreen } from './conversation-screen';
 import { ChatNewConversation } from './chat-new-conversation';
+import { retailerIds, type RetailerId } from './chat-composer-types';
 import type { DisplayMessage } from './message-list';
 import { selectAndUploadAsset } from './asset-upload';
 
@@ -55,6 +56,7 @@ export const ChatScreen = () => {
   const [focusedProductId, setFocusedProductId] = useState<string | null>(null);
   const [unread, setUnread] = useState<UnreadState>({ chat: false, products: false });
   const [loading, setLoading] = useState(false);
+  const [providerIds, setProviderIds] = useState<ReadonlyArray<RetailerId>>([]);
   const trackedConversationId = useRef<string | null>(null);
   const seenMessageIds = useRef<Set<string> | null>(null);
   const seenProductIds = useRef<Set<string> | null>(null);
@@ -62,6 +64,7 @@ export const ChatScreen = () => {
   useEffect(() => {
     setConversationId(routeConversationId);
     setSendInitialDraft(false);
+    setProviderIds([]);
   }, [routeConversationId]);
 
   useEffect(() => {
@@ -69,6 +72,7 @@ export const ChatScreen = () => {
     if (deletedConversation === conversationId) {
       setConversationId(null);
       setSendInitialDraft(false);
+      setProviderIds([]);
       setSelectedTab('채팅');
       router.setParams({ deletedConversationId: undefined, id: undefined });
       return;
@@ -132,6 +136,16 @@ export const ChatScreen = () => {
     setSelectedTab('상품');
     setUnread((state) => ({ ...state, products: false }));
   }, []);
+
+  const toggleProvider = useCallback((providerId: RetailerId): void => {
+    setProviderIds((current) =>
+      current.includes(providerId)
+        ? current.filter((id) => id !== providerId)
+        : retailerIds.filter((id) => current.includes(id) || id === providerId),
+    );
+  }, []);
+
+  const resetProviders = useCallback((): void => setProviderIds([]), []);
 
   const create = async (draft = '', withImage = false): Promise<void> => {
     if (!online) {
@@ -232,9 +246,18 @@ export const ChatScreen = () => {
                 key={conversationId}
                 onMessagesChange={handleMessagesChange}
                 onProductSelect={focusProduct}
+                onProviderReset={resetProviders}
+                onProviderToggle={toggleProvider}
+                providerIds={providerIds}
               />
             ) : (
-              <ChatNewConversation loading={loading} onCreate={create} online={online} />
+              <ChatNewConversation
+                loading={loading}
+                onCreate={create}
+                onProviderToggle={toggleProvider}
+                online={online}
+                providerIds={providerIds}
+              />
             )}
           </View>
           <View style={selectedTab === '상품' ? styles.visible : styles.hidden}>

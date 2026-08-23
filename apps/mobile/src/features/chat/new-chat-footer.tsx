@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useReducedTransparency } from '@/shared/accessibility/use-reduced-transparency';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+import type { RetailerId } from './chat-composer-types';
+import { ChatQuickActions } from './chat-quick-actions';
 import { useKeyboardLift } from './use-keyboard-lift';
 
 type NewChatFooterProps = Readonly<{
@@ -12,8 +14,11 @@ type NewChatFooterProps = Readonly<{
   inputEditable: boolean;
   loading: boolean;
   onAttach: () => Promise<void>;
+  onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
   onSend: () => Promise<void>;
   onStop?: () => Promise<void>;
+  providerIds?: ReadonlyArray<RetailerId> | undefined;
+  quickActionsEnabled?: boolean;
   sendDisabled: boolean;
   setText: (text: string) => void;
   text: string;
@@ -25,8 +30,11 @@ export const NewChatFooter = ({
   inputEditable,
   loading,
   onAttach,
+  onProviderToggle,
   onSend,
   onStop,
+  providerIds = [],
+  quickActionsEnabled = true,
   sendDisabled,
   setText,
   text,
@@ -37,6 +45,8 @@ export const NewChatFooter = ({
   const showStop = loading && Boolean(onStop);
   const glassAvailable =
     Platform.OS === 'ios' && !reducedTransparency && isGlassEffectAPIAvailable();
+  const showQuickActions =
+    quickActionsEnabled && inputEditable && text.trim().length === 0;
   const send = (): void => {
     if (!sendDisabled) void (showStop ? onStop?.() : onSend());
   };
@@ -91,10 +101,17 @@ export const NewChatFooter = ({
     <Animated.View
       style={
         fill
-          ? [styles.keyboard, { paddingBottom: keyboardPad }]
-          : { paddingBottom: keyboardPad }
+          ? [styles.keyboard, styles.footer, { paddingBottom: keyboardPad }]
+          : [styles.footer, { paddingBottom: keyboardPad }]
       }
     >
+      {showQuickActions && onProviderToggle ? (
+        <ChatQuickActions
+          onProviderToggle={onProviderToggle}
+          providerIds={providerIds}
+          setText={setText}
+        />
+      ) : null}
       {glassAvailable ? (
         <GlassView glassEffectStyle="regular" isInteractive style={styles.glassComposer}>
           {content}
@@ -108,6 +125,7 @@ export const NewChatFooter = ({
 
 const styles = StyleSheet.create((theme) => ({
   keyboard: { flex: 1, justifyContent: 'flex-end' },
+  footer: { gap: theme.spacing.sm },
   glassComposer: {
     alignItems: 'center',
     borderCurve: 'continuous',
