@@ -2,12 +2,6 @@ import type { ChatClientPersistence, ChatPersistedState } from '@tanstack/ai-cli
 import { openDatabaseAsync } from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-export type CachedConversation = Readonly<{
-  id: string;
-  title: string;
-  updatedAt: string;
-}>;
-
 export type CachedProduct = Readonly<{
   id: string;
   title: string;
@@ -94,35 +88,6 @@ let databasePromise: Promise<SQLiteDatabase> | undefined;
 const database = (): Promise<SQLiteDatabase> => {
   databasePromise ??= initialize();
   return databasePromise;
-};
-
-export const cacheConversations = async (
-  conversations: ReadonlyArray<CachedConversation>,
-): Promise<void> => {
-  const db = await database();
-  await db.withTransactionAsync(async () => {
-    for (const conversation of conversations.slice(0, 50)) {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO conversation_cache (id, title, updated_at) VALUES (?, ?, ?)',
-        conversation.id,
-        conversation.title,
-        conversation.updatedAt,
-      );
-    }
-    await db.runAsync(`
-      DELETE FROM conversation_cache
-      WHERE id NOT IN (
-        SELECT id FROM conversation_cache ORDER BY updated_at DESC LIMIT 50
-      )
-    `);
-  });
-};
-
-export const readCachedConversations = async (): Promise<Array<CachedConversation>> => {
-  const db = await database();
-  return db.getAllAsync<CachedConversation>(
-    'SELECT id, title, updated_at AS updatedAt FROM conversation_cache ORDER BY updated_at DESC LIMIT 50',
-  );
 };
 
 export const deleteCachedConversation = async (conversationId: string): Promise<void> => {

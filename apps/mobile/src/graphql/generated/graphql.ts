@@ -66,6 +66,12 @@ export type SearchProductsInput = {
 /** The state of an AI tool call. */
 export type ToolStatus = 'COMPLETED' | 'FAILED' | 'STARTED';
 
+/** Input for updating the authenticated viewer. */
+export type UpdateViewerInput = {
+  /** The user-facing nickname. */
+  displayName: string;
+};
+
 export type CreateAssetUploadMutationVariables = Exact<{
   input: CreateAssetUploadInput;
 }>;
@@ -451,6 +457,24 @@ export type DeleteConversationMutation = {
   deleteConversation: {
     __typename: 'DeletePayload';
     success: boolean;
+    userErrors: Array<{
+      __typename: 'UserError';
+      code: string;
+      message: string;
+      path: Array<string>;
+    }>;
+  };
+};
+
+export type UpdateViewerMutationVariables = Exact<{
+  input: UpdateViewerInput;
+}>;
+
+export type UpdateViewerMutation = {
+  __typename: 'Mutation';
+  updateViewer: {
+    __typename: 'ViewerPayload';
+    viewer: { __typename: 'Viewer'; id: string; displayName: string } | null;
     userErrors: Array<{
       __typename: 'UserError';
       code: string;
@@ -2719,6 +2743,78 @@ export const DeleteConversationDocument = {
   DeleteConversationMutation,
   DeleteConversationMutationVariables
 >;
+export const UpdateViewerDocument = {
+  __meta__: { hash: '00e83729cab370c5a7c1d9e6a104ecd77117f83a5fc2cf60048326a61ae0ca16' },
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateViewer' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'UpdateViewerInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateViewer' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'viewer' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'userErrors' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'path' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateViewerMutation, UpdateViewerMutationVariables>;
 export const DeleteViewerAccountDocument = {
   __meta__: { hash: 'c8fa15afa194d3e2f9ce9fefb86de127ce7c37fd03afe484216944980d659f50' },
   kind: 'Document',

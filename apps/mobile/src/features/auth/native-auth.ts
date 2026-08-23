@@ -1,6 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { initializeKakaoSDK } from '@react-native-kakao/core';
-import { login as kakaoLogin } from '@react-native-kakao/user';
+import { login as kakaoLogin, me as kakaoMe } from '@react-native-kakao/user';
 import { environment } from '@/shared/config/environment';
 
 export type IdentityCredential = Readonly<{
@@ -17,4 +17,11 @@ export const kakaoIdentity = async (): Promise<IdentityCredential> => {
   const credential = await kakaoLogin({ nonce });
   if (!credential.idToken) throw new Error('Kakao OIDC 토큰을 받지 못했습니다.');
   return { identityToken: credential.idToken, nonce };
+};
+
+export const kakaoAccountEmail = async (): Promise<string | null> => {
+  const account = await kakaoMe();
+  return account.email && account.isEmailValid && account.isEmailVerified
+    ? account.email
+    : null;
 };
