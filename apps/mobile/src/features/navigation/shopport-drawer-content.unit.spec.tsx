@@ -1,14 +1,19 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import { createElement as mockCreateElement, type ReactNode } from 'react';
+import { Pressable as mockPressable } from 'react-native';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { ShopportDrawerContent } from './shopport-drawer-content';
 
 const mockCloseDrawer = jest.fn();
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
 jest.mock('expo-router', () => ({
   router: {
-    push: jest.fn(),
+    push: (href: unknown): void => {
+      mockPush(href);
+    },
     replace: (href: unknown): void => {
       mockReplace(href);
     },
@@ -44,7 +49,15 @@ jest.mock('@/shared/storage/database', () => ({
 }));
 
 jest.mock('@/shared/ui/glass-button', () => ({
-  GlassButton: () => null,
+  GlassButton: ({
+    accessibilityLabel,
+    children,
+    onPress,
+  }: {
+    accessibilityLabel?: string;
+    children: ReactNode;
+    onPress: () => void;
+  }) => mockCreateElement(mockPressable, { accessibilityLabel, onPress }, children),
   glassButtonIconSize: 16,
 }));
 
@@ -66,5 +79,18 @@ describe('shopport drawer content', () => {
       id: undefined,
     });
     expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  it('opens settings from the drawer header', async () => {
+    const props = {
+      navigation: { closeDrawer: mockCloseDrawer },
+    } as unknown as DrawerContentComponentProps;
+    const screen = render(<ShopportDrawerContent {...props} />);
+    await act(async () => Promise.resolve());
+
+    fireEvent.press(screen.getByLabelText('설정 열기'));
+
+    expect(mockCloseDrawer).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/settings');
   });
 });

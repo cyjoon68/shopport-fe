@@ -1,3 +1,17 @@
+mutation UpdateViewer($input: UpdateViewerInput!) {
+  updateViewer(input: $input) {
+    viewer {
+      id
+      displayName
+    }
+    userErrors {
+      code
+      message
+      path
+    }
+  }
+}
+
 mutation DeleteViewerAccount {
   deleteViewerAccount {
     success

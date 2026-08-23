@@ -181,15 +181,15 @@ export const ShopportDrawerContent = ({ navigation }: DrawerContentComponentProp
           Shopport
         </Text>
         <GlassButton
-          accessibilityLabel="대화 기록 검색"
+          accessibilityLabel="설정 열기"
           hitSlop={8}
-          onPress={() => navigate('/history')}
-          style={styles.searchButton}
+          onPress={() => navigate('/settings')}
+          style={styles.settingsButton}
         >
           <Image
             contentFit="contain"
-            source="sf:magnifyingglass"
-            style={styles.searchSymbol}
+            source="sf:gearshape"
+            style={styles.settingsSymbol}
             tintColor={theme.colors.text}
           />
         </GlassButton>
@@ -251,14 +251,14 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'space-between',
   },
   title: { color: theme.colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -1 },
-  searchButton: {
+  settingsButton: {
     alignItems: 'center',
     borderRadius: theme.radii.pill,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
-  searchSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },
+  settingsSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },
   links: { gap: theme.spacing.xs },
   link: {
     alignItems: 'center',

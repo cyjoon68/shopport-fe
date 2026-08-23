@@ -18,6 +18,7 @@ import {
   SavedProductsDocument,
   SearchProductsDocument,
   UnsaveProductDocument,
+  UpdateViewerDocument,
   UploadedImagesDocument,
   ViewerDocument,
 } from '@/graphql/generated/graphql';
@@ -45,6 +46,7 @@ const operationDocuments = [
   CreateConversationDocument,
   RenameConversationDocument,
   DeleteConversationDocument,
+  UpdateViewerDocument,
   DeleteViewerAccountDocument,
   ViewerDocument,
 ];
