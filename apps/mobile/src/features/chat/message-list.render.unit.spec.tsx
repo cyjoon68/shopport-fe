@@ -1,23 +1,36 @@
 import { render } from '@testing-library/react-native';
-import { createElement as mockCreateElement, type ReactNode } from 'react';
+import {
+  createElement as mockCreateElement,
+  forwardRef as mockForwardRef,
+  type ReactNode,
+  useImperativeHandle as mockUseImperativeHandle,
+} from 'react';
 import { View as mockNativeView } from 'react-native';
 import type { DisplayMessage } from './message-list';
 
+type FlashListProps = Readonly<{
+  data: ReadonlyArray<DisplayMessage>;
+  maintainVisibleContentPosition?: Readonly<{
+    autoscrollToBottomThreshold?: number;
+  }>;
+  renderItem: ({ item }: { item: DisplayMessage }) => ReactNode;
+}>;
+
+let mockFlashListProps: FlashListProps | null = null;
+const mockScrollToEnd = jest.fn();
+
 jest.mock('@shopify/flash-list', () => ({
-  FlashList: ({
-    data,
-    renderItem,
-  }: {
-    data: ReadonlyArray<DisplayMessage>;
-    renderItem: ({ item }: { item: DisplayMessage }) => ReactNode;
-  }) =>
-    mockCreateElement(
+  FlashList: mockForwardRef((props: FlashListProps, ref) => {
+    mockFlashListProps = props;
+    mockUseImperativeHandle(ref, () => ({ scrollToEnd: mockScrollToEnd }));
+    return mockCreateElement(
       mockNativeView,
       null,
-      data.map((item) =>
-        mockCreateElement(mockNativeView, { key: item.id }, renderItem({ item })),
+      props.data.map((item) =>
+        mockCreateElement(mockNativeView, { key: item.id }, props.renderItem({ item })),
       ),
-    ),
+    );
+  }),
 }));
 
 import { MessageList } from './message-list';
@@ -53,6 +66,11 @@ const message = {
 } satisfies DisplayMessage;
 
 describe('chat message list', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFlashListProps = null;
+  });
+
   it('does not expose internal tool status to the user', () => {
     const screen = render(<MessageList messages={[message]} />);
 
@@ -60,6 +78,52 @@ describe('chat message list', () => {
     expect(screen.getByLabelText('추천 상품')).toBeOnTheScreen();
     expect(screen.getByText('자세히 보기')).toBeOnTheScreen();
     expect(screen.queryByText('searchProducts 완료')).toBeNull();
+  });
+
+  it('follows streamed responses near the bottom without moving existing messages', () => {
+    render(<MessageList messages={[message]} />);
+
+    expect(mockScrollToEnd).not.toHaveBeenCalled();
+    expect(mockFlashListProps?.maintainVisibleContentPosition).toEqual({
+      autoscrollToBottomThreshold: 0.2,
+    });
+  });
+
+  it('scrolls to a newly sent user message once', () => {
+    const screen = render(<MessageList messages={[message]} />);
+    const userMessage = {
+      ...message,
+      id: 'user-1',
+      products: [],
+      role: 'user' as const,
+      text: '립밤 찾아줘',
+      tools: [],
+    };
+
+    screen.rerender(
+      <MessageList
+        messages={[
+          message,
+          userMessage,
+          { ...message, id: 'assistant-2', text: '찾아볼게요.' },
+        ]}
+      />,
+    );
+
+    expect(mockScrollToEnd).toHaveBeenCalledTimes(1);
+    expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: true });
+
+    screen.rerender(
+      <MessageList
+        messages={[
+          message,
+          userMessage,
+          { ...message, id: 'assistant-2', text: '상품을 찾아볼게요.' },
+        ]}
+      />,
+    );
+
+    expect(mockScrollToEnd).toHaveBeenCalledTimes(1);
   });
 
   it('keeps an askUser question as a single assistant line without inline options', () => {

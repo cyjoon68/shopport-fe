@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { StyleSheet } from 'react-native-unistyles';
 import type { CachedProduct } from '@/shared/storage/database';
 import { ChatProductRow } from './chat-product-row';
@@ -20,6 +21,10 @@ type MessageListProps = Readonly<{
   onAskUserPress?: (() => void) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
+
+const maintainVisibleContentPosition = {
+  autoscrollToBottomThreshold: 0.2,
+} as const;
 
 const MessageRow = ({
   activeAskUserId,
@@ -130,6 +135,17 @@ export const MessageList = ({
   onProductSelect,
 }: MessageListProps) => {
   const activeAskUserId = activeAskUserRequest(messages)?.id ?? null;
+  const listRef = useRef<FlashListRef<DisplayMessage> | null>(null);
+  const latestUserMessageId = messages.findLast(({ role }) => role === 'user')?.id;
+  const previousLatestUserMessageIdRef = useRef(latestUserMessageId);
+
+  useEffect(() => {
+    const previousLatestUserMessageId = previousLatestUserMessageIdRef.current;
+    previousLatestUserMessageIdRef.current = latestUserMessageId;
+    if (latestUserMessageId !== previousLatestUserMessageId)
+      listRef.current?.scrollToEnd({ animated: true });
+  }, [latestUserMessageId]);
+
   return (
     <FlashList
       contentContainerStyle={styles.list}
@@ -137,6 +153,8 @@ export const MessageList = ({
       keyExtractor={(message) => message.id}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
+      maintainVisibleContentPosition={maintainVisibleContentPosition}
+      ref={listRef}
       style={styles.flex}
       renderItem={({ item }) => (
         <MessageRow
