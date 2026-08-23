@@ -26,14 +26,18 @@ import { ASK_USER_SKIP_MESSAGE } from './ask-user';
 import { useOnline } from '@/providers/network-provider';
 import { createStableChatMessageId } from './message-id';
 import { AskUserCard } from './ask-user-card';
+import type { RetailerId } from './chat-composer-types';
 import type { CachedProduct } from '@/shared/storage/database';
 import type { DisplayMessage } from './message-list';
 
 type ConversationScreenProps = Readonly<{
   conversationId?: string;
   initialSend?: boolean;
+  onProviderReset?: (() => void) | undefined;
+  onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
   onMessagesChange?: ((messages: ReadonlyArray<DisplayMessage>) => void) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
+  providerIds?: ReadonlyArray<RetailerId> | undefined;
 }>;
 
 export const ConversationScreen = ({
@@ -41,6 +45,9 @@ export const ConversationScreen = ({
   initialSend: initialSendProp,
   onMessagesChange,
   onProductSelect,
+  onProviderReset,
+  onProviderToggle,
+  providerIds = [],
 }: ConversationScreenProps = {}) => {
   const { id: routeId, send: routeSend } = useLocalSearchParams<{
     id?: string;
@@ -51,13 +58,19 @@ export const ConversationScreen = ({
   const { status } = useSession();
   const online = useOnline();
   const assetId = useRef<string | null>(null);
+  const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
   const connection = useMemo(
     () =>
       xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
         const token = getAccessToken();
         return {
           headers: token ? { authorization: `Bearer ${token}` } : {},
-          body: { assetId: assetId.current },
+          body: {
+            assetId: assetId.current,
+            ...(providerIdsRef.current === undefined
+              ? {}
+              : { providerIds: providerIdsRef.current }),
+          },
           reconnect: { delayMs: 300, maxAttempts: 5 },
         };
       }),
@@ -120,13 +133,16 @@ export const ConversationScreen = ({
 
   const send = async (text: string, nextAssetId: string | null): Promise<void> => {
     assetId.current = nextAssetId;
+    providerIdsRef.current = activeAskUser ? undefined : providerIds;
     try {
       await chat.sendMessage({
         id: createStableChatMessageId(),
         content: text || '이 이미지와 관련된 상품을 찾아줘',
       });
+      onProviderReset?.();
     } finally {
       assetId.current = null;
+      providerIdsRef.current = undefined;
     }
   };
 
@@ -252,8 +268,11 @@ export const ConversationScreen = ({
         key={id}
         conversationId={id}
         loading={chat.isLoading}
+        onProviderToggle={onProviderToggle}
         onSend={send}
         onStop={stop}
+        providerIds={providerIds}
+        quickActionsEnabled={!activeAskUser}
         sendInitialDraft={initialSend}
       />
     </View>

@@ -9,8 +9,11 @@ export const ChatComposer = ({
   allowFreeText = true,
   conversationId,
   loading,
+  onProviderToggle,
   onSend,
   onStop,
+  providerIds,
+  quickActionsEnabled = true,
   sendInitialDraft = false,
 }: ChatComposerProps) => {
   const online = useOnline();
@@ -57,6 +60,9 @@ export const ChatComposer = ({
       loading={loading}
       online={online}
       onStop={onStop}
+      onProviderToggle={onProviderToggle}
+      providerIds={providerIds}
+      quickActionsEnabled={quickActionsEnabled}
       remove={remove}
       send={send}
       sendDisabled={sendDisabled}
