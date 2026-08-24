@@ -14,7 +14,10 @@ describe('production app configuration', () => {
   const previous = new Map<string, string | undefined>();
 
   beforeEach(() => {
-    for (const key of keys) previous.set(key, process.env[key]);
+    for (const key of keys) {
+      const value: unknown = process.env[key];
+      previous.set(key, typeof value === 'string' ? value : undefined);
+    }
     process.env.EAS_BUILD_PROFILE = 'production';
     process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY = 'secure-kakao-key';
     delete process.env.EXPO_PUBLIC_API_URL;
