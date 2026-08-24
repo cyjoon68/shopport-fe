@@ -82,7 +82,7 @@ describe('chat composer draft isolation', () => {
     expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
   });
 
-  it('clears the sent text while the chat response is pending', async () => {
+  it('keeps the draft pending and clears it after the send succeeds', async () => {
     const response = deferred<void>();
     mockedReadDraft.mockResolvedValue({
       text: '전송할 문장',
@@ -104,7 +104,35 @@ describe('chat composer draft isolation', () => {
     await act(flushPromises);
 
     expect(onSend).toHaveBeenCalledWith('전송할 문장', null);
+    expect(inputValue(screen)).toBe('전송할 문장');
+
+    await act(async () => {
+      response.resolve();
+      await flushPromises();
+    });
     expect(inputValue(screen)).toBe('');
+  });
+
+  it('keeps the draft when sending fails', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '다시 보낼 문장',
+      assetId: null,
+      assetUri: null,
+    });
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={jest.fn(() => Promise.reject(new Error('연결 실패')))}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(inputValue(screen)).toBe('다시 보낼 문장');
   });
 
   it('blocks direct input when a clarification requires an option', async () => {

@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client/react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -21,148 +21,163 @@ type ProductCardProps = Readonly<{
   product: CachedProduct;
 }>;
 
-export const ProductCard = ({
-  compact = false,
-  highlighted = false,
-  horizontal = false,
-  product,
-}: ProductCardProps) => {
-  const [saved, setSaved] = useState(product.isSaved);
-  const [saveProduct] = useMutation(SaveProductDocument);
-  const [unsaveProduct] = useMutation(UnsaveProductDocument);
-  const { theme } = useUnistyles();
-  const online = useOnline();
-  const reducedMotion = useReducedMotion();
-  styles.useVariants({ compact, highlighted, horizontal });
+export const ProductCard = memo(
+  ({
+    compact = false,
+    highlighted = false,
+    horizontal = false,
+    product,
+  }: ProductCardProps) => {
+    const [saved, setSaved] = useState(product.isSaved);
+    const [saveProduct] = useMutation(SaveProductDocument);
+    const [unsaveProduct] = useMutation(UnsaveProductDocument);
+    const { theme } = useUnistyles();
+    const online = useOnline();
+    const reducedMotion = useReducedMotion();
+    styles.useVariants({ compact, highlighted, horizontal });
 
-  const toggleSaved = async (): Promise<void> => {
-    if (!online) {
-      Alert.alert('오프라인', '온라인에서 찜을 변경할 수 있습니다.');
-      return;
-    }
-    const next = !saved;
-    if (next) {
-      const result = await saveProduct({
-        variables: { input: { productId: product.id } },
-      });
-      if (result.data?.saveProduct.userErrors.length) {
-        Alert.alert(
-          '찜 변경 실패',
-          result.data.saveProduct.userErrors[0]?.message ?? '다시 시도해 주세요.',
-        );
+    useEffect(() => setSaved(product.isSaved), [product.isSaved]);
+
+    const toggleSaved = async (): Promise<void> => {
+      if (!online) {
+        Alert.alert('오프라인', '온라인에서 찜을 변경할 수 있습니다.');
         return;
       }
-    } else {
-      const result = await unsaveProduct({
-        variables: { input: { productId: product.id } },
-      });
-      if (result.data?.unsaveProduct.userErrors.length) {
-        Alert.alert(
-          '찜 변경 실패',
-          result.data.unsaveProduct.userErrors[0]?.message ?? '다시 시도해 주세요.',
-        );
+      const next = !saved;
+      try {
+        if (next) {
+          const result = await saveProduct({
+            variables: { input: { productId: product.id } },
+          });
+          if (result.data?.saveProduct.userErrors.length) {
+            Alert.alert(
+              '찜 변경 실패',
+              result.data.saveProduct.userErrors[0]?.message ?? '다시 시도해 주세요.',
+            );
+            return;
+          }
+        } else {
+          const result = await unsaveProduct({
+            variables: { input: { productId: product.id } },
+          });
+          if (result.data?.unsaveProduct.userErrors.length) {
+            Alert.alert(
+              '찜 변경 실패',
+              result.data.unsaveProduct.userErrors[0]?.message ?? '다시 시도해 주세요.',
+            );
+            return;
+          }
+        }
+      } catch {
+        Alert.alert('찜 변경 실패', '연결을 확인하고 다시 시도해 주세요.');
         return;
       }
-    }
-    setSaved(next);
-    await cacheProducts([{ ...product, isSaved: next }]);
-    await Haptics.selectionAsync();
-  };
+      setSaved(next);
+      await Promise.all([
+        cacheProducts([{ ...product, isSaved: next }]),
+        Haptics.selectionAsync(),
+      ]).catch(() => undefined);
+    };
 
-  const open = async (): Promise<void> => {
-    if (!online) {
-      Alert.alert('오프라인', '구매 링크는 온라인에서 열 수 있습니다.');
-      return;
-    }
-    const url = new URL(product.outboundUrl);
-    if (url.protocol !== 'https:') {
-      Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
-      return;
-    }
-    await Linking.openURL(url.toString());
-  };
+    const open = async (): Promise<void> => {
+      if (!online) {
+        Alert.alert('오프라인', '구매 링크는 온라인에서 열 수 있습니다.');
+        return;
+      }
+      const url = new URL(product.outboundUrl);
+      if (url.protocol !== 'https:') {
+        Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
+        return;
+      }
+      try {
+        await Linking.openURL(url.toString());
+      } catch {
+        Alert.alert('구매 링크를 열 수 없어요', '다시 시도해 주세요.');
+      }
+    };
 
-  const details = (
-    <>
-      <Text
-        allowFontScaling
-        lineBreakStrategyIOS="hangul-word"
-        maxFontSizeMultiplier={2}
-        numberOfLines={horizontal || compact ? 2 : 3}
-        style={styles.title}
-        textBreakStrategy="balanced"
-      >
-        {product.title}
-      </Text>
-      <Text allowFontScaling style={styles.provider}>
-        {product.providerName}
-        {product.isAffiliate ? ' · 제휴 링크' : ''}
-      </Text>
-      <Text allowFontScaling style={styles.price}>
-        {formatMoney(product.totalMinor, product.currency)}
-      </Text>
-      <Text allowFontScaling style={product.isInStock ? styles.stock : styles.soldOut}>
-        {product.isInStock ? '구매 가능' : '품절'}
-      </Text>
-    </>
-  );
-
-  const saveButton = (
-    <Pressable
-      accessibilityLabel={`${product.title} ${saved ? '찜 해제' : '찜'}`}
-      accessibilityRole="button"
-      onPress={() => void toggleSaved()}
-      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
-    >
-      <View style={styles.smallButtonSurface} testID="product-card-bookmark-surface">
-        <Image
-          contentFit="contain"
-          source={saved ? 'sf:bookmark.fill' : 'sf:bookmark'}
-          style={styles.smallButtonIcon}
-          tintColor={theme.colors.text}
-        />
-      </View>
-    </Pressable>
-  );
-
-  return (
-    <View
-      accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
-      style={styles.card}
-    >
-      <View style={horizontal ? styles.horizontalTop : undefined}>
-        <Pressable
-          accessibilityHint="구매 링크를 엽니다"
-          accessibilityLabel={`${product.title} 구매 링크`}
-          accessibilityRole="button"
-          onPress={() => void open()}
-          style={horizontal ? styles.horizontalImageButton : styles.imageButton}
+    const details = (
+      <>
+        <Text
+          allowFontScaling
+          lineBreakStrategyIOS="hangul-word"
+          maxFontSizeMultiplier={2}
+          numberOfLines={horizontal || compact ? 2 : 3}
+          style={styles.title}
+          textBreakStrategy="balanced"
         >
+          {product.title}
+        </Text>
+        <Text allowFontScaling style={styles.provider}>
+          {product.providerName}
+          {product.isAffiliate ? ' · 제휴 링크' : ''}
+        </Text>
+        <Text allowFontScaling style={styles.price}>
+          {formatMoney(product.totalMinor, product.currency)}
+        </Text>
+        <Text allowFontScaling style={product.isInStock ? styles.stock : styles.soldOut}>
+          {product.isInStock ? '구매 가능' : '품절'}
+        </Text>
+      </>
+    );
+
+    const saveButton = (
+      <Pressable
+        accessibilityLabel={`${product.title} ${saved ? '찜 해제' : '찜'}`}
+        accessibilityRole="button"
+        onPress={() => void toggleSaved()}
+        style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+      >
+        <View style={styles.smallButtonSurface} testID="product-card-bookmark-surface">
           <Image
-            accessibilityLabel={`${product.title} 상품 이미지`}
-            contentFit="cover"
-            source={product.imageUrl}
-            style={horizontal ? styles.horizontalImage : styles.image}
-            transition={reducedMotion ? 0 : 150}
+            contentFit="contain"
+            source={saved ? 'sf:bookmark.fill' : 'sf:bookmark'}
+            style={styles.smallButtonIcon}
+            tintColor={theme.colors.text}
           />
-        </Pressable>
-        <View style={styles.body}>
-          {horizontal ? (
-            <View style={styles.horizontalDetails}>
-              <View style={styles.horizontalInfo}>{details}</View>
-              {saveButton}
-            </View>
-          ) : (
-            <>
-              {details}
-              <View style={styles.actions}>{saveButton}</View>
-            </>
-          )}
+        </View>
+      </Pressable>
+    );
+
+    return (
+      <View
+        accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
+        style={styles.card}
+      >
+        <View style={horizontal ? styles.horizontalTop : undefined}>
+          <Pressable
+            accessibilityHint="구매 링크를 엽니다"
+            accessibilityLabel={`${product.title} 구매 링크`}
+            accessibilityRole="button"
+            onPress={() => void open()}
+            style={horizontal ? styles.horizontalImageButton : styles.imageButton}
+          >
+            <Image
+              accessibilityLabel={`${product.title} 상품 이미지`}
+              contentFit="cover"
+              source={product.imageUrl}
+              style={horizontal ? styles.horizontalImage : styles.image}
+              transition={reducedMotion ? 0 : 150}
+            />
+          </Pressable>
+          <View style={styles.body}>
+            {horizontal ? (
+              <View style={styles.horizontalDetails}>
+                <View style={styles.horizontalInfo}>{details}</View>
+                {saveButton}
+              </View>
+            ) : (
+              <>
+                {details}
+                <View style={styles.actions}>{saveButton}</View>
+              </>
+            )}
+          </View>
         </View>
       </View>
-    </View>
-  );
-};
+    );
+  },
+);
 
 const styles = StyleSheet.create((theme) => ({
   card: {

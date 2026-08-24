@@ -84,15 +84,9 @@ export const ChatQuickActions = ({
               accessibilityState={{ checked: selected }}
               key={id}
               onPress={() => toggleProvider(id)}
-              style={[
-                styles.action,
-                selected ? styles.selectedAction : styles.actionSurface,
-              ]}
+              style={styles.action(selected)}
             >
-              <Text
-                allowFontScaling
-                style={[styles.actionLabel, selected ? styles.selectedLabel : null]}
-              >
+              <Text allowFontScaling style={styles.actionLabel(selected)}>
                 {label}
               </Text>
             </Pressable>
@@ -106,9 +100,9 @@ export const ChatQuickActions = ({
               accessibilityRole="button"
               key={id}
               onPress={() => setActivePromptGroup(id)}
-              style={[styles.action, styles.actionSurface]}
+              style={styles.action(false)}
             >
-              <Text allowFontScaling style={styles.actionLabel}>
+              <Text allowFontScaling style={styles.actionLabel(false)}>
                 {label}
               </Text>
             </Pressable>
@@ -192,22 +186,22 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },
-  action: {
+  action: (selected: boolean) => ({
     alignItems: 'center',
+    backgroundColor: selected ? theme.colors.primary : theme.colors.surface,
+    borderColor: theme.colors.border,
     borderCurve: 'continuous',
     borderRadius: theme.radii.pill,
+    borderWidth: selected ? 0 : 1,
     justifyContent: 'center',
     minHeight: theme.interaction.minTouchTarget,
     paddingHorizontal: theme.spacing.md,
-  },
-  actionSurface: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-  },
-  selectedAction: { backgroundColor: theme.colors.primary },
-  actionLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
-  selectedLabel: { color: theme.colors.primaryText },
+  }),
+  actionLabel: (selected: boolean) => ({
+    color: selected ? theme.colors.primaryText : theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  }),
   sheetRoot: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,

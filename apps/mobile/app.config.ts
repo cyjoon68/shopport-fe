@@ -5,16 +5,28 @@ const environmentValue = (name: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
+const requireProductionHttpsUrl = (value: string | undefined, name: string): void => {
+  if (!value) throw new Error(`${name} is required for production`);
+  try {
+    if (new URL(value).protocol !== 'https:') throw new Error();
+  } catch {
+    throw new Error(`${name} must be an HTTPS URL for production`);
+  }
+};
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const kakaoNativeAppKey =
     environmentValue('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY') ??
     'development-kakao-native-key';
   const easProjectId = environmentValue('EAS_PROJECT_ID');
-  if (
-    environmentValue('EAS_BUILD_PROFILE') === 'production' &&
-    kakaoNativeAppKey.startsWith('development-')
-  ) {
-    throw new Error('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for production');
+  const apiUrl = environmentValue('EXPO_PUBLIC_API_URL');
+  const privacyPolicyUrl = environmentValue('EXPO_PUBLIC_PRIVACY_POLICY_URL');
+  if (environmentValue('EAS_BUILD_PROFILE') === 'production') {
+    if (kakaoNativeAppKey.startsWith('development-')) {
+      throw new Error('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for production');
+    }
+    requireProductionHttpsUrl(apiUrl, 'EXPO_PUBLIC_API_URL');
+    requireProductionHttpsUrl(privacyPolicyUrl, 'EXPO_PUBLIC_PRIVACY_POLICY_URL');
   }
   return {
     ...config,
@@ -72,11 +84,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ],
     experiments: { typedRoutes: true },
     extra: {
-      apiUrl: environmentValue('EXPO_PUBLIC_API_URL') ?? 'http://127.0.0.1:4000',
-      revenueCatAppleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_APPLE_KEY') ?? '',
-      revenueCatGoogleKey: environmentValue('EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY') ?? '',
+      apiUrl: apiUrl ?? 'http://127.0.0.1:4000',
       sentryDsn: environmentValue('EXPO_PUBLIC_SENTRY_DSN') ?? '',
-      storybookEnabled: environmentValue('EXPO_PUBLIC_STORYBOOK_ENABLED') === 'true',
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
     ...(easProjectId ? { updates: { url: `https://u.expo.dev/${easProjectId}` } } : {}),

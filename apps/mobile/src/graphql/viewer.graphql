@@ -3,13 +3,5 @@ query Viewer {
     id
     displayName
     profileImageUrl
-    trialStartedAt
-    trialEndsAt
-    entitlement {
-      key
-      isActive
-      productId
-      expiresAt
-    }
   }
 }

@@ -1,3 +1,4 @@
+import { File, type UploadOptions, type UploadResult } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
 import { apolloClient } from '@/providers/apollo-client';
@@ -9,6 +10,8 @@ jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
   requestMediaLibraryPermissionsAsync: jest.fn(),
 }));
+
+jest.mock('expo-file-system', () => ({ File: jest.fn() }));
 
 jest.mock('@/providers/apollo-client', () => ({
   apolloClient: { mutate: jest.fn() },
@@ -25,6 +28,8 @@ const mockedLaunchImageLibraryAsync =
   ImagePicker.launchImageLibraryAsync as jest.MockedFunction<
     typeof ImagePicker.launchImageLibraryAsync
   >;
+const mockedFile = File as jest.MockedClass<typeof File>;
+const mockUpload = jest.fn<Promise<UploadResult>, [string, UploadOptions?]>();
 
 const selectedAsset = {
   fileSize: 128,
@@ -47,19 +52,18 @@ const mockSuccessfulSelection = (): void => {
   });
 };
 
-const mockPutFailure = (): jest.SpyInstance =>
-  jest
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce({
-      blob: jest.fn().mockResolvedValue(new Blob(['asset'])),
-    } as unknown as Response)
-    .mockResolvedValueOnce({ ok: false } as unknown as Response);
+const mockPutFailure = (): void => {
+  mockUpload.mockResolvedValue({ body: '', headers: {}, status: 500 });
+};
 
 describe('asset deletion payload validation', () => {
   beforeEach(() => {
     mockedMutate.mockReset();
     mockedRequestMediaLibraryPermissionsAsync.mockReset();
     mockedLaunchImageLibraryAsync.mockReset();
+    mockedFile.mockReset();
+    mockUpload.mockReset();
+    mockedFile.mockImplementation(() => ({ upload: mockUpload }) as unknown as File);
   });
 
   afterEach(() => {
@@ -72,6 +76,44 @@ describe('asset deletion payload validation', () => {
     });
 
     await expect(removeUploadedAsset('asset-1')).resolves.toBeUndefined();
+  });
+
+  it('streams the selected file through the native uploader', async () => {
+    mockSuccessfulSelection();
+    mockUpload.mockResolvedValue({ body: '', headers: {}, status: 200 });
+    mockedMutate.mockResolvedValue({
+      data: {
+        createAssetUpload: {
+          upload: {
+            asset: { id: 'asset-streamed' },
+            headers: [
+              { name: 'content-type', value: 'image/png' },
+              { name: 'if-none-match', value: '*' },
+            ],
+            uploadUrl: 'https://upload.example/asset-streamed',
+          },
+          userErrors: [],
+        },
+      },
+    });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toEqual({
+      id: 'asset-streamed',
+      uri: selectedAsset.uri,
+    });
+
+    expect(mockedFile).toHaveBeenCalledWith(selectedAsset.uri);
+    expect(mockUpload).toHaveBeenCalledWith(
+      'https://upload.example/asset-streamed',
+      expect.objectContaining({
+        headers: { 'content-type': 'image/png', 'if-none-match': '*' },
+        httpMethod: 'PUT',
+      }),
+    );
+    const uploadOptions = mockUpload.mock.calls[0]?.[1];
+    expect(uploadOptions?.signal).toBeInstanceOf(AbortSignal);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('throws the first GraphQL user error when deletion reports failure', async () => {

@@ -49,15 +49,18 @@ const reviveDates = (_key: string, value: unknown): unknown => {
   return value;
 };
 
+const parseJson = (value: string, revive = false): unknown => {
+  try {
+    return JSON.parse(value, revive ? reviveDates : undefined) as unknown;
+  } catch {
+    return null;
+  }
+};
+
 const initialize = async (): Promise<SQLiteDatabase> => {
   const db = await openDatabaseAsync('shopport.db');
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS conversation_cache (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
     CREATE TABLE IF NOT EXISTS conversation_pin (
       conversation_id TEXT PRIMARY KEY NOT NULL,
       pinned_at INTEGER NOT NULL
@@ -88,11 +91,6 @@ let databasePromise: Promise<SQLiteDatabase> | undefined;
 const database = (): Promise<SQLiteDatabase> => {
   databasePromise ??= initialize();
   return databasePromise;
-};
-
-export const deleteCachedConversation = async (conversationId: string): Promise<void> => {
-  const db = await database();
-  await db.runAsync('DELETE FROM conversation_cache WHERE id = ?', conversationId);
 };
 
 export const readPinnedConversationIds = async (): Promise<Array<string>> => {
@@ -151,22 +149,11 @@ export const readCachedProducts = async (): Promise<Array<CachedProduct>> => {
     'SELECT payload FROM product_cache ORDER BY updated_at DESC LIMIT 100',
   );
   return rows.flatMap(({ payload }) => {
-    const parsed: unknown = JSON.parse(payload);
+    const parsed = parseJson(payload);
     return isRecord(parsed) && typeof parsed.id === 'string'
       ? [parsed as CachedProduct]
       : [];
   });
-};
-
-export const readCachedProduct = async (id: string): Promise<CachedProduct | null> => {
-  const db = await database();
-  const row = await db.getFirstAsync<{ payload: string }>(
-    'SELECT payload FROM product_cache WHERE id = ? LIMIT 1',
-    id,
-  );
-  if (!row) return null;
-  const parsed: unknown = JSON.parse(row.payload);
-  return isRecord(parsed) && parsed.id === id ? (parsed as CachedProduct) : null;
 };
 
 export const readCachedChatMessages = async (): Promise<
@@ -177,12 +164,8 @@ export const readCachedChatMessages = async (): Promise<
     'SELECT payload FROM chat_cache ORDER BY updated_at DESC LIMIT 50',
   );
   return rows.flatMap(({ payload }) => {
-    try {
-      const parsed: unknown = JSON.parse(payload, reviveDates);
-      return isPersistedChat(parsed) ? parsed.messages : [];
-    } catch {
-      return [];
-    }
+    const parsed = parseJson(payload, true);
+    return isPersistedChat(parsed) ? parsed.messages : [];
   });
 };
 
@@ -219,7 +202,6 @@ export const deleteDraft = async (conversationId: string): Promise<void> => {
 export const clearPrivateStorage = async (): Promise<void> => {
   const db = await database();
   await db.execAsync(`
-    DELETE FROM conversation_cache;
     DELETE FROM conversation_pin;
     DELETE FROM product_cache;
     DELETE FROM draft;
@@ -235,7 +217,7 @@ export const sqliteChatPersistence: ChatClientPersistence = {
       id,
     );
     if (!row) return null;
-    const parsed: unknown = JSON.parse(row.payload, reviveDates);
+    const parsed = parseJson(row.payload, true);
     return isPersistedChat(parsed) ? parsed : null;
   },
   setItem: async (id, state) => {

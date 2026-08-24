@@ -4,7 +4,7 @@ import * as Crypto from 'expo-crypto';
 
 import { environment } from '@/shared/config/environment';
 
-export type IdentityCredential = Readonly<{
+type IdentityCredential = Readonly<{
   identityToken: string;
   nonce: string;
 }>;

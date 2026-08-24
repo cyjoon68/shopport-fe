@@ -23,7 +23,7 @@ query Conversations($after: String) {
 query Conversation($id: UUID!) {
   conversation(id: $id) {
     ...ConversationSummary
-    messages {
+    messages(first: 50) {
       id
       role
       status
@@ -73,7 +73,7 @@ query FoundProducts($first: Int!, $after: String) {
     edges {
       cursor
       node {
-        messages {
+        messages(first: 20) {
           parts {
             __typename
             ... on ProductReferenceMessagePart {
@@ -99,7 +99,7 @@ query UploadedImages($first: Int!, $after: String) {
     edges {
       cursor
       node {
-        messages {
+        messages(first: 20) {
           parts {
             __typename
             ... on ImageMessagePart {

@@ -30,7 +30,13 @@ import { chatErrorPresentation } from './chat-errors';
 import { cancelRunThenStop } from './chat-http';
 import { createStableChatMessageId } from './message-id';
 import type { DisplayMessage } from './message-list';
-import { activeAskUserRequest, mergeMessages, MessageList } from './message-list';
+import {
+  activeAskUserRequest,
+  fromHistoricalMessage,
+  fromLiveMessage,
+  mergeDisplayMessages,
+  MessageList,
+} from './message-list';
 
 type ConversationScreenProps = Readonly<{
   conversationId?: string;
@@ -97,9 +103,17 @@ export const ConversationScreen = ({
   });
 
   const historicalMessages = data?.conversation?.messages;
+  const historicalDisplayMessages = useMemo(
+    () => (historicalMessages ?? []).map(fromHistoricalMessage),
+    [historicalMessages],
+  );
+  const liveDisplayMessages = useMemo(
+    () => chat.messages.map(fromLiveMessage),
+    [chat.messages],
+  );
   const displayMessages = useMemo(
-    () => mergeMessages(historicalMessages ?? [], chat.messages),
-    [chat.messages, historicalMessages],
+    () => mergeDisplayMessages(historicalDisplayMessages, liveDisplayMessages),
+    [historicalDisplayMessages, liveDisplayMessages],
   );
   const activeAskUser = activeAskUserRequest(displayMessages);
   const [askSheetOpen, setAskSheetOpen] = useState(false);
@@ -204,6 +218,7 @@ export const ConversationScreen = ({
         </View>
       ) : (
         <MessageList
+          isGenerating={chat.isLoading}
           messages={displayMessages}
           onAskUserPress={() => {
             if (!skipAskUserRef.current) setAskSheetOpen(true);

@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client/react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { EmptyState, Screen } from '@shopport/ui';
 import { Redirect } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -24,6 +24,7 @@ type FoundProductsContentProps = Readonly<{
   presentation?: ProductPresentation;
   scope?: ProductScope;
 }>;
+const recommendationKey = ({ product }: RecommendedProduct): string => product.id;
 
 const RecommendationSummary = ({ aiSummary }: Readonly<{ aiSummary: string }>) => (
   <View style={styles.summaryCard}>
@@ -146,6 +147,27 @@ export const FoundProductsContent = ({
     const timeout = setTimeout(() => setHighlightedProductId(null), 1_600);
     return () => clearTimeout(timeout);
   }, [focusProductId, recommendations]);
+  const loadMore = useCallback(() => {
+    const pageInfo = data?.conversations.pageInfo;
+    if (pageInfo?.hasNextPage)
+      void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
+  }, [data?.conversations.pageInfo, fetchMore]);
+  const renderRecommendation = useCallback(
+    ({ item }: Readonly<{ item: RecommendedProduct }>) => (
+      <View style={styles.gridCell}>
+        <ProductCard
+          compact
+          highlighted={item.product.id === highlightedProductId}
+          horizontal={presentation === 'recommendations'}
+          product={item.product}
+        />
+        {presentation === 'recommendations' && item.aiSummary ? (
+          <RecommendationSummary aiSummary={item.aiSummary} />
+        ) : null}
+      </View>
+    ),
+    [highlightedProductId, presentation],
+  );
 
   return (
     <View style={styles.content} testID="found-products-content">
@@ -157,7 +179,7 @@ export const FoundProductsContent = ({
       <FlashList
         contentContainerStyle={styles.list}
         data={recommendations}
-        keyExtractor={({ product }) => product.id}
+        keyExtractor={recommendationKey}
         ListEmptyComponent={
           <EmptyState
             description={
@@ -168,26 +190,10 @@ export const FoundProductsContent = ({
             title="찾은 상품이 없습니다"
           />
         }
-        onEndReached={() => {
-          const pageInfo = data?.conversations.pageInfo;
-          if (pageInfo?.hasNextPage)
-            void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
-        }}
+        onEndReached={loadMore}
         numColumns={1}
         ref={listRef}
-        renderItem={({ item }) => (
-          <View style={styles.gridCell}>
-            <ProductCard
-              compact
-              highlighted={item.product.id === highlightedProductId}
-              horizontal={presentation === 'recommendations'}
-              product={item.product}
-            />
-            {presentation === 'recommendations' && item.aiSummary ? (
-              <RecommendationSummary aiSummary={item.aiSummary} />
-            ) : null}
-          </View>
-        )}
+        renderItem={renderRecommendation}
         style={styles.listView}
       />
     </View>

@@ -14,7 +14,6 @@ test-results/
 .env
 .env.*
 !.env.example
-!apps/mobile/.env.example
 apps/mobile/ios/
 apps/mobile/android/
 *.tsbuildinfo

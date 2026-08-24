@@ -139,6 +139,40 @@ describe('product card links', () => {
     ]);
   });
 
+  it('reflects saved-state changes from a refreshed parent query', () => {
+    const screen = render(<ProductCard product={product} />);
+
+    screen.rerender(<ProductCard product={{ ...product, isSaved: true }} />);
+
+    expect(screen.getByTestId('sf:bookmark.fill')).toBeOnTheScreen();
+    expect(screen.getByLabelText('텀블러 찜 해제')).toBeOnTheScreen();
+  });
+
+  it('reports rejected save and outbound-link requests', async () => {
+    const saveProduct = jest.fn().mockRejectedValue(new Error('Network request failed'));
+    mockedUseMutation.mockReturnValue([
+      saveProduct,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('Cannot open URL'));
+    const screen = render(<ProductCard product={product} />);
+
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+    fireEvent.press(screen.getByLabelText('텀블러 구매 링크'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        '찜 변경 실패',
+        '연결을 확인하고 다시 시도해 주세요.',
+      );
+      expect(alertSpy).toHaveBeenCalledWith(
+        '구매 링크를 열 수 없어요',
+        '다시 시도해 주세요.',
+      );
+    });
+  });
+
   it('uses a bookmark icon instead of a text label', () => {
     const screen = render(<ProductCard product={product} />);
 

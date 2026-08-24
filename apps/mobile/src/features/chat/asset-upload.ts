@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
 import {
@@ -11,6 +12,7 @@ export type UploadedAsset = Readonly<{ id: string; uri: string }>;
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const maxBytes = 15 * 1024 * 1024;
 const maxPixels = 20_000_000;
+const uploadTimeoutMilliseconds = 60_000;
 
 export const selectAndUploadAsset = async (
   conversationId: string,
@@ -52,15 +54,25 @@ export const selectAndUploadAsset = async (
       payload?.userErrors[0]?.message ?? '이미지 업로드를 준비하지 못했습니다.',
     );
   }
-  const blob = await (await fetch(selected.uri)).blob();
-  const upload = await fetch(payload.upload.uploadUrl, {
-    method: 'PUT',
-    headers: Object.fromEntries(
-      payload.upload.headers.map(({ name, value }) => [name, value]),
-    ),
-    body: blob,
-  });
-  if (!upload.ok) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), uploadTimeoutMilliseconds);
+  let uploaded = false;
+  try {
+    const result = await new File(selected.uri).upload(payload.upload.uploadUrl, {
+      httpMethod: 'PUT',
+      headers: Object.fromEntries(
+        payload.upload.headers.map(({ name, value }) => [name, value]),
+      ),
+      mimeType: contentType,
+      signal: controller.signal,
+    });
+    uploaded = result.status >= 200 && result.status < 300;
+  } catch {
+    uploaded = false;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!uploaded) {
     await bestEffortRemoveUploadedAsset(payload.upload.asset.id);
     throw new Error('이미지를 업로드하지 못했습니다.');
   }

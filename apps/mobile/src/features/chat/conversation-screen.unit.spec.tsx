@@ -53,10 +53,12 @@ jest.mock('@/shared/storage/database', () => ({ sqliteChatPersistence: {} }));
 
 jest.mock('./message-list', () => ({
   activeAskUserRequest: () => null,
-  mergeMessages: (history: ReadonlyArray<unknown>, messages: ReadonlyArray<unknown>) => [
-    ...history,
-    ...messages,
-  ],
+  fromHistoricalMessage: (message: unknown) => message,
+  fromLiveMessage: (message: unknown) => message,
+  mergeDisplayMessages: (
+    history: ReadonlyArray<unknown>,
+    messages: ReadonlyArray<unknown>,
+  ) => [...history, ...messages],
   MessageList: () => null,
 }));
 
