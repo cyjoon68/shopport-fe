@@ -66,9 +66,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-build-properties',
         {
-          ios: { deploymentTarget: '16.4' },
+          ios: { deploymentTarget: '18.0' },
           android: {
-            minSdkVersion: 24,
+            compileSdkVersion: 36,
+            minSdkVersion: 29,
+            targetSdkVersion: 36,
             extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
           },
         },
