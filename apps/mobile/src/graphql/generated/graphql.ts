@@ -57,12 +57,6 @@ export type RenameConversationInput = {
   title: string;
 };
 
-/** Input for product search. */
-export type SearchProductsInput = {
-  /** The Korean natural-language search text. */
-  query: string;
-};
-
 /** The state of an AI tool call. */
 export type ToolStatus = 'COMPLETED' | 'FAILED' | 'STARTED';
 
@@ -147,40 +141,6 @@ export type ProductCardFragment = {
     total: { __typename: 'Money'; amountMinor: string; currency: string };
   };
 } & { ' $fragmentName'?: 'ProductCardFragment' };
-
-export type SearchProductsQueryVariables = Exact<{
-  input: SearchProductsInput;
-  first: number;
-  after?: string | null | undefined;
-}>;
-
-export type SearchProductsQuery = {
-  __typename: 'Query';
-  searchProducts: {
-    __typename: 'ProductConnection';
-    edges: Array<{
-      __typename: 'ProductEdge';
-      cursor: string;
-      node: { __typename: 'Product' } & {
-        ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
-      };
-    }>;
-    pageInfo: { __typename: 'PageInfo'; hasNextPage: boolean; endCursor: string | null };
-  };
-};
-
-export type ProductQueryVariables = Exact<{
-  id: string;
-}>;
-
-export type ProductQuery = {
-  __typename: 'Query';
-  product:
-    | ({ __typename: 'Product' } & {
-        ' $fragmentRefs'?: { ProductCardFragment: ProductCardFragment };
-      })
-    | null;
-};
 
 export type SavedProductsQueryVariables = Exact<{
   first: number;
@@ -509,15 +469,6 @@ export type ViewerQuery = {
     id: string;
     displayName: string;
     profileImageUrl: string | null;
-    trialStartedAt: string;
-    trialEndsAt: string;
-    entitlement: {
-      __typename: 'Entitlement';
-      key: string;
-      isActive: boolean;
-      productId: string | null;
-      expiresAt: string | null;
-    };
   };
 };
 
@@ -838,319 +789,6 @@ export const DeleteAssetDocument = {
     },
   ],
 } as unknown as DocumentNode<DeleteAssetMutation, DeleteAssetMutationVariables>;
-export const SearchProductsDocument = {
-  __meta__: { hash: 'f4f6469083c5fe0e294229875ce6da554af5f64ee4fefbeea4fc89c4cc224aff' },
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'query',
-      name: { kind: 'Name', value: 'SearchProducts' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
-          type: {
-            kind: 'NonNullType',
-            type: {
-              kind: 'NamedType',
-              name: { kind: 'Name', value: 'SearchProductsInput' },
-            },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'first' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'after' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'searchProducts' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'input' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'first' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'first' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'after' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'after' } },
-              },
-            ],
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'edges' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'cursor' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'node' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            {
-                              kind: 'Field',
-                              name: { kind: 'Name', value: '__typename' },
-                            },
-                            {
-                              kind: 'FragmentSpread',
-                              name: { kind: 'Name', value: 'ProductCard' },
-                            },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'pageInfo' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'hasNextPage' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'endCursor' } },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-    {
-      kind: 'FragmentDefinition',
-      name: { kind: 'Name', value: 'ProductCard' },
-      typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Product' } },
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'title' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'isAffiliate' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'isSaved' } },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'provider' },
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
-              ],
-            },
-          },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'offer' },
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'price' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'shipping' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'total' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<SearchProductsQuery, SearchProductsQueryVariables>;
-export const ProductDocument = {
-  __meta__: { hash: '04b82f110066e77230fca4c0d42f3c993ff27ce804c74e424c502472396beb1a' },
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'query',
-      name: { kind: 'Name', value: 'Product' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'UUID' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'product' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'id' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
-              },
-            ],
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                { kind: 'FragmentSpread', name: { kind: 'Name', value: 'ProductCard' } },
-              ],
-            },
-          },
-        ],
-      },
-    },
-    {
-      kind: 'FragmentDefinition',
-      name: { kind: 'Name', value: 'ProductCard' },
-      typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Product' } },
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'title' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'imageUrl' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'isAffiliate' } },
-          { kind: 'Field', name: { kind: 'Name', value: 'isSaved' } },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'provider' },
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'providerId' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
-              ],
-            },
-          },
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'offer' },
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'price' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'shipping' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'total' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'amountMinor' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'currency' } },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<ProductQuery, ProductQueryVariables>;
 export const SavedProductsDocument = {
   __meta__: { hash: 'bf57c797b4648170197cfea2a3603e97894cf05bc6e06e0102ed2ef420d41b32' },
   kind: 'Document',
@@ -1732,7 +1370,7 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
-  __meta__: { hash: 'f74b49a2e4e66ac29bc1092a56331ffd8d6746621fc0dd12ff1273e26dfc8a5c' },
+  __meta__: { hash: '1fc08b88d65d3ad04a05b55a2e13f1e9f6c8bf25ce8f5b37f3cf3c9913a04cb3' },
   kind: 'Document',
   definitions: [
     {
@@ -1774,6 +1412,13 @@ export const ConversationDocument = {
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'messages' },
+                  arguments: [
+                    {
+                      kind: 'Argument',
+                      name: { kind: 'Name', value: 'first' },
+                      value: { kind: 'IntValue', value: '50' },
+                    },
+                  ],
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
@@ -2076,7 +1721,7 @@ export const ConversationDocument = {
   ],
 } as unknown as DocumentNode<ConversationQuery, ConversationQueryVariables>;
 export const FoundProductsDocument = {
-  __meta__: { hash: '5247c3cc1b6810567526197b40340f874355295ee7eadf0eafea5dab29b41e98' },
+  __meta__: { hash: '7bd85e54691c850fb533b3078a9ec21c60545e61d3a0a2db6090915afdf68162' },
   kind: 'Document',
   definitions: [
     {
@@ -2142,6 +1787,13 @@ export const FoundProductsDocument = {
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'messages' },
+                              arguments: [
+                                {
+                                  kind: 'Argument',
+                                  name: { kind: 'Name', value: 'first' },
+                                  value: { kind: 'IntValue', value: '20' },
+                                },
+                              ],
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
@@ -2327,7 +1979,7 @@ export const FoundProductsDocument = {
   ],
 } as unknown as DocumentNode<FoundProductsQuery, FoundProductsQueryVariables>;
 export const UploadedImagesDocument = {
-  __meta__: { hash: 'dfa717f164a431b3a7f1673846b2d26e0af46ba510602c757ad931c4d343b05d' },
+  __meta__: { hash: '2f436e786805b7a4e20ed5897c9fa93093e82183feb365dbdff4d5a701f1b925' },
   kind: 'Document',
   definitions: [
     {
@@ -2393,6 +2045,13 @@ export const UploadedImagesDocument = {
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'messages' },
+                              arguments: [
+                                {
+                                  kind: 'Argument',
+                                  name: { kind: 'Name', value: 'first' },
+                                  value: { kind: 'IntValue', value: '20' },
+                                },
+                              ],
                               selectionSet: {
                                 kind: 'SelectionSet',
                                 selections: [
@@ -2860,7 +2519,7 @@ export const DeleteViewerAccountDocument = {
   DeleteViewerAccountMutationVariables
 >;
 export const ViewerDocument = {
-  __meta__: { hash: '04019bff4059c8cbcaefa660f6376ba8ed7911ae533b89627679cfb355e7b98f' },
+  __meta__: { hash: 'a98ada7d1ed26637d7f189e8f53817711cf9f2e4c8e668808339081a5734e478' },
   kind: 'Document',
   definitions: [
     {
@@ -2881,22 +2540,6 @@ export const ViewerDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'displayName' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'profileImageUrl' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'trialStartedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'entitlement' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'key' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'isActive' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'expiresAt' } },
-                    ],
-                  },
-                },
               ],
             },
           },

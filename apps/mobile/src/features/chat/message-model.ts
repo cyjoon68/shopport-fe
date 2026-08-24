@@ -23,7 +23,7 @@ type DisplayImage = Readonly<{
   url: string | null;
 }>;
 
-export type DisplayTool = Readonly<{
+type DisplayTool = Readonly<{
   id: string;
   name: string;
   status: 'STARTED' | 'COMPLETED' | 'FAILED';
@@ -210,13 +210,13 @@ const mergeDisplayMessage = (
   askUsers: live.askUsers.length ? live.askUsers : historical.askUsers,
 });
 
-export const mergeMessages = (
-  historical: ReadonlyArray<HistoricalMessage>,
-  live: ReadonlyArray<UIMessage>,
+export const mergeDisplayMessages = (
+  historical: ReadonlyArray<DisplayMessage>,
+  live: ReadonlyArray<DisplayMessage>,
 ): Array<DisplayMessage> => {
-  const merged = historical.map(fromHistoricalMessage);
+  const merged = [...historical];
   const positions = new Map(merged.map((message, index) => [message.id, index]));
-  for (const message of live.map(fromLiveMessage)) {
+  for (const message of live) {
     const position = positions.get(message.id);
     if (position === undefined) {
       positions.set(message.id, merged.length);
@@ -228,6 +228,12 @@ export const mergeMessages = (
   }
   return merged;
 };
+
+export const mergeMessages = (
+  historical: ReadonlyArray<HistoricalMessage>,
+  live: ReadonlyArray<UIMessage>,
+): Array<DisplayMessage> =>
+  mergeDisplayMessages(historical.map(fromHistoricalMessage), live.map(fromLiveMessage));
 
 export const activeAskUserRequest = (
   messages: ReadonlyArray<DisplayMessage>,

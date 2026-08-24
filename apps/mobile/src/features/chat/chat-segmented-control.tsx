@@ -33,43 +33,50 @@ export const ChatSegmentedControl = ({
   testID,
   value,
 }: ChatSegmentedControlProps) => {
-  const activePillOffset = useSharedValue(getActivePillOffset(value));
-  const dragStartOffset = useSharedValue(activePillOffset.value);
+  const initialPillOffset = getActivePillOffset(value);
+  const activePillOffset = useSharedValue(initialPillOffset);
+  const dragStartOffset = useSharedValue(initialPillOffset);
 
   useEffect(() => {
-    activePillOffset.value = withTiming(getActivePillOffset(value), {
-      duration: animationDuration,
-    });
+    activePillOffset.set(
+      withTiming(getActivePillOffset(value), { duration: animationDuration }),
+    );
   }, [activePillOffset, value]);
 
   const activePillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: activePillOffset.value }],
+    transform: [{ translateX: activePillOffset.get() }],
   }));
 
   const panGesture = Gesture.Pan()
     .activateAfterLongPress(longPressDelay)
     .onBegin(() => {
       cancelAnimation(activePillOffset);
-      dragStartOffset.value = activePillOffset.value;
+      dragStartOffset.set(activePillOffset.get());
     })
     .onUpdate((event) => {
-      activePillOffset.value = Math.max(
-        0,
-        Math.min(activePillWidth, dragStartOffset.value + event.translationX),
+      activePillOffset.set(
+        Math.max(
+          0,
+          Math.min(activePillWidth, dragStartOffset.get() + event.translationX),
+        ),
       );
     })
     .onEnd(() => {
-      const nextValue = activePillOffset.value >= activePillWidth / 2 ? '상품' : '채팅';
-      activePillOffset.value = withTiming(nextValue === '상품' ? activePillWidth : 0, {
-        duration: animationDuration,
-      });
+      const nextValue = activePillOffset.get() >= activePillWidth / 2 ? '상품' : '채팅';
+      activePillOffset.set(
+        withTiming(nextValue === '상품' ? activePillWidth : 0, {
+          duration: animationDuration,
+        }),
+      );
       runOnJS(onValueChange)(nextValue);
     })
     .onFinalize((_, success) => {
       if (success) return;
-      activePillOffset.value = withTiming(value === '상품' ? activePillWidth : 0, {
-        duration: animationDuration,
-      });
+      activePillOffset.set(
+        withTiming(value === '상품' ? activePillWidth : 0, {
+          duration: animationDuration,
+        }),
+      );
     });
 
   return (

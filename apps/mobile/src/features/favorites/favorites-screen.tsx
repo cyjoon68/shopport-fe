@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client/react';
 import { FlashList } from '@shopify/flash-list';
 import { EmptyState, Screen } from '@shopport/ui';
 import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -14,6 +14,11 @@ import { useOnline } from '@/providers/network-provider';
 import type { CachedProduct } from '@/shared/storage/database';
 import { cacheProducts, readCachedProducts } from '@/shared/storage/database';
 
+const productKey = ({ id }: CachedProduct): string => id;
+const renderProduct = ({ item }: Readonly<{ item: CachedProduct }>) => (
+  <ProductCard product={item} />
+);
+
 export const FavoritesScreen = () => {
   const { status } = useSession();
   const online = useOnline();
@@ -23,17 +28,33 @@ export const FavoritesScreen = () => {
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated' || !online,
   });
-  const products = data?.savedProducts.edges.map(({ node }) => productFromFragment(node));
+  const products = useMemo(
+    () => data?.savedProducts.edges.map(({ node }) => productFromFragment(node)),
+    [data],
+  );
   useEffect(() => {
+    let active = true;
     if (products?.length) {
-      void cacheProducts(products);
+      void cacheProducts(products).catch(() => undefined);
       setCached(products);
-      return;
+      return () => {
+        active = false;
+      };
     }
-    void readCachedProducts().then((items) =>
-      setCached(items.filter(({ isSaved }) => isSaved)),
-    );
+    void readCachedProducts()
+      .then((items) => {
+        if (active) setCached(items.filter(({ isSaved }) => isSaved));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [products]);
+  const loadMore = useCallback(() => {
+    const pageInfo = data?.savedProducts.pageInfo;
+    if (pageInfo?.hasNextPage)
+      void fetchMore({ variables: { first: 20, after: pageInfo.endCursor } });
+  }, [data?.savedProducts.pageInfo, fetchMore]);
   if (status === 'guest') return <Redirect href="/auth" />;
   return (
     <Screen testID="favorites-screen">
@@ -45,19 +66,15 @@ export const FavoritesScreen = () => {
       <FlashList
         contentContainerStyle={styles.list}
         data={products ?? cached}
-        keyExtractor={({ id }) => id}
+        keyExtractor={productKey}
         ListEmptyComponent={
           <EmptyState
             description="상품 카드에서 찜을 누르면 저장됩니다."
             title="찜한 상품이 없습니다"
           />
         }
-        onEndReached={() => {
-          const pageInfo = data?.savedProducts.pageInfo;
-          if (pageInfo?.hasNextPage)
-            void fetchMore({ variables: { first: 20, after: pageInfo.endCursor } });
-        }}
-        renderItem={({ item }) => <ProductCard product={item} />}
+        onEndReached={loadMore}
+        renderItem={renderProduct}
       />
     </Screen>
   );

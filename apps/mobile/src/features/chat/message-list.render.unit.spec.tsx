@@ -2,6 +2,7 @@ import { render } from '@testing-library/react-native';
 import {
   createElement as mockCreateElement,
   forwardRef as mockForwardRef,
+  type ReactElement,
   type ReactNode,
   useImperativeHandle as mockUseImperativeHandle,
 } from 'react';
@@ -13,6 +14,7 @@ type FlashListProps = Readonly<{
   data: ReadonlyArray<DisplayMessage>;
   maintainVisibleContentPosition?: Readonly<{
     autoscrollToBottomThreshold?: number;
+    startRenderingFromBottom?: boolean;
   }>;
   renderItem: ({ item }: { item: DisplayMessage }) => ReactNode;
 }>;
@@ -87,7 +89,34 @@ describe('chat message list', () => {
     expect(mockScrollToEnd).not.toHaveBeenCalled();
     expect(mockFlashListProps?.maintainVisibleContentPosition).toEqual({
       autoscrollToBottomThreshold: 0.2,
+      startRenderingFromBottom: true,
     });
+  });
+
+  it('animates only the latest message while a response is being generated', () => {
+    const userMessage = {
+      ...message,
+      id: 'user-1',
+      products: [],
+      role: 'user' as const,
+      text: '립밤 찾아줘',
+      tools: [],
+    };
+    render(<MessageList isGenerating messages={[message, userMessage]} />);
+
+    const assistantRow = mockFlashListProps?.renderItem({
+      item: message,
+    }) as ReactElement<{
+      animate: boolean;
+    }>;
+    const userRow = mockFlashListProps?.renderItem({
+      item: userMessage,
+    }) as ReactElement<{
+      animate: boolean;
+    }>;
+
+    expect(assistantRow.props.animate).toBe(false);
+    expect(userRow.props.animate).toBe(true);
   });
 
   it('scrolls to a newly sent user message once', () => {

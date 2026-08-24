@@ -1,7 +1,7 @@
 import { getAccessToken } from '@/features/auth/auth-token';
 import { environment } from '@/shared/config/environment';
 
-export const cancelChatRun = async (threadId: string, runId: string): Promise<void> => {
+const cancelChatRun = async (threadId: string, runId: string): Promise<void> => {
   const token = getAccessToken();
   const response = await fetch(`${environment.apiUrl}/v1/ai/chat/cancel`, {
     method: 'POST',

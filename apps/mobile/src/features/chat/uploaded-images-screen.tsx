@@ -3,12 +3,26 @@ import { FlashList } from '@shopify/flash-list';
 import { EmptyState, Screen } from '@shopport/ui';
 import { Image } from 'expo-image';
 import { Redirect } from 'expo-router';
+import { useCallback, useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth/session-provider';
 import { UploadedImagesDocument } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
+
+type UploadedImage = Readonly<{ id: string; url: string }>;
+const imageKey = ({ id }: UploadedImage): string => id;
+const renderImage = ({ item }: Readonly<{ item: UploadedImage }>) => (
+  <View style={styles.imageCell}>
+    <Image
+      accessibilityLabel="업로드한 이미지"
+      contentFit="cover"
+      source={item.url}
+      style={styles.image}
+    />
+  </View>
+);
 
 export const UploadedImagesScreen = () => {
   const { status } = useSession();
@@ -18,17 +32,24 @@ export const UploadedImagesScreen = () => {
     fetchPolicy: 'cache-and-network',
     skip: status !== 'authenticated' || !online,
   });
-  const results =
-    data?.conversations.edges.flatMap(({ node }) =>
-      node.messages.flatMap(({ parts }) =>
-        parts.flatMap((part) =>
-          part.__typename === 'ImageMessagePart' && part.asset.url
-            ? [{ id: part.asset.id, url: part.asset.url }]
-            : [],
+  const images = useMemo(() => {
+    const results =
+      data?.conversations.edges.flatMap(({ node }) =>
+        node.messages.flatMap(({ parts }) =>
+          parts.flatMap((part) =>
+            part.__typename === 'ImageMessagePart' && part.asset.url
+              ? [{ id: part.asset.id, url: part.asset.url }]
+              : [],
+          ),
         ),
-      ),
-    ) ?? [];
-  const images = [...new Map(results.map((image) => [image.id, image])).values()];
+      ) ?? [];
+    return [...new Map(results.map((image) => [image.id, image])).values()];
+  }, [data]);
+  const loadMore = useCallback(() => {
+    const pageInfo = data?.conversations.pageInfo;
+    if (pageInfo?.hasNextPage)
+      void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
+  }, [data?.conversations.pageInfo, fetchMore]);
 
   if (status === 'guest') return <Redirect href="/auth" />;
 
@@ -42,7 +63,7 @@ export const UploadedImagesScreen = () => {
       <FlashList
         contentContainerStyle={styles.list}
         data={images}
-        keyExtractor={({ id }) => id}
+        keyExtractor={imageKey}
         ListEmptyComponent={
           <EmptyState
             description="대화에 첨부한 이미지가 여기에 모입니다."
@@ -50,21 +71,8 @@ export const UploadedImagesScreen = () => {
           />
         }
         numColumns={3}
-        onEndReached={() => {
-          const pageInfo = data?.conversations.pageInfo;
-          if (pageInfo?.hasNextPage)
-            void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
-        }}
-        renderItem={({ item }) => (
-          <View style={styles.imageCell}>
-            <Image
-              accessibilityLabel="업로드한 이미지"
-              contentFit="cover"
-              source={item.url}
-              style={styles.image}
-            />
-          </View>
-        )}
+        onEndReached={loadMore}
+        renderItem={renderImage}
       />
     </Screen>
   );

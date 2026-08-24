@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { createElement as mockCreateElement, type ReactNode } from 'react';
 import {
+  Alert,
   Linking,
   Pressable as mockPressable,
   Text as mockText,
@@ -14,7 +15,9 @@ import { SettingsScreen } from './settings-screen';
 
 const mockLogout = jest.fn();
 const mockUpdateViewer = jest.fn();
+const mockDeleteAccount = jest.fn();
 const mockOpenUrl = jest.spyOn(Linking, 'openURL');
+let mockMutationCall = 0;
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -80,7 +83,14 @@ describe('settings screen', () => {
     mockedUseQuery.mockReturnValue({
       data: { viewer: { displayName: '기존 닉네임' } },
     } as unknown as ReturnType<typeof useQuery>);
-    mockedUseMutation.mockReturnValue([mockUpdateViewer, { loading: false }] as never);
+    mockedUseMutation.mockReset();
+    mockMutationCall = 0;
+    mockedUseMutation.mockImplementation(
+      () =>
+        (mockMutationCall++ % 2 === 0
+          ? [mockUpdateViewer, { loading: false }]
+          : [mockDeleteAccount, { loading: false }]) as never,
+    );
     mockedKakaoAccountEmail.mockResolvedValue('shopper@example.com');
     mockUpdateViewer.mockResolvedValue({
       data: {
@@ -91,6 +101,10 @@ describe('settings screen', () => {
       },
     });
     mockOpenUrl.mockResolvedValue(true);
+    mockLogout.mockResolvedValue(undefined);
+    mockDeleteAccount.mockResolvedValue({
+      data: { deleteViewerAccount: { success: true, userErrors: [] } },
+    });
   });
 
   it('updates the nickname and displays the Kakao account email', async () => {
@@ -121,5 +135,33 @@ describe('settings screen', () => {
     fireEvent.press(screen.getByLabelText('개인정보 처리방침'));
 
     expect(mockOpenUrl).toHaveBeenCalledWith('https://example.com/privacy');
+  });
+
+  it('reports account deletion and logout failures', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('Network request failed'));
+    mockLogout.mockRejectedValueOnce(new Error('SecureStore failed'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<SettingsScreen />);
+    await waitFor(() =>
+      expect(screen.getByText('shopper@example.com')).toBeOnTheScreen(),
+    );
+
+    fireEvent.press(screen.getByLabelText('회원 탈퇴'));
+    const confirmation = alertSpy.mock.calls.find(
+      ([title]) => title === '회원 탈퇴를 진행할까요?',
+    );
+    const actions = confirmation?.[2] as
+      | Array<{ text?: string; onPress?: () => void }>
+      | undefined;
+    actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
+    fireEvent.press(screen.getByLabelText('로그아웃'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        '삭제 실패',
+        '연결을 확인하고 다시 시도해 주세요.',
+      );
+      expect(alertSpy).toHaveBeenCalledWith('로그아웃 실패', '다시 시도해 주세요.');
+    });
   });
 });

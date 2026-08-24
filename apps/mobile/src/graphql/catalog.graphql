@@ -29,27 +29,6 @@ fragment ProductCard on Product {
   }
 }
 
-query SearchProducts($input: SearchProductsInput!, $first: Int!, $after: String) {
-  searchProducts(input: $input, first: $first, after: $after) {
-    edges {
-      cursor
-      node {
-        ...ProductCard
-      }
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-
-query Product($id: UUID!) {
-  product(id: $id) {
-    ...ProductCard
-  }
-}
-
 query SavedProducts($first: Int!, $after: String) {
   savedProducts(first: $first, after: $after) {
     edges {

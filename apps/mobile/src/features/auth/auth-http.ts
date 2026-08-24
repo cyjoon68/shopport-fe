@@ -2,13 +2,15 @@ import * as SecureStore from 'expo-secure-store';
 
 import { environment } from '@/shared/config/environment';
 
-export type AuthProviderName = 'kakao';
+type AuthProviderName = 'kakao';
 
 export type TokenPair = Readonly<{
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
 }>;
+
+export class SessionExpiredError extends Error {}
 
 const refreshTokenKey = 'shopport.refresh-token';
 const authenticationRetryLimit = 8;
@@ -73,7 +75,10 @@ export const authenticate = async (
 
 export const rotateTokens = async (refreshToken: string): Promise<TokenPair> => {
   const response = await post('/v1/auth/refresh', { refreshToken });
-  if (!response.ok) throw new Error('세션이 만료되었습니다.');
+  if (response.status === 401 || response.status === 403) {
+    throw new SessionExpiredError('세션이 만료되었습니다.');
+  }
+  if (!response.ok) throw new Error('세션 서버에 연결할 수 없습니다.');
   return parseTokenPair(await response.json());
 };
 

@@ -83,6 +83,24 @@ export const SettingsScreen = () => {
     });
   };
 
+  const deleteViewer = async (): Promise<void> => {
+    try {
+      const result = await deleteAccount();
+      if (!result.data?.deleteViewerAccount.success) {
+        Alert.alert(
+          '삭제 실패',
+          result.data?.deleteViewerAccount.userErrors[0]?.message ??
+            '다시 시도해 주세요.',
+        );
+        return;
+      }
+      await logout();
+      router.replace('/auth');
+    } catch {
+      Alert.alert('삭제 실패', '연결을 확인하고 다시 시도해 주세요.');
+    }
+  };
+
   const confirmDelete = (): void => {
     if (!online) {
       Alert.alert('오프라인', '계정 삭제는 온라인에서 할 수 있습니다.');
@@ -96,21 +114,7 @@ export const SettingsScreen = () => {
         {
           text: '회원 탈퇴',
           style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              const result = await deleteAccount();
-              if (!result.data?.deleteViewerAccount.success) {
-                Alert.alert(
-                  '삭제 실패',
-                  result.data?.deleteViewerAccount.userErrors[0]?.message ??
-                    '다시 시도해 주세요.',
-                );
-                return;
-              }
-              await logout();
-              router.replace('/auth');
-            })();
-          },
+          onPress: () => void deleteViewer(),
         },
       ],
     );
@@ -163,7 +167,14 @@ export const SettingsScreen = () => {
         <GlassActionButton onPress={openPrivacyPolicy} variant="secondary">
           개인정보 처리방침
         </GlassActionButton>
-        <GlassActionButton onPress={() => void logout()} variant="secondary">
+        <GlassActionButton
+          onPress={() =>
+            void logout().catch(() => {
+              Alert.alert('로그아웃 실패', '다시 시도해 주세요.');
+            })
+          }
+          variant="secondary"
+        >
           로그아웃
         </GlassActionButton>
         <GlassActionButton onPress={confirmDelete} variant="danger">

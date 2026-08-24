@@ -16,14 +16,14 @@ jest.mock('expo-sqlite', () => ({
 
 import {
   clearPrivateStorage,
-  deleteCachedConversation,
   readCachedChatMessages,
-  readCachedProduct,
+  readCachedProducts,
   readPinnedConversationIds,
   setConversationPinned,
+  sqliteChatPersistence,
 } from './database';
 
-describe('offline product detail and private storage', () => {
+describe('offline cache and private storage', () => {
   beforeEach(() => {
     mockExecAsync.mockClear();
     mockGetFirstAsync.mockReset();
@@ -31,17 +31,17 @@ describe('offline product detail and private storage', () => {
     mockRunAsync.mockReset();
   });
 
-  it('loads the offline product detail deterministically by ID', async () => {
-    mockGetFirstAsync.mockResolvedValue({
-      payload: JSON.stringify({ id: 'product-2', title: '오프라인 상품' }),
-    });
-    await expect(readCachedProduct('product-2')).resolves.toEqual(
-      expect.objectContaining({ id: 'product-2' }),
-    );
-    expect(mockGetFirstAsync).toHaveBeenCalledWith(
-      'SELECT payload FROM product_cache WHERE id = ? LIMIT 1',
-      'product-2',
-    );
+  it('ignores corrupted product and chat cache rows', async () => {
+    mockGetAllAsync.mockResolvedValue([
+      { payload: '{broken' },
+      { payload: JSON.stringify({ id: 'product-3', title: '정상 상품' }) },
+    ]);
+    await expect(readCachedProducts()).resolves.toEqual([
+      expect.objectContaining({ id: 'product-3' }),
+    ]);
+
+    mockGetFirstAsync.mockResolvedValueOnce({ payload: '{broken' });
+    await expect(sqliteChatPersistence.getItem('chat-1')).resolves.toBeNull();
   });
 
   it('reads messages from every persisted chat', async () => {
@@ -59,7 +59,6 @@ describe('offline product detail and private storage', () => {
   it('clears conversations, products, drafts and persisted chat on logout', async () => {
     await clearPrivateStorage();
     const statement = mockExecAsync.mock.calls.at(-1)?.[0] as string;
-    expect(statement).toContain('DELETE FROM conversation_cache');
     expect(statement).toContain('DELETE FROM product_cache');
     expect(statement).toContain('DELETE FROM draft');
     expect(statement).toContain('DELETE FROM chat_cache');
@@ -74,14 +73,6 @@ describe('offline product detail and private storage', () => {
       expect.stringContaining('INSERT OR REPLACE INTO conversation_pin'),
       'conversation-1',
       expect.any(Number),
-    );
-  });
-
-  it('removes a deleted conversation from the local list cache', async () => {
-    await deleteCachedConversation('conversation-1');
-    expect(mockRunAsync).toHaveBeenCalledWith(
-      'DELETE FROM conversation_cache WHERE id = ?',
-      'conversation-1',
     );
   });
 });

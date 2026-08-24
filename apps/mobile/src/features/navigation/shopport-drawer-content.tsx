@@ -11,7 +11,7 @@ import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth/session-provider';
-import { conversationHref } from '@/features/chat';
+import { conversationHref } from '@/features/chat/conversation-href';
 import { readFragment } from '@/graphql/generated';
 import {
   ConversationsDocument,

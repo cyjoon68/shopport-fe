@@ -8,8 +8,8 @@ import {
   useState,
 } from 'react';
 
-import { resetRevenueCat } from '@/features/subscription/revenuecat';
 import { apolloClient } from '@/providers/apollo-client';
+import { useOnline } from '@/providers/network-provider';
 import { clearPrivateStorage } from '@/shared/storage/database';
 
 import { loginErrorMessage } from './auth-error';
@@ -20,12 +20,13 @@ import {
   readRefreshToken,
   revokeSession,
   rotateTokens,
+  SessionExpiredError,
   writeRefreshToken,
 } from './auth-http';
 import { setAccessToken } from './auth-token';
 import { kakaoIdentity } from './native-auth';
-import type { SessionStatus } from './session-boundary';
-import { SessionBoundaryContext } from './session-boundary';
+
+type SessionStatus = 'booting' | 'authenticated' | 'guest';
 
 type SessionContextValue = Readonly<{
   error: string | null;
@@ -36,8 +37,10 @@ type SessionContextValue = Readonly<{
 }>;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+const refreshRetryMilliseconds = 5_000;
 
 export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
+  const online = useOnline();
   const [status, setStatus] = useState<SessionStatus>('booting');
   const [error, setError] = useState<string | null>(null);
   const [expiry, setExpiry] = useState<number | null>(null);
@@ -57,26 +60,37 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
     await deleteRefreshToken();
     await apolloClient.clearStore();
     await clearPrivateStorage();
-    await resetRevenueCat();
     setStatus('guest');
+    setError(null);
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
-    const refreshToken = await readRefreshToken();
-    if (!refreshToken) {
-      setStatus('guest');
-      return;
-    }
     try {
+      setError(null);
+      const refreshToken = await readRefreshToken();
+      if (!refreshToken) {
+        setStatus('guest');
+        return;
+      }
       await install(await rotateTokens(refreshToken));
-    } catch {
-      await clear();
+    } catch (refreshError) {
+      if (refreshError instanceof SessionExpiredError) {
+        await clear();
+        return;
+      }
+      setError('세션을 확인할 수 없습니다. 연결을 확인해 주세요.');
     }
   }, [clear, install]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (online) void refresh();
+  }, [online, refresh]);
+
+  useEffect(() => {
+    if (!online || !error || status === 'guest') return undefined;
+    const timeout = setTimeout(() => void refresh(), refreshRetryMilliseconds);
+    return () => clearTimeout(timeout);
+  }, [error, online, refresh, status]);
 
   useEffect(() => {
     if (!expiry) return undefined;
@@ -114,13 +128,7 @@ export const SessionProvider = ({ children }: Readonly<{ children: ReactNode }>)
     () => ({ error, login, logout, sessionVersion, status }),
     [error, login, logout, sessionVersion, status],
   );
-  return (
-    <SessionContext.Provider value={value}>
-      <SessionBoundaryContext.Provider value={{ sessionVersion, status }}>
-        {children}
-      </SessionBoundaryContext.Provider>
-    </SessionContext.Provider>
-  );
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 };
 
 export const useSession = (): SessionContextValue => {

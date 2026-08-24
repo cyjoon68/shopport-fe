@@ -1,4 +1,4 @@
-import { authenticate } from './auth-http';
+import { authenticate, rotateTokens, SessionExpiredError } from './auth-http';
 
 describe('authentication HTTP contract', () => {
   afterEach(() => {
@@ -66,6 +66,19 @@ describe('authentication HTTP contract', () => {
       );
     await expect(authenticate('kakao', 'oidc-token', 'nonce')).rejects.toThrow(
       '인증 서버 응답이 올바르지 않습니다.',
+    );
+  });
+
+  it('distinguishes an invalid refresh token from a server outage', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await expect(rotateTokens('expired.token')).rejects.toBeInstanceOf(
+      SessionExpiredError,
+    );
+
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    await expect(rotateTokens('valid.token')).rejects.not.toBeInstanceOf(
+      SessionExpiredError,
     );
   });
 });

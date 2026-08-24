@@ -149,9 +149,9 @@ export const useComposerActions = ({
       if (Platform.OS === 'ios')
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (!isCurrent(expected)) return;
-      state.setText('');
       await onSend(trimmed, currentAsset?.id ?? null);
       if (!isCurrent(expected)) return;
+      state.setText('');
       state.setAsset(null);
       await state.deleteDraft(conversationId);
     } catch (error) {

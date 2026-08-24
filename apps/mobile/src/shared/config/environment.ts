@@ -24,8 +24,5 @@ export const environment = {
     readEnv('EXPO_PUBLIC_PRIVACY_POLICY_URL'),
     'Privacy policy URL',
   ),
-  revenueCatAppleKey: readEnv('EXPO_PUBLIC_REVENUECAT_APPLE_KEY') ?? '',
-  revenueCatGoogleKey: readEnv('EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY') ?? '',
   sentryDsn: readEnv('EXPO_PUBLIC_SENTRY_DSN') ?? '',
-  storybookEnabled: readEnv('EXPO_PUBLIC_STORYBOOK_ENABLED') === 'true',
 } as const;

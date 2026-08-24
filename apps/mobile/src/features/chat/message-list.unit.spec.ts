@@ -13,6 +13,7 @@ import {
   activeAskUserRequest,
   fromHistoricalMessage,
   fromLiveMessage,
+  mergeDisplayMessages,
   mergeMessages,
 } from './message-list';
 
@@ -178,6 +179,20 @@ describe('historical message parts', () => {
     );
     expect(merged[0]?.askUsers).toHaveLength(1);
     expect(merged[0]?.askUsers[0]?.id).toBe('live-question');
+  });
+
+  it('preserves unchanged historical message references while live content streams', () => {
+    const historicalMessage = fromHistoricalMessage(historical);
+    const liveMessage = fromLiveMessage({
+      id: '0198a122-0c00-7000-8000-000000000099',
+      role: 'assistant',
+      parts: [{ type: 'text', content: '새 응답' }],
+    });
+
+    const merged = mergeDisplayMessages([historicalMessage], [liveMessage]);
+
+    expect(merged[0]).toBe(historicalMessage);
+    expect(merged[1]).toBe(liveMessage);
   });
 
   it('requires canonical UUIDs for cross-source identity and isolates legacy IDs', () => {

@@ -6,7 +6,6 @@ import {
   RenameConversationDocument,
 } from '@/graphql/generated/graphql';
 import {
-  deleteCachedConversation,
   deleteDraft,
   setConversationPinned,
   sqliteChatPersistence,
@@ -115,7 +114,6 @@ export const useConversationActionHandlers = ({
               onDeleted(conversation.id);
               let cacheCleanupFailed = false;
               const cleanupResults = await Promise.allSettled([
-                deleteCachedConversation(conversation.id),
                 sqliteChatPersistence.removeItem(conversation.id),
                 setConversationPinned(conversation.id, false),
                 deleteDraft(conversation.id),

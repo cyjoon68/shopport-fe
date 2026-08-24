@@ -1,6 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 const NetworkContext = createContext(true);
 
@@ -13,8 +13,7 @@ export const NetworkProvider = ({ children }: Readonly<{ children: ReactNode }>)
       }),
     [],
   );
-  const value = useMemo(() => online, [online]);
-  return <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>;
+  return <NetworkContext.Provider value={online}>{children}</NetworkContext.Provider>;
 };
 
 export const useOnline = (): boolean => useContext(NetworkContext);

@@ -8,8 +8,6 @@
   },
   "include": [
     "src",
-    ".rnstorybook/**/*.ts",
-    ".rnstorybook/**/*.tsx",
     "app.config.ts",
     "codegen.ts",
     ".expo/types/**/*.ts",

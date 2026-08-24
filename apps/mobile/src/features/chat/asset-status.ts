@@ -1,8 +1,8 @@
 import { AssetDocument } from '@/graphql/generated/graphql';
 import { apolloClient } from '@/providers/apollo-client';
 
-export type AssetProcessingResult = 'READY' | 'REJECTED' | 'TIMEOUT';
-export type AssetRemoteStatus = 'PENDING_UPLOAD' | 'PROCESSING' | 'READY' | 'REJECTED';
+type AssetProcessingResult = 'READY' | 'REJECTED' | 'TIMEOUT';
+type AssetRemoteStatus = 'PENDING_UPLOAD' | 'PROCESSING' | 'READY' | 'REJECTED';
 
 type PollOptions = Readonly<{
   intervalMs?: number;
