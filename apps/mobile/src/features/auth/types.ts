@@ -13,13 +13,16 @@ export type IdentityCredential = Readonly<{
   nonce: string;
 }>;
 
-export type SessionStatus = 'booting' | 'authenticated' | 'guest';
+export type SessionStatus =
+  | 'booting'
+  | 'guest'
+  | 'authenticated'
+  | 'offline-authenticated';
 
 export type SessionContextValue = Readonly<{
   error: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
-  sessionVersion: number;
   status: SessionStatus;
 }>;
 
