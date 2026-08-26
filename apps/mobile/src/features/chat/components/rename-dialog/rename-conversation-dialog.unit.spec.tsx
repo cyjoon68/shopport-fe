@@ -1,6 +1,6 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 import { useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, TextInput } from 'react-native';
 
 import { RenameConversationDialog } from './rename-conversation-dialog';
 
@@ -13,16 +13,18 @@ const createDeferred = () => {
 };
 
 const DialogHarness = ({
+  initialTitle = '기존 이름',
   onDismiss,
   onSubmit,
 }: {
+  initialTitle?: string;
   onDismiss: () => void;
   onSubmit: (title: string) => Promise<boolean>;
 }) => {
   const [visible, setVisible] = useState(true);
   return (
     <RenameConversationDialog
-      initialTitle="기존 이름"
+      initialTitle={initialTitle}
       onDismiss={() => {
         onDismiss();
         setVisible(false);
@@ -45,6 +47,9 @@ describe('RenameConversationDialog on Android', () => {
 
   it('announces a modal, labels and focuses the input, and supports cancel', async () => {
     const onDismiss = jest.fn();
+    const focus = jest
+      .spyOn(TextInput.prototype, 'focus')
+      .mockImplementation(() => undefined);
     const user = userEvent.setup();
     render(
       <RenameConversationDialog
@@ -55,12 +60,13 @@ describe('RenameConversationDialog on Android', () => {
       />,
     );
 
-    const modal = screen.getByLabelText('대화 이름 바꾸기');
+    const modal = screen.getByRole('dialog', { name: '대화 이름 바꾸기' });
     const input = screen.getByLabelText('대화 이름');
-    expect(modal.props.accessibilityViewIsModal).toBe(true);
+    expect(modal).toBeVisible();
     expect(screen.getByText('대화 이름')).toBeOnTheScreen();
     expect(input).toHaveDisplayValue('기존 이름');
-    expect(input).toHaveProp('autoFocus', true);
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
 
     await user.press(screen.getByRole('button', { name: '취소' }));
 
@@ -77,7 +83,8 @@ describe('RenameConversationDialog on Android', () => {
 
     await user.clear(input);
     const save = screen.getByRole('button', { name: '저장' });
-    expect(save.props.accessibilityState).toEqual({ busy: false, disabled: true });
+    expect(save).toBeDisabled();
+    expect(save).not.toBeBusy();
     await user.press(save);
     expect(onSubmit).not.toHaveBeenCalled();
 
@@ -85,17 +92,9 @@ describe('RenameConversationDialog on Android', () => {
     await user.press(screen.getByRole('button', { name: '저장' }));
 
     expect(onSubmit).toHaveBeenCalledWith('새 이름');
-    expect(screen.getByRole('button', { name: '저장' }).props.accessibilityState).toEqual(
-      {
-        busy: true,
-        disabled: true,
-      },
-    );
-    expect(screen.getByRole('button', { name: '취소' }).props.accessibilityState).toEqual(
-      {
-        disabled: true,
-      },
-    );
+    expect(screen.getByRole('button', { name: '저장' })).toBeBusy();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
 
     await act(async () => {
       deferred.resolve(true);
@@ -104,5 +103,68 @@ describe('RenameConversationDialog on Android', () => {
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText('대화 이름')).not.toBeOnTheScreen();
+  });
+
+  it('preserves user edits when the server title changes while open', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <RenameConversationDialog
+        initialTitle="기존 이름"
+        onDismiss={jest.fn()}
+        onSubmit={jest.fn()}
+        visible
+      />,
+    );
+    const input = screen.getByLabelText('대화 이름');
+
+    await user.clear(input);
+    await user.type(input, '사용자 편집');
+    view.rerender(
+      <RenameConversationDialog
+        initialTitle="서버 이름"
+        onDismiss={jest.fn()}
+        onSubmit={jest.fn()}
+        visible
+      />,
+    );
+
+    expect(screen.getByLabelText('대화 이름')).toHaveDisplayValue('사용자 편집');
+  });
+
+  it('keeps a pending submit busy and dismisses after the server title changes', async () => {
+    const deferred = createDeferred();
+    const onDismiss = jest.fn();
+    const onSubmit = jest.fn(() => deferred.promise);
+    const user = userEvent.setup();
+    const view = render(
+      <DialogHarness
+        initialTitle="기존 이름"
+        onDismiss={onDismiss}
+        onSubmit={onSubmit}
+      />,
+    );
+    const input = screen.getByLabelText('대화 이름');
+    await user.clear(input);
+    await user.type(input, '새 이름');
+    await user.press(screen.getByRole('button', { name: '저장' }));
+
+    view.rerender(
+      <DialogHarness
+        initialTitle="서버 이름"
+        onDismiss={onDismiss}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    expect(screen.getByLabelText('대화 이름')).toHaveDisplayValue('새 이름');
+    expect(screen.getByRole('button', { name: '저장' })).toBeBusy();
+    await act(async () => {
+      deferred.resolve(true);
+      await deferred.promise;
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole('dialog', { name: '대화 이름 바꾸기' }),
+    ).not.toBeOnTheScreen();
   });
 });

@@ -33,6 +33,18 @@ const onDeleted = jest.fn();
 const onPinnedChange = jest.fn();
 const onRefresh = jest.fn();
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+};
+
+const successfulDelete = {
+  data: { deleteConversation: { success: true, userErrors: [] } },
+};
+
 const props = (online = true) => ({
   conversation: { id: 'conversation-1', title: '기존 이름' },
   onDeleted,
@@ -139,6 +151,58 @@ describe('useConversationActions', () => {
     await request;
 
     expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it('finishes durable delete cleanup without stale UI after owner unmount', async () => {
+    const deletion = createDeferred<typeof successfulDelete>();
+    deleteConversation.mockReturnValueOnce(deletion.promise);
+    const { result, unmount } = renderHook(() => useConversationActions(props()));
+    confirmDelete(result.current.remove);
+    jest.mocked(Alert.alert).mockClear();
+
+    unmount();
+    deletion.resolve(successfulDelete);
+
+    await waitFor(() => expect(mockedDeleteDraft).toHaveBeenCalledWith('conversation-1'));
+    expect(mockedPersistence.removeItem).toHaveBeenCalledWith('conversation-1');
+    expect(mockedSetConversationPinned).toHaveBeenCalledWith('conversation-1', false);
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it('finishes durable delete cleanup without stale UI after going offline', async () => {
+    const deletion = createDeferred<typeof successfulDelete>();
+    deleteConversation.mockReturnValueOnce(deletion.promise);
+    const { result, rerender } = renderHook(
+      ({ online }: { online: boolean }) => useConversationActions(props(online)),
+      { initialProps: { online: true } },
+    );
+    confirmDelete(result.current.remove);
+    jest.mocked(Alert.alert).mockClear();
+
+    rerender({ online: false });
+    deletion.resolve(successfulDelete);
+
+    await waitFor(() => expect(mockedDeleteDraft).toHaveBeenCalledWith('conversation-1'));
+    expect(mockedPersistence.removeItem).toHaveBeenCalledWith('conversation-1');
+    expect(mockedSetConversationPinned).toHaveBeenCalledWith('conversation-1', false);
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it('stops owner UI after onDeleted unmounts but still finishes cleanup', async () => {
+    const { result, unmount } = renderHook(() => useConversationActions(props()));
+    onDeleted.mockImplementationOnce(unmount);
+    confirmDelete(result.current.remove);
+    jest.mocked(Alert.alert).mockClear();
+
+    await waitFor(() => expect(mockedDeleteDraft).toHaveBeenCalledWith('conversation-1'));
+
+    expect(onDeleted).toHaveBeenCalledWith('conversation-1');
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 
   it('returns success after rename when only the list refresh fails', async () => {

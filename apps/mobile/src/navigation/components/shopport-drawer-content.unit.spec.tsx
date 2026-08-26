@@ -31,6 +31,16 @@ let mockSessionStatus = 'authenticated';
 let mockConversationEdges: ReadonlyArray<unknown> = [];
 let mockPageInfo = { endCursor: null as string | null, hasNextPage: false };
 
+const createDeferred = <T,>() => {
+  let reject!: (error: Error) => void;
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle, fail) => {
+    reject = fail;
+    resolve = settle;
+  });
+  return { promise, reject, resolve };
+};
+
 jest.mock('expo-router', () => {
   const Link = Object.assign(
     ({ children }: { children: ReactNode }) =>
@@ -238,6 +248,55 @@ describe('shopport drawer content', () => {
       ),
     );
   });
+
+  it('suppresses an in-flight page failure after drawer unmount', async () => {
+    const pagination = createDeferred<void>();
+    mockPageInfo = { endCursor: 'cursor-1', hasNextPage: true };
+    mockFetchMore.mockReturnValueOnce(pagination.promise);
+    const user = userEvent.setup();
+    const view = render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+    await user.press(screen.getByRole('button', { name: '대화 더 불러오기' }));
+    jest.mocked(Alert.alert).mockClear();
+
+    view.unmount();
+    await act(async () => {
+      pagination.reject(new Error('pagination failed'));
+      await pagination.promise.catch(() => undefined);
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it.each(['network', 'session'] as const)(
+    'suppresses an in-flight page failure after %s disablement and releases its cursor',
+    async (policy) => {
+      const pagination = createDeferred<void>();
+      mockPageInfo = { endCursor: 'cursor-1', hasNextPage: true };
+      mockFetchMore.mockReturnValueOnce(pagination.promise);
+      const user = userEvent.setup();
+      const view = render(<ShopportDrawerContent {...drawerProps} />);
+      await act(async () => Promise.resolve());
+      await user.press(screen.getByRole('button', { name: '대화 더 불러오기' }));
+      jest.mocked(Alert.alert).mockClear();
+
+      if (policy === 'network') mockOnline = false;
+      else mockSessionStatus = 'unauthenticated';
+      view.rerender(<ShopportDrawerContent {...drawerProps} />);
+      await act(async () => {
+        pagination.reject(new Error('pagination failed'));
+        await pagination.promise.catch(() => undefined);
+      });
+
+      expect(Alert.alert).not.toHaveBeenCalled();
+      mockOnline = true;
+      mockSessionStatus = 'authenticated';
+      mockFetchMore.mockResolvedValueOnce(undefined);
+      view.rerender(<ShopportDrawerContent {...drawerProps} />);
+      await user.press(screen.getByRole('button', { name: '대화 더 불러오기' }));
+      expect(mockFetchMore).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('blocks a retained next-page callback after remote reads are disabled', async () => {
     mockPageInfo = { endCursor: 'cursor-1', hasNextPage: true };

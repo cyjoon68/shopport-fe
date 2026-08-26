@@ -12,13 +12,20 @@ export const RenameConversationDialog = ({
 }: RenameConversationDialogProps) => {
   const [title, setTitle] = useState(initialTitle);
   const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const submissionRef = useRef(0);
+  const visibleRef = useRef(false);
 
   useEffect(() => {
-    submissionRef.current += 1;
-    if (visible) {
+    const opening = visible && !visibleRef.current;
+    const closing = !visible && visibleRef.current;
+    visibleRef.current = visible;
+    if (closing) submissionRef.current += 1;
+    if (opening) {
+      submissionRef.current += 1;
       setTitle(initialTitle);
       setSubmitting(false);
+      inputRef.current?.focus();
     }
   }, [initialTitle, visible]);
 
@@ -62,8 +69,10 @@ export const RenameConversationDialog = ({
           style={styles.backdrop}
         />
         <View
+          accessible
           accessibilityLabel="대화 이름 바꾸기"
           accessibilityViewIsModal
+          role="dialog"
           style={styles.dialog}
         >
           <Text allowFontScaling style={styles.title}>
@@ -75,10 +84,10 @@ export const RenameConversationDialog = ({
             </Text>
             <TextInput
               accessibilityLabel="대화 이름"
-              autoFocus
               editable={!submitting}
               onChangeText={setTitle}
               onSubmitEditing={() => void submit()}
+              ref={inputRef}
               returnKeyType="done"
               selectTextOnFocus
               style={styles.input}

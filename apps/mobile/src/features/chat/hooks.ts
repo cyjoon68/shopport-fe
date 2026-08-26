@@ -117,16 +117,16 @@ export const useConversationActions = ({
           if (!activeRef.current || !onlineRef.current) return;
           void deleteConversation({ variables: { input: { id: conversation.id } } })
             .then(async (result) => {
-              if (!activeRef.current || !onlineRef.current) return;
               const payload = result.data?.deleteConversation;
               if (!payload?.success) {
-                Alert.alert(
-                  '삭제 실패',
-                  payload?.userErrors[0]?.message ?? '다시 시도해 주세요.',
-                );
+                if (activeRef.current && onlineRef.current)
+                  Alert.alert(
+                    '삭제 실패',
+                    payload?.userErrors[0]?.message ?? '다시 시도해 주세요.',
+                  );
                 return;
               }
-              onDeleted(conversation.id);
+              if (activeRef.current && onlineRef.current) onDeleted(conversation.id);
               const cleanupResults = await Promise.allSettled([
                 sqliteChatPersistence.removeItem(conversation.id),
                 setConversationPinned(conversation.id, false),
@@ -135,19 +135,20 @@ export const useConversationActions = ({
               const cacheCleanupFailed = cleanupResults.some(
                 ({ status }) => status === 'rejected',
               );
-              if (onlineRef.current) {
-                try {
-                  await onRefresh();
-                } catch {
-                  Alert.alert(
-                    '삭제 완료',
-                    cacheCleanupFailed
-                      ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
-                      : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
-                  );
-                  return;
-                }
+              if (!activeRef.current || !onlineRef.current) return;
+              try {
+                await onRefresh();
+              } catch {
+                if (!activeRef.current || !onlineRef.current) return;
+                Alert.alert(
+                  '삭제 완료',
+                  cacheCleanupFailed
+                    ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
+                    : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+                );
+                return;
               }
+              if (!activeRef.current || !onlineRef.current) return;
               if (cacheCleanupFailed) {
                 Alert.alert(
                   '삭제 완료',
@@ -156,7 +157,8 @@ export const useConversationActions = ({
               }
             })
             .catch(() => {
-              if (activeRef.current) Alert.alert('삭제 실패', '다시 시도해 주세요.');
+              if (activeRef.current && onlineRef.current)
+                Alert.alert('삭제 실패', '다시 시도해 주세요.');
             });
         },
       },

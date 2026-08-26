@@ -127,6 +127,7 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const enabled = status === 'authenticated' && online;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const mountedRef = useRef(true);
   const activeCursorsRef = useRef(new Set<string>());
   const [pinnedIds, setPinnedIds] = useState<ReadonlySet<string>>(new Set());
   const { data, fetchMore, refetch } = useQuery(ConversationsDocument, {
@@ -141,6 +142,12 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const conversations: ReadonlyArray<DrawerConversation> = [...conversationItems].sort(
     (left, right) => Number(pinnedIds.has(right.id)) - Number(pinnedIds.has(left.id)),
   );
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (status !== 'authenticated') return;
     void readPinnedConversationIds()
@@ -174,7 +181,7 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   };
 
   const loadMore = async (): Promise<void> => {
-    if (!enabledRef.current) return;
+    if (!mountedRef.current || !enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
     const cursor = pageInfo?.endCursor;
     if (!pageInfo?.hasNextPage || !cursor || activeCursorsRef.current.has(cursor)) return;
@@ -257,9 +264,10 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
             accessibilityLabel="대화 더 불러오기"
             accessibilityRole="button"
             onPress={() =>
-              void loadMore().catch(() =>
-                Alert.alert('대화 불러오기 실패', '다시 시도해 주세요.'),
-              )
+              void loadMore().catch(() => {
+                if (mountedRef.current && enabledRef.current)
+                  Alert.alert('대화 불러오기 실패', '다시 시도해 주세요.');
+              })
             }
             style={styles.loadMore}
           >
