@@ -6,15 +6,6 @@ export type DrawerConversation = Readonly<{
   title: string;
 }>;
 
-export type ConversationActionHandlersProps = Readonly<{
-  conversation: DrawerConversation | null;
-  onDeleted: (conversationId: string) => void;
-  online: boolean;
-  pinned: boolean;
-  onPinnedChange: (conversationId: string, pinned: boolean) => void;
-  onRefresh: () => Promise<unknown>;
-}>;
-
 export type DrawerLinkProps = Readonly<{
   label: string;
   onPress: () => void;

@@ -1,9 +1,20 @@
+import { useMutation } from '@apollo/client/react';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Animated, AppState, Keyboard, Platform } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 
-import { deleteDraft, readDraft, saveDraft } from '@/shared/storage';
+import {
+  DeleteConversationDocument,
+  RenameConversationDocument,
+} from '@/graphql/generated/graphql';
+import {
+  deleteDraft,
+  readDraft,
+  saveDraft,
+  setConversationPinned,
+  sqliteChatPersistence,
+} from '@/shared/storage';
 
 import {
   pollAssetUntilSettled,
@@ -16,7 +27,144 @@ import type {
   ComposerActionsArgs,
   ComposerLifecycle,
   ComposerState,
+  ConversationActionProps,
 } from './types';
+
+export const useConversationActions = ({
+  conversation,
+  onDeleted,
+  online,
+  pinned,
+  onPinnedChange,
+  onRefresh,
+}: ConversationActionProps): {
+  remove: () => void;
+  rename: (title: string) => Promise<boolean>;
+  togglePin: () => void;
+} => {
+  const activeRef = useRef(true);
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  const [renameConversation] = useMutation(RenameConversationDocument);
+  const [deleteConversation] = useMutation(DeleteConversationDocument);
+
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
+
+  const togglePin = (): void => {
+    if (!activeRef.current) return;
+    const nextPinned = !pinned;
+    void setConversationPinned(conversation.id, nextPinned)
+      .then(() => {
+        if (activeRef.current) onPinnedChange(conversation.id, nextPinned);
+      })
+      .catch(() => {
+        if (activeRef.current) Alert.alert('오류', '고정 상태를 저장하지 못했습니다.');
+      });
+  };
+
+  const rename = async (title: string): Promise<boolean> => {
+    if (!activeRef.current) return false;
+    if (!onlineRef.current) {
+      Alert.alert('오프라인', '대화 이름 변경은 온라인에서 할 수 있습니다.');
+      return false;
+    }
+    const nextTitle = title.trim();
+    if (!nextTitle) return false;
+    try {
+      const result = await renameConversation({
+        variables: { input: { id: conversation.id, title: nextTitle } },
+      });
+      if (!activeRef.current) return false;
+      const message = result.data?.renameConversation.userErrors[0]?.message;
+      if (message) {
+        Alert.alert('이름 변경 실패', message);
+        return false;
+      }
+      if (onlineRef.current) {
+        try {
+          await onRefresh();
+        } catch {
+          Alert.alert(
+            '이름 변경 완료',
+            '서버에서 이름은 변경됐지만 목록을 새로 고치지 못했습니다.',
+          );
+        }
+      }
+      return true;
+    } catch {
+      if (activeRef.current) Alert.alert('이름 변경 실패', '다시 시도해 주세요.');
+      return false;
+    }
+  };
+
+  const remove = (): void => {
+    if (!activeRef.current) return;
+    if (!onlineRef.current) {
+      Alert.alert('오프라인', '대화 삭제는 온라인에서 할 수 있습니다.');
+      return;
+    }
+    Alert.alert('대화를 삭제할까요?', '메시지와 첨부 이미지도 함께 삭제됩니다.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          if (!activeRef.current || !onlineRef.current) return;
+          void deleteConversation({ variables: { input: { id: conversation.id } } })
+            .then(async (result) => {
+              if (!activeRef.current || !onlineRef.current) return;
+              const payload = result.data?.deleteConversation;
+              if (!payload?.success) {
+                Alert.alert(
+                  '삭제 실패',
+                  payload?.userErrors[0]?.message ?? '다시 시도해 주세요.',
+                );
+                return;
+              }
+              onDeleted(conversation.id);
+              const cleanupResults = await Promise.allSettled([
+                sqliteChatPersistence.removeItem(conversation.id),
+                setConversationPinned(conversation.id, false),
+                deleteDraft(conversation.id),
+              ]);
+              const cacheCleanupFailed = cleanupResults.some(
+                ({ status }) => status === 'rejected',
+              );
+              if (onlineRef.current) {
+                try {
+                  await onRefresh();
+                } catch {
+                  Alert.alert(
+                    '삭제 완료',
+                    cacheCleanupFailed
+                      ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
+                      : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+                  );
+                  return;
+                }
+              }
+              if (cacheCleanupFailed) {
+                Alert.alert(
+                  '삭제 완료',
+                  '서버에서 삭제되었지만 기기 캐시를 정리하지 못했습니다.',
+                );
+              }
+            })
+            .catch(() => {
+              if (activeRef.current) Alert.alert('삭제 실패', '다시 시도해 주세요.');
+            });
+        },
+      },
+    ]);
+  };
+
+  return { remove, rename, togglePin };
+};
 
 const isCurrentComposerConversation = (
   lifecycle: ComposerLifecycle,

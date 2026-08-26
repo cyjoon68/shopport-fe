@@ -14,6 +14,22 @@ export type AskUserRequest = Readonly<{
 
 export type UploadedAsset = Readonly<{ id: string; uri: string }>;
 
+export type ConversationActionProps = Readonly<{
+  conversation: Readonly<{ id: string; title: string }>;
+  onDeleted: (conversationId: string) => void;
+  online: boolean;
+  pinned: boolean;
+  onPinnedChange: (conversationId: string, pinned: boolean) => void;
+  onRefresh: () => Promise<unknown>;
+}>;
+
+export type RenameConversationDialogProps = Readonly<{
+  initialTitle: string;
+  onDismiss: () => void;
+  onSubmit: (title: string) => Promise<boolean>;
+  visible: boolean;
+}>;
+
 export type Attachment = UploadedAsset &
   Readonly<{ state: 'checking' | 'processing' | 'ready' | 'rejected' | 'timeout' }>;
 
