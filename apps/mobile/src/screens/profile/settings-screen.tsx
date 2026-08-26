@@ -1,16 +1,11 @@
-import { useMutation, useQuery } from '@apollo/client/react';
 import { Screen, SectionTitle } from '@shopport/ui';
 import { Redirect, router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { kakaoAccountEmail, useSession } from '@/features/auth';
-import {
-  DeleteViewerAccountDocument,
-  UpdateViewerDocument,
-  ViewerDocument,
-} from '@/graphql/generated/graphql';
+import { useProfile } from '@/features/profile';
 import { useOnline } from '@/providers/network-provider';
 import { environment } from '@/shared/config/environment';
 import { GlassActionButton } from '@/shared/ui/glass-button';
@@ -28,20 +23,13 @@ const SettingsContent = () => {
   const { logout, status } = useSession();
   const online = useOnline();
   const remoteEnabled = status === 'authenticated' && online;
-  const remoteEnabledRef = useRef(remoteEnabled);
-  remoteEnabledRef.current = remoteEnabled;
-  const { data } = useQuery(ViewerDocument, {
-    fetchPolicy: remoteEnabled ? 'cache-and-network' : 'cache-only',
-    skip: false,
-  });
-  const [updateViewer, { loading: updating }] = useMutation(UpdateViewerDocument);
-  const [deleteAccount] = useMutation(DeleteViewerAccountDocument);
+  const { deleteAccount, displayName, updateDisplayName, updating } = useProfile();
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState<string | null | undefined>();
 
   useEffect(() => {
-    if (data?.viewer.displayName) setNickname(data.viewer.displayName);
-  }, [data?.viewer.displayName]);
+    if (displayName) setNickname(displayName);
+  }, [displayName]);
 
   useEffect(() => {
     if (!remoteEnabled) return;
@@ -59,7 +47,7 @@ const SettingsContent = () => {
   }, [remoteEnabled]);
 
   const trimmedNickname = nickname.trim();
-  const nicknameUnchanged = trimmedNickname === data?.viewer.displayName;
+  const nicknameUnchanged = trimmedNickname === displayName;
   const saveNicknameDisabled =
     !remoteEnabled ||
     !trimmedNickname ||
@@ -67,23 +55,8 @@ const SettingsContent = () => {
     nicknameUnchanged;
 
   const saveNickname = async (): Promise<void> => {
-    if (!remoteEnabledRef.current) return;
-    try {
-      const result = await updateViewer({
-        variables: { input: { displayName: trimmedNickname } },
-      });
-      const payload = result.data?.updateViewer;
-      if (!payload?.viewer) {
-        Alert.alert(
-          '닉네임을 변경하지 못했어요',
-          payload?.userErrors[0]?.message ?? '다시 시도해 주세요.',
-        );
-        return;
-      }
-      setNickname(payload.viewer.displayName);
-    } catch {
-      Alert.alert('닉네임을 변경하지 못했어요', '연결을 확인하고 다시 시도해 주세요.');
-    }
+    const error = await updateDisplayName(trimmedNickname);
+    if (error) Alert.alert('닉네임을 변경하지 못했어요', error);
   };
 
   const openPrivacyPolicy = (): void => {
@@ -100,22 +73,13 @@ const SettingsContent = () => {
   };
 
   const deleteViewer = async (): Promise<void> => {
-    if (!remoteEnabledRef.current) return;
-    try {
-      const result = await deleteAccount();
-      if (!result.data?.deleteViewerAccount.success) {
-        Alert.alert(
-          '삭제 실패',
-          result.data?.deleteViewerAccount.userErrors[0]?.message ??
-            '다시 시도해 주세요.',
-        );
-        return;
-      }
-      await logout();
-      router.replace('/auth');
-    } catch {
-      Alert.alert('삭제 실패', '연결을 확인하고 다시 시도해 주세요.');
+    const error = await deleteAccount();
+    if (error) {
+      Alert.alert('삭제 실패', error);
+      return;
     }
+    await logout();
+    router.replace('/auth');
   };
 
   const confirmDelete = (): void => {
