@@ -1,14 +1,16 @@
+import { useQuery } from '@apollo/client/react';
 import { render } from '@testing-library/react-native';
 import { createElement as mockCreateElement, type ReactNode } from 'react';
 import { Text as mockText, View as mockView } from 'react-native';
 
 import type { SessionStatus } from '@/features/auth';
-import { useUploadedImages } from '@/features/chat/api/hooks';
 
 import { UploadedImagesScreen } from './uploaded-images-screen';
 
 let mockStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
+let mockEndReached: (() => void) | undefined;
+const mockFetchMore = jest.fn();
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
@@ -23,12 +25,39 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => mockOnline,
 }));
 
-jest.mock('@/features/chat/api/hooks', () => ({
-  useUploadedImages: jest.fn(() => ({ images: [], loadMore: jest.fn() })),
+jest.mock('@apollo/client/react', () => ({
+  useApolloClient: jest.fn(),
+  useMutation: jest.fn(),
+  useQuery: jest.fn(() => ({
+    data: {
+      conversations: {
+        edges: [],
+        pageInfo: { endCursor: 'cursor-1', hasNextPage: true },
+      },
+    },
+    fetchMore: mockFetchMore,
+  })),
+}));
+
+jest.mock(
+  '@tanstack/ai-react',
+  () => ({
+    useChat: jest.fn(),
+    xhrHttpStream: jest.fn(),
+  }),
+  { virtual: true },
+);
+
+jest.mock('@/shared/storage', () => ({
+  flushChatPersistence: jest.fn(),
+  sqliteChatPersistence: {},
 }));
 
 jest.mock('@shopify/flash-list', () => ({
-  FlashList: () => mockCreateElement(mockText, { testID: 'image-list' }, 'images'),
+  FlashList: ({ onEndReached }: { onEndReached: () => void }) => {
+    mockEndReached = onEndReached;
+    return mockCreateElement(mockText, { testID: 'image-list' }, 'images');
+  },
 }));
 
 jest.mock('@shopport/ui', () => ({
@@ -37,13 +66,14 @@ jest.mock('@shopport/ui', () => ({
     mockCreateElement(mockView, { testID }, children),
 }));
 
-const mockedUseUploadedImages = jest.mocked(useUploadedImages);
+const mockedUseQuery = jest.mocked(useQuery);
 
 describe('uploaded images screen session policy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockStatus = 'authenticated';
     mockOnline = true;
+    mockEndReached = undefined;
   });
 
   it('does not mount image cache or query hooks while booting', () => {
@@ -51,7 +81,7 @@ describe('uploaded images screen session policy', () => {
     const screen = render(<UploadedImagesScreen />);
 
     expect(screen.queryByTestId('uploaded-images-screen')).toBeNull();
-    expect(mockedUseUploadedImages).not.toHaveBeenCalled();
+    expect(mockedUseQuery).not.toHaveBeenCalled();
   });
 
   it('redirects guests before image hooks mount', () => {
@@ -59,14 +89,17 @@ describe('uploaded images screen session policy', () => {
     const screen = render(<UploadedImagesScreen />);
 
     expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
-    expect(mockedUseUploadedImages).not.toHaveBeenCalled();
+    expect(mockedUseQuery).not.toHaveBeenCalled();
   });
 
   it('enables remote image reads for online authenticated sessions', () => {
     const screen = render(<UploadedImagesScreen />);
 
     expect(screen.getByTestId('image-list')).toBeOnTheScreen();
-    expect(mockedUseUploadedImages).toHaveBeenCalledWith(true);
+    expect(mockedUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ skip: false }),
+    );
   });
 
   it('renders the offline cache-only surface with remote image reads disabled', () => {
@@ -78,6 +111,20 @@ describe('uploaded images screen session policy', () => {
     expect(
       screen.getByText('오프라인에서는 업로드한 이미지를 불러올 수 없습니다.'),
     ).toBeOnTheScreen();
-    expect(mockedUseUploadedImages).toHaveBeenCalledWith(false);
+    expect(mockedUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('blocks a retained public end-reached callback after going offline', () => {
+    const screen = render(<UploadedImagesScreen />);
+    const retainedEndReached = mockEndReached;
+
+    mockStatus = 'offline-authenticated';
+    screen.rerender(<UploadedImagesScreen />);
+    retainedEndReached?.();
+
+    expect(mockFetchMore).not.toHaveBeenCalled();
   });
 });

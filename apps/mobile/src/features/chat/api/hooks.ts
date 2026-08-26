@@ -1,6 +1,11 @@
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
-import { useChat, xhrHttpStream } from '@tanstack/ai-react';
-import { useState } from 'react';
+import {
+  type ChatClientPersistence,
+  type ConnectConnectionAdapter,
+  useChat,
+  xhrHttpStream,
+} from '@tanstack/ai-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/features/auth/auth-token';
 import { readFragment } from '@/graphql/generated';
@@ -48,12 +53,16 @@ export const useConversationHistory = (conversationId: string, online: boolean) 
 export const useChatRun = ({
   assetId,
   conversationId,
+  online,
   onFinish,
   providerIds,
 }: ChatRunOptions) => {
   const client = useApolloClient();
-  const [connection] = useState(() =>
-    xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  const previousOnlineRef = useRef(online);
+  const [connection] = useState<ConnectConnectionAdapter>(() => {
+    const transport = xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
       const token = getAccessToken();
       return {
         headers: token ? { authorization: `Bearer ${token}` } : {},
@@ -65,22 +74,49 @@ export const useChatRun = ({
         },
         reconnect: { delayMs: 300, maxAttempts: 5 },
       };
-    }),
-  );
-  return useChat({
+    });
+    return {
+      async *connect(messages, data, abortSignal, runContext) {
+        if (!onlineRef.current) return;
+        yield* transport.connect(messages, data, abortSignal, runContext);
+      },
+      async *joinRun(runId, abortSignal) {
+        if (!onlineRef.current) return;
+        yield* transport.joinRun(runId, abortSignal);
+      },
+    };
+  });
+  const [persistence] = useState<ChatClientPersistence>(() => ({
+    getItem: async (id) => {
+      const state = await sqliteChatPersistence.getItem(id);
+      if (onlineRef.current || !state || Array.isArray(state)) return state;
+      return { messages: state.messages };
+    },
+    setItem: sqliteChatPersistence.setItem,
+    removeItem: sqliteChatPersistence.removeItem,
+  }));
+  const chat = useChat({
     connection,
     onFinish: () => {
       onFinish();
       void flushChatPersistence(conversationId).catch(() => undefined);
-      void client.refetchQueries({ include: [ConversationsDocument] });
+      if (onlineRef.current)
+        void client.refetchQueries({ include: [ConversationsDocument] });
     },
-    persistence: sqliteChatPersistence,
+    persistence,
     queue: 'drop',
     threadId: conversationId,
   });
+  useEffect(() => {
+    if (previousOnlineRef.current && !online) chat.stop();
+    previousOnlineRef.current = online;
+  }, [chat.stop, online]);
+  return chat;
 };
 
 export const useUploadedImages = (enabled: boolean) => {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const { data, fetchMore } = useQuery(UploadedImagesDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
@@ -98,6 +134,7 @@ export const useUploadedImages = (enabled: boolean) => {
     ) ?? [];
   const images = [...new Map(imageResults.map((image) => [image.id, image])).values()];
   const loadMore = (): void => {
+    if (!enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
     if (pageInfo?.hasNextPage)
       void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });

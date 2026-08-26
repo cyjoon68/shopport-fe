@@ -10,7 +10,7 @@ export const NetworkProvider = ({ children }: Readonly<{ children: ReactNode }>)
     let active = true;
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (active)
-        setOnline(state.isConnected === true && state.isInternetReachable !== false);
+        setOnline(state.isConnected === true && state.isInternetReachable === true);
     });
     return () => {
       active = false;

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Screen, SectionTitle } from '@shopport/ui';
 import { Redirect, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -28,6 +28,8 @@ const SettingsContent = () => {
   const { logout, status } = useSession();
   const online = useOnline();
   const remoteEnabled = status === 'authenticated' && online;
+  const remoteEnabledRef = useRef(remoteEnabled);
+  remoteEnabledRef.current = remoteEnabled;
   const { data } = useQuery(ViewerDocument, {
     fetchPolicy: remoteEnabled ? 'cache-and-network' : 'cache-only',
     skip: false,
@@ -65,6 +67,7 @@ const SettingsContent = () => {
     nicknameUnchanged;
 
   const saveNickname = async (): Promise<void> => {
+    if (!remoteEnabledRef.current) return;
     try {
       const result = await updateViewer({
         variables: { input: { displayName: trimmedNickname } },
@@ -97,6 +100,7 @@ const SettingsContent = () => {
   };
 
   const deleteViewer = async (): Promise<void> => {
+    if (!remoteEnabledRef.current) return;
     try {
       const result = await deleteAccount();
       if (!result.data?.deleteViewerAccount.success) {

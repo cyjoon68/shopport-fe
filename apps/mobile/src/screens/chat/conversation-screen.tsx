@@ -82,6 +82,7 @@ const ConversationContent = ({
   } = useChatRun({
     assetId,
     conversationId: id,
+    online,
     onFinish: () => {
       responseFinishedRef.current = true;
     },

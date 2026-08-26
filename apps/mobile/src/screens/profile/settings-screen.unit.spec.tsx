@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client/react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { createElement as mockCreateElement, type ReactNode } from 'react';
 import {
   Alert,
@@ -20,6 +20,7 @@ const mockOpenUrl = jest.spyOn(Linking, 'openURL');
 let mockMutationCall = 0;
 let mockStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
+let mockSaveNickname: (() => void) | undefined;
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
@@ -51,16 +52,14 @@ jest.mock('@shopport/ui', () => ({
 }));
 
 jest.mock('@/shared/ui/glass-button', () => ({
-  GlassActionButton: ({
-    children,
-    disabled,
-    onPress,
-  }: {
+  GlassActionButton: (props: {
     children: ReactNode;
     disabled?: boolean;
     onPress: () => void;
-  }) =>
-    mockCreateElement(
+  }) => {
+    const { children, disabled, onPress } = props;
+    if (children === '닉네임 저장') mockSaveNickname = onPress;
+    return mockCreateElement(
       mockPressable,
       {
         accessibilityLabel: typeof children === 'string' ? children : undefined,
@@ -68,7 +67,8 @@ jest.mock('@/shared/ui/glass-button', () => ({
         onPress,
       },
       mockCreateElement(mockText, null, children),
-    ),
+    );
+  },
 }));
 
 const mockedUseMutation = useMutation as jest.MockedFunction<typeof useMutation>;
@@ -82,6 +82,7 @@ describe('settings screen', () => {
     jest.clearAllMocks();
     mockStatus = 'authenticated';
     mockOnline = true;
+    mockSaveNickname = undefined;
     mockedUseQuery.mockReturnValue({
       data: { viewer: { displayName: '기존 닉네임' } },
     } as unknown as ReturnType<typeof useQuery>);
@@ -212,5 +213,39 @@ describe('settings screen', () => {
       );
       expect(alertSpy).toHaveBeenCalledWith('로그아웃 실패', '다시 시도해 주세요.');
     });
+  });
+
+  it('blocks a retained delete confirmation after the session becomes offline', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<SettingsScreen />);
+    await waitFor(() => expect(mockedKakaoAccountEmail).toHaveBeenCalledTimes(1));
+
+    fireEvent.press(screen.getByLabelText('회원 탈퇴'));
+    const confirmation = alertSpy.mock.calls.find(
+      ([title]) => title === '회원 탈퇴를 진행할까요?',
+    );
+    const actions = confirmation?.[2] as
+      | Array<{ text?: string; onPress?: () => void }>
+      | undefined;
+    mockStatus = 'offline-authenticated';
+    screen.rerender(<SettingsScreen />);
+    actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
+
+    await act(async () => Promise.resolve());
+    expect(mockDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('checks current remote permission again before saving a nickname', async () => {
+    const screen = render(<SettingsScreen />);
+    await waitFor(() => expect(mockedKakaoAccountEmail).toHaveBeenCalledTimes(1));
+    fireEvent.changeText(screen.getByLabelText('닉네임'), '새 닉네임');
+    const save = mockSaveNickname;
+
+    mockStatus = 'offline-authenticated';
+    screen.rerender(<SettingsScreen />);
+    save?.();
+
+    await act(async () => Promise.resolve());
+    expect(mockUpdateViewer).not.toHaveBeenCalled();
   });
 });

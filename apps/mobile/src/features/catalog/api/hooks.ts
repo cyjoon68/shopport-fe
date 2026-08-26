@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client/react';
+import { useRef } from 'react';
 
 import {
   FoundProductsDocument,
@@ -12,6 +13,8 @@ import type { RecommendedProduct } from '../types';
 const pageSize = 20;
 
 export const useFoundProductRecommendations = (enabled: boolean) => {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const { data, fetchMore } = useQuery(FoundProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -28,6 +31,7 @@ export const useFoundProductRecommendations = (enabled: boolean) => {
       ),
     ) ?? [];
   const loadMore = (): void => {
+    if (!enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
     if (pageInfo?.hasNextPage)
       void fetchMore({ variables: { after: pageInfo.endCursor, first: pageSize } });

@@ -34,6 +34,7 @@ export type PollOptions = Readonly<{
 export type ChatRunOptions = Readonly<{
   assetId: MutableRefObject<string | null>;
   conversationId: string;
+  online: boolean;
   onFinish: () => void;
   providerIds: MutableRefObject<ReadonlyArray<RetailerId> | undefined>;
 }>;

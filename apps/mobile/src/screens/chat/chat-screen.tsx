@@ -19,7 +19,7 @@ import {
   selectAndUploadAsset,
 } from '@/features/chat';
 import { useCreateConversation } from '@/features/chat/api/hooks';
-import { useOnline } from '@/providers/network-provider';
+import { NetworkBoundary, useOnline } from '@/providers/network-provider';
 import { saveDraft } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
@@ -33,7 +33,12 @@ export const ChatScreen = () => {
   if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
 
-  return <ChatContent online={status === 'authenticated' && networkOnline} />;
+  const online = status === 'authenticated' && networkOnline;
+  return (
+    <NetworkBoundary online={online}>
+      <ChatContent online={online} />
+    </NetworkBoundary>
+  );
 };
 
 const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {

@@ -21,6 +21,7 @@ let mockHistory: ReadonlyArray<unknown> = [];
 let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
 const mockSendMessage = jest.fn<Promise<void>, [unknown]>();
+const mockStopChat = jest.fn();
 const mockRefetchQueries = jest.fn();
 let mockSessionStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
@@ -112,6 +113,7 @@ describe('conversation screen', () => {
     mockBoundaryOnline = undefined;
     mockActiveAskUser = null;
     mockSendMessage.mockReset();
+    mockStopChat.mockReset();
     mockRefetchQueries.mockReset().mockResolvedValue([]);
     mockedUseApolloClient.mockReturnValue({
       refetchQueries: mockRefetchQueries,
@@ -131,7 +133,7 @@ describe('conversation screen', () => {
         messages: mockChatMessages,
         runId: null,
         sendMessage: mockSendMessage,
-        stop: jest.fn(),
+        stop: mockStopChat,
       } as unknown as ReturnType<typeof useChat>;
     });
   });
@@ -184,6 +186,19 @@ describe('conversation screen', () => {
     });
     expect(mockBoundaryOnline).toBe(false);
     expect(screen.queryByTestId('ask-user-sheet')).toBeNull();
+  });
+
+  it('stops mounted transport and blocks a retained finish refetch after going offline', () => {
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+    const retainedFinish = mockFinish;
+
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ConversationScreen conversationId="conversation-1" />);
+    retainedFinish?.();
+
+    expect(mockStopChat).toHaveBeenCalledTimes(1);
+    expect(mockRefetchQueries).not.toHaveBeenCalled();
   });
 
   it('hides quick actions once the conversation has content', () => {

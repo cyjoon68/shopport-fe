@@ -158,6 +158,26 @@ describe('session transitions', () => {
     );
   });
 
+  it('logs out an offline session locally without attempting server revocation', async () => {
+    mockOnline = false;
+    mockedReadRefreshToken.mockResolvedValue('session.secret');
+    renderSession();
+    await waitFor(() => expect(session().status).toBe('offline-authenticated'));
+    jest.clearAllMocks();
+    mockedReadRefreshToken.mockResolvedValue('session.secret');
+
+    await act(async () => {
+      await session().logout();
+    });
+
+    expect(session().status).toBe('guest');
+    expect(mockedRevokeSession).not.toHaveBeenCalled();
+    expect(mockedDeleteRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockedApolloClient.clearStore.mock.calls).toHaveLength(1);
+    expect(mockedClosePrivateStorage).toHaveBeenCalledTimes(1);
+    expect(mockedClearPrivateStorage).toHaveBeenCalledTimes(1);
+  });
+
   it('closes an offline storage open that completes after logout', async () => {
     mockOnline = false;
     mockedReadRefreshToken.mockResolvedValue('session.secret');

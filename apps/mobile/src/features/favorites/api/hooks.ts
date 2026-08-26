@@ -1,5 +1,5 @@
 import { useQuery } from '@apollo/client/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { productFromFragment } from '@/features/catalog/domain/models';
 import { SavedProductsDocument } from '@/graphql/generated/graphql';
@@ -9,6 +9,8 @@ import type { CachedProduct } from '@/shared/storage/types';
 const pageSize = 20;
 
 export const useSavedProducts = (enabled: boolean) => {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const { data, fetchMore } = useQuery(SavedProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -37,6 +39,7 @@ export const useSavedProducts = (enabled: boolean) => {
 
   const products = productEdges?.map(({ node }) => productFromFragment(node));
   const loadMore = (): void => {
+    if (!enabledRef.current) return;
     const pageInfo = data?.savedProducts.pageInfo;
     if (pageInfo?.hasNextPage)
       void fetchMore({ variables: { after: pageInfo.endCursor, first: pageSize } });

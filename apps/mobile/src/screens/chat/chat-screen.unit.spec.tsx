@@ -1,8 +1,13 @@
 import { useMutation } from '@apollo/client/react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { print } from 'graphql';
-import { createElement as mockCreateElement } from 'react';
-import { Alert, Text as mockNativeText } from 'react-native';
+import {
+  type ComponentType,
+  createElement as mockCreateElement,
+  Fragment as mockFragment,
+  type ReactNode,
+} from 'react';
+import { Alert, Linking, Text as mockNativeText } from 'react-native';
 
 import type { SessionStatus } from '@/features/auth';
 import type { ChatTab, DisplayMessage } from '@/features/chat';
@@ -47,6 +52,8 @@ let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
 let mockFoundProductsRenderCount = 0;
 let mockSessionStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
+let mockEffectiveOnline: boolean | undefined;
+const mockMutate = jest.fn();
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
@@ -115,6 +122,9 @@ jest.mock('./conversation-screen', () => ({
 }));
 
 jest.mock('@/features/catalog', () => {
+  const ProductCard = jest.requireActual<{
+    ProductCard: ComponentType<{ product: DisplayMessage['products'][number] }>;
+  }>('@/features/catalog/components/product-card').ProductCard;
   return {
     ProductList: ({
       conversationRecommendations,
@@ -130,9 +140,18 @@ jest.mock('@/features/catalog', () => {
       mockFoundProductsPresentation = presentation;
       mockFoundProductsScope = scope;
       return mockCreateElement(
-        mockNativeText,
-        { testID: 'found-products-content' },
-        conversationRecommendations?.[0]?.product.title ?? '상품',
+        mockFragment,
+        null,
+        mockCreateElement(
+          mockNativeText,
+          { testID: 'found-products-content' },
+          conversationRecommendations?.[0]?.product.title ?? '상품',
+        ),
+        conversationRecommendations?.[0]
+          ? mockCreateElement(ProductCard, {
+              product: conversationRecommendations[0].product,
+            })
+          : null,
       );
     },
   };
@@ -153,14 +172,20 @@ jest.mock('@/features/auth', () => ({
 }));
 
 jest.mock('@/providers/network-provider', () => ({
-  useOnline: () => mockOnline,
+  NetworkBoundary: ({ children, online }: { children: ReactNode; online: boolean }) => {
+    mockEffectiveOnline = online;
+    return children;
+  },
+  useOnline: () => mockEffectiveOnline ?? mockOnline,
 }));
 
 jest.mock('@/shared/storage', () => ({
+  cacheProducts: jest.fn(() => Promise.resolve()),
   saveDraft: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('@/shared/accessibility/hooks', () => ({
+  useReducedMotion: () => false,
   useReducedTransparency: () => false,
 }));
 
@@ -190,8 +215,9 @@ describe('chat screen', () => {
     mockFoundProductsRenderCount = 0;
     mockSessionStatus = 'authenticated';
     mockOnline = true;
+    mockEffectiveOnline = undefined;
     mockedUseMutation.mockReturnValue([
-      jest.fn(),
+      mockMutate,
       { called: false, client: {}, loading: false, reset: jest.fn() },
     ] as ReturnType<typeof useMutation>);
   });
@@ -216,6 +242,25 @@ describe('chat screen', () => {
     expect(mockedUseMutation).not.toHaveBeenCalled();
   });
 
+  it('keeps mounted bootstrap transitions behind the effective network boundary', () => {
+    mockSessionStatus = 'booting';
+    const screen = render(<ChatScreen />);
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+
+    mockSessionStatus = 'guest';
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+
+    mockSessionStatus = 'authenticated';
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
+  });
+
   it('permits remote conversation work only for an online authenticated session', () => {
     const screen = render(<ChatScreen />);
 
@@ -236,6 +281,54 @@ describe('chat screen', () => {
     expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
     act(() => mockTabChange?.('상품'));
     expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
+  });
+
+  it('blocks cached product actions when a mounted chat becomes offline-authenticated', () => {
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    mockSearchParams = { id: 'conversation-1' };
+    const screen = render(<ChatScreen />);
+    const product = {
+      id: 'product-1',
+      title: '립밤',
+      imageUrl: 'https://example.com/lipbalm.jpg',
+      providerId: 'oliveyoung',
+      providerName: '올리브영',
+      amountMinor: '3000',
+      shippingMinor: '0',
+      totalMinor: '3000',
+      currency: 'KRW',
+      isAffiliate: false,
+      isInStock: true,
+      outboundUrl: 'https://example.com/product',
+      deliveryExpectedAt: null,
+      observedAt: '2026-08-26T00:00:00.000Z',
+      isSaved: false,
+    } as const;
+    act(() =>
+      mockConversationOnMessagesChange?.([
+        {
+          askUsers: [],
+          id: 'assistant-1',
+          images: [],
+          products: [product],
+          recommendations: [{ product, aiSummary: '추천' }],
+          role: 'assistant',
+          status: 'COMPLETED',
+          text: '추천',
+          tools: [],
+        },
+      ]),
+    );
+    act(() => mockConversationOnProductSelect?.(product));
+
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+    fireEvent.press(screen.getByLabelText('립밤 찜'));
+    fireEvent.press(screen.getByLabelText('립밤 구매 링크'));
+
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(openUrl).not.toHaveBeenCalled();
   });
 
   it('opens the drawer from the top-left menu button', () => {

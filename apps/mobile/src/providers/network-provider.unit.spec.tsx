@@ -74,6 +74,20 @@ describe('network provider', () => {
     expect(screen.getByText('online')).toBeOnTheScreen();
   });
 
+  it('fails closed until internet reachability is explicitly restored', () => {
+    const screen = render(
+      <NetworkProvider>
+        <State />
+      </NetworkProvider>,
+    );
+
+    act(() => mockListener?.(connectivity(true, null)));
+    expect(screen.getByText('offline')).toBeOnTheScreen();
+
+    act(() => mockListener?.(connectivity(true, true)));
+    expect(screen.getByText('online')).toBeOnTheScreen();
+  });
+
   it('unsubscribes exactly once and ignores late listener updates', () => {
     const setOnline = jest.fn();
     let LateUpdateNetworkProvider = NetworkProvider;

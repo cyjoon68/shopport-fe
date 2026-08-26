@@ -54,4 +54,28 @@ describe('useSavedProducts', () => {
       expect.objectContaining({ skip: true }),
     );
   });
+
+  it('blocks a retained pagination callback after remote reads are disabled', () => {
+    mockedReadCachedProducts.mockImplementation(() => new Promise(() => undefined));
+    const fetchMore = jest.fn();
+    mockedUseQuery.mockReturnValue({
+      data: {
+        savedProducts: {
+          edges: [],
+          pageInfo: { endCursor: 'cursor-1', hasNextPage: true },
+        },
+      },
+      fetchMore,
+    } as never);
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useSavedProducts(enabled),
+      { initialProps: { enabled: true } },
+    );
+    const retainedLoadMore = result.current.loadMore;
+
+    rerender({ enabled: false });
+    retainedLoadMore();
+
+    expect(fetchMore).not.toHaveBeenCalled();
+  });
 });

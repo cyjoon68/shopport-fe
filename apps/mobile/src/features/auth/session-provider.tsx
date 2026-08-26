@@ -224,13 +224,14 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   const logout = (): Promise<void> => {
     const existing = logoutFlightRef.current;
     if (existing?.generation === generationRef.current) return existing.promise;
+    const revokeRemotely = status === 'authenticated' && online;
     const { generation, storageClose } = beginGuestSession();
     const promise = (async (): Promise<void> => {
       const refreshToken = serializeCredentialMutation(readRefreshToken);
       const secureStoreCleanup = serializeCredentialMutation(deleteRefreshToken);
-      const revocation = refreshToken.then((token) =>
-        token ? revokeSession(token) : undefined,
-      );
+      const revocation = revokeRemotely
+        ? refreshToken.then((token) => (token ? revokeSession(token) : undefined))
+        : Promise.resolve();
       const results = await Promise.allSettled([
         revocation,
         secureStoreCleanup,
