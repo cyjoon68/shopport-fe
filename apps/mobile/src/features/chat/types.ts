@@ -15,7 +15,7 @@ export type AskUserRequest = Readonly<{
 export type UploadedAsset = Readonly<{ id: string; uri: string }>;
 
 export type Attachment = UploadedAsset &
-  Readonly<{ state: 'checking' | 'processing' | 'ready' | 'timeout' }>;
+  Readonly<{ state: 'checking' | 'processing' | 'ready' | 'rejected' | 'timeout' }>;
 
 export type RetailerId = 'oliveyoung' | 'daiso';
 

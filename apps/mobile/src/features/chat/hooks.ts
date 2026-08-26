@@ -83,7 +83,9 @@ export const useComposerState = (
       return;
     }
     if (result === 'REJECTED') {
-      setAsset((current) => (current?.id === id ? null : current));
+      setAsset((current) =>
+        current?.id === id ? { ...current, state: 'rejected' } : current,
+      );
       Alert.alert(
         '이미지 처리 실패',
         '이미지를 처리할 수 없습니다. 다른 이미지를 선택해 주세요.',
@@ -246,7 +248,8 @@ export const useComposerState = (
 
   useEffect(() => {
     const current = assetRef.current;
-    if (online && current && current.state !== 'ready') void verifyAsset(current);
+    if (online && current && current.state !== 'ready' && current.state !== 'rejected')
+      void verifyAsset(current);
   }, [asset?.id, online]);
 
   useEffect(() => {
@@ -290,12 +293,84 @@ export const useComposerActions = ({
   online,
   state,
 }: ComposerActionsArgs) => {
+  const sendInFlightRef = useRef(false);
+  const submittedDraftRef = useRef<{
+    assetId: string | null;
+    conversationId: string;
+    text: string;
+  } | null>(null);
+  const latestRef = useRef({
+    allowFreeText,
+    asset: state.asset,
+    conversationId,
+    draftReadyFor: state.draftReadyFor,
+    loading,
+    online,
+    text: state.text,
+    uploading: state.uploading,
+  });
+  latestRef.current = {
+    allowFreeText,
+    asset: state.asset,
+    conversationId,
+    draftReadyFor: state.draftReadyFor,
+    loading,
+    online,
+    text: state.text,
+    uploading: state.uploading,
+  };
   const currentSnapshot = () => ({
     generation: state.lifecycleRef.current.generation,
     version: state.lifecycleRef.current.version,
   });
   const isCurrent = ({ generation, version }: ReturnType<typeof currentSnapshot>) =>
     state.isCurrentConversation(conversationId, version, generation);
+  const isEligible = (snapshot: typeof latestRef.current): boolean =>
+    snapshot.allowFreeText &&
+    snapshot.conversationId === conversationId &&
+    snapshot.draftReadyFor === conversationId &&
+    Boolean(snapshot.text.trim() || snapshot.asset) &&
+    snapshot.online &&
+    !snapshot.loading &&
+    !snapshot.uploading &&
+    (!snapshot.asset || snapshot.asset.state === 'ready');
+  const matchesDraft = (
+    snapshot: typeof latestRef.current,
+    text: string,
+    assetId: string | null,
+  ): boolean =>
+    snapshot.conversationId === conversationId &&
+    snapshot.draftReadyFor === conversationId &&
+    snapshot.text.trim() === text &&
+    (snapshot.asset?.id ?? null) === assetId;
+  const cleanupSubmittedDraft = async (
+    expected: ReturnType<typeof currentSnapshot>,
+    text: string,
+    assetId: string | null,
+  ): Promise<boolean> => {
+    const current = latestRef.current;
+    if (
+      current.conversationId === conversationId &&
+      !matchesDraft(current, text, assetId)
+    )
+      return false;
+    try {
+      await state.deleteDraft(conversationId);
+    } catch {
+      if (isCurrent(expected))
+        Alert.alert(
+          '초안 정리 실패',
+          '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
+        );
+      return false;
+    }
+    if (isCurrent(expected) && matchesDraft(latestRef.current, text, assetId)) {
+      state.assetRef.current = null;
+      state.setText('');
+      state.setAsset(null);
+    }
+    return true;
+  };
 
   const attach = async (): Promise<void> => {
     const expected = currentSnapshot();
@@ -378,43 +453,53 @@ export const useComposerActions = ({
 
   const send = async (): Promise<boolean> => {
     const expected = currentSnapshot();
-    if (state.draftReadyFor !== conversationId) return false;
-    const currentText = state.text;
-    const currentAsset = state.asset;
-    const trimmed = currentText.trim();
-    if (
-      !allowFreeText ||
-      (!trimmed && !currentAsset) ||
-      !online ||
-      loading ||
-      state.uploading ||
-      (currentAsset && currentAsset.state !== 'ready')
-    )
-      return false;
+    const current = latestRef.current;
+    const trimmed = current.text.trim();
+    const assetId = current.asset?.id ?? null;
+    if (sendInFlightRef.current) return false;
+    const submitted = submittedDraftRef.current;
+    const retryingSubmittedDraft =
+      submitted &&
+      submitted.conversationId === conversationId &&
+      submitted.text === trimmed &&
+      submitted.assetId === assetId;
+    if (!retryingSubmittedDraft && !isEligible(current)) return false;
+    sendInFlightRef.current = true;
     try {
-      if (currentAsset) {
-        const status = await readAssetStatus(currentAsset.id);
-        if (!isCurrent(expected)) return false;
+      if (retryingSubmittedDraft)
+        return cleanupSubmittedDraft(expected, trimmed, assetId);
+      if (current.asset) {
+        const status = await readAssetStatus(current.asset.id);
+        if (
+          !isCurrent(expected) ||
+          !isEligible(latestRef.current) ||
+          !matchesDraft(latestRef.current, trimmed, assetId)
+        )
+          return false;
         if (status !== 'READY') {
           if (status === 'REJECTED')
-            state.applyProcessingResult(currentAsset.id, 'REJECTED');
-          else void state.verifyAsset(currentAsset);
+            state.applyProcessingResult(current.asset.id, 'REJECTED');
+          else void state.verifyAsset(current.asset);
           return false;
         }
       }
-      if (!isCurrent(expected)) return false;
+      if (
+        !isCurrent(expected) ||
+        !isEligible(latestRef.current) ||
+        !matchesDraft(latestRef.current, trimmed, assetId)
+      )
+        return false;
       if (Platform.OS === 'ios')
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (!isCurrent(expected)) return false;
-      await onSend(trimmed, currentAsset?.id ?? null);
-      if (!isCurrent(expected)) return false;
-      await state.deleteDraft(conversationId);
-      if (isCurrent(expected)) {
-        state.assetRef.current = null;
-        state.setText('');
-        state.setAsset(null);
-      }
-      return true;
+      if (
+        !isCurrent(expected) ||
+        !isEligible(latestRef.current) ||
+        !matchesDraft(latestRef.current, trimmed, assetId)
+      )
+        return false;
+      await onSend(trimmed, assetId);
+      submittedDraftRef.current = { assetId, conversationId, text: trimmed };
+      return cleanupSubmittedDraft(expected, trimmed, assetId);
     } catch (error) {
       if (isCurrent(expected))
         Alert.alert(
@@ -422,6 +507,8 @@ export const useComposerActions = ({
           error instanceof Error ? error.message : '다시 시도해 주세요.',
         );
       return false;
+    } finally {
+      sendInFlightRef.current = false;
     }
   };
 

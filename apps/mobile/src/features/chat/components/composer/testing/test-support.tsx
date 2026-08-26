@@ -1,7 +1,8 @@
 import type { render } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 
-import { readDraft, saveDraft } from '@/shared/storage';
+import { useOnline } from '@/providers/network-provider';
+import { deleteDraft, readDraft, saveDraft } from '@/shared/storage';
 
 import {
   pollAssetUntilSettled,
@@ -18,7 +19,9 @@ export type DraftValue = Readonly<{
 }>;
 
 export const mockedReadDraft = readDraft as jest.MockedFunction<typeof readDraft>;
+export const mockedDeleteDraft = deleteDraft as jest.MockedFunction<typeof deleteDraft>;
 export const mockedSaveDraft = saveDraft as jest.MockedFunction<typeof saveDraft>;
+export const mockedUseOnline = useOnline as jest.MockedFunction<typeof useOnline>;
 export const mockedRemoveUploadedAsset = removeUploadedAsset as jest.MockedFunction<
   typeof removeUploadedAsset
 >;
@@ -74,8 +77,11 @@ export const flushPromises = async (): Promise<void> => {
 
 export const resetComposerMocks = (): void => {
   jest.useFakeTimers();
+  mockedUseOnline.mockReturnValue(true);
   mockedReadDraft.mockReset();
   mockedReadDraft.mockResolvedValue({ text: '', assetId: null, assetUri: null });
+  mockedDeleteDraft.mockReset();
+  mockedDeleteDraft.mockResolvedValue(undefined);
   mockedSaveDraft.mockClear();
   mockedRemoveUploadedAsset.mockClear();
   mockedSelectAndUploadAsset.mockReset();

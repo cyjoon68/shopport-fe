@@ -1,5 +1,5 @@
 jest.mock('@/providers/network-provider', () => ({
-  useOnline: () => true,
+  useOnline: jest.fn(),
 }));
 
 jest.mock('@/shared/storage', () => ({

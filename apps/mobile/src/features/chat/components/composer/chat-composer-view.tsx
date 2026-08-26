@@ -57,9 +57,11 @@ export const ChatComposerView = ({
               allowFontScaling
               style={styles.statusLabel}
             >
-              {asset.state === 'timeout'
-                ? '처리 확인 시간이 초과되었습니다'
-                : '이미지 처리 중'}
+              {asset.state === 'rejected'
+                ? '이미지 처리 실패'
+                : asset.state === 'timeout'
+                  ? '처리 확인 시간이 초과되었습니다'
+                  : '이미지 처리 중'}
             </Text>
             {asset.state === 'timeout' ? (
               <GlassButton
