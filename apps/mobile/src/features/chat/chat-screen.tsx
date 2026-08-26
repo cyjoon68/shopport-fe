@@ -31,6 +31,61 @@ import type { DisplayMessage } from './message-list';
 
 type UnreadState = Readonly<{ chat: boolean; products: boolean }>;
 
+const cachedProductKeys = [
+  'id',
+  'title',
+  'imageUrl',
+  'providerId',
+  'providerName',
+  'amountMinor',
+  'shippingMinor',
+  'totalMinor',
+  'currency',
+  'isAffiliate',
+  'isInStock',
+  'outboundUrl',
+  'deliveryExpectedAt',
+  'observedAt',
+  'isSaved',
+] as const satisfies ReadonlyArray<keyof CachedProduct>;
+
+const sameProduct = (left: CachedProduct, right: CachedProduct): boolean =>
+  cachedProductKeys.every((key) => left[key] === right[key]);
+
+const sameProducts = (
+  left: ReadonlyArray<CachedProduct>,
+  right: ReadonlyArray<CachedProduct>,
+): boolean =>
+  left.length === right.length &&
+  left.every((product, index) => {
+    const other = right[index];
+    return other ? sameProduct(product, other) : false;
+  });
+
+const sameMessageProjection = (
+  left: ReadonlyArray<DisplayMessage>,
+  right: ReadonlyArray<DisplayMessage>,
+): boolean =>
+  left.length === right.length &&
+  left.every((message, index) => {
+    const other = right[index];
+    return (
+      other !== undefined &&
+      message.id === other.id &&
+      message.role === other.role &&
+      sameProducts(message.products, other.products) &&
+      message.recommendations.length === other.recommendations.length &&
+      message.recommendations.every((recommendation, recommendationIndex) => {
+        const nextRecommendation = other.recommendations[recommendationIndex];
+        return (
+          nextRecommendation !== undefined &&
+          recommendation.aiSummary === nextRecommendation.aiSummary &&
+          sameProduct(recommendation.product, nextRecommendation.product)
+        );
+      })
+    );
+  });
+
 export const ChatScreen = () => {
   const { theme } = useUnistyles();
   const { status } = useSession();
@@ -122,7 +177,7 @@ export const ChatScreen = () => {
   }, [conversationId, messages, selectedTab]);
 
   const handleMessagesChange = useCallback((next: ReadonlyArray<DisplayMessage>) => {
-    setMessages(next);
+    setMessages((current) => (sameMessageProjection(current, next) ? current : next));
   }, []);
 
   const selectTab = useCallback((next: ChatTab): void => {

@@ -18,7 +18,7 @@ export {
   mergeDisplayMessages,
   mergeMessages,
 } from './message-model';
-export type { DisplayMessage } from './message-model';
+export type { DisplayMessage, DisplayMessageMergeCache } from './message-model';
 
 type MessageListProps = Readonly<{
   messages: ReadonlyArray<DisplayMessage>;
@@ -32,6 +32,7 @@ const maintainVisibleContentPosition = {
   startRenderingFromBottom: true,
 } as const;
 const messageKey = (message: DisplayMessage): string => message.id;
+const messageType = (message: DisplayMessage): string => message.role;
 
 const MessageRow = memo(
   ({
@@ -216,6 +217,7 @@ export const MessageList = ({
     <FlashList
       contentContainerStyle={styles.list}
       data={messages}
+      getItemType={messageType}
       keyExtractor={messageKey}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"

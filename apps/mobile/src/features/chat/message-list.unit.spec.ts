@@ -195,6 +195,20 @@ describe('historical message parts', () => {
     expect(merged[1]).toBe(liveMessage);
   });
 
+  it('reuses merged rows while their historical and live sources are unchanged', () => {
+    const historicalMessage = fromHistoricalMessage(historical);
+    const liveMessage = fromLiveMessage({
+      id: historical.id,
+      role: 'assistant',
+      parts: [{ type: 'text', content: '실시간 추천 결과' }],
+    });
+    const cache = new Map();
+    const first = mergeDisplayMessages([historicalMessage], [liveMessage], cache);
+    const second = mergeDisplayMessages([historicalMessage], [liveMessage], cache);
+
+    expect(second[0]).toBe(first[0]);
+  });
+
   it('requires canonical UUIDs for cross-source identity and isolates legacy IDs', () => {
     expect(isStableChatMessageId('0198a122-0c00-7000-8000-000000000001')).toBe(true);
     expect(isStableChatMessageId('0198a122-0c00-4000-8000-000000000001')).toBe(false);

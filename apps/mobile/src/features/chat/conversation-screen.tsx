@@ -1,5 +1,5 @@
 import { useApolloClient, useQuery } from '@apollo/client/react';
-import { useChat, xhrHttpStream } from '@tanstack/ai-react';
+import { type UIMessage, useChat, xhrHttpStream } from '@tanstack/ai-react';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -20,7 +20,7 @@ import { ConversationDocument, ConversationsDocument } from '@/graphql/generated
 import { useOnline } from '@/providers/network-provider';
 import { environment } from '@/shared/config/environment';
 import type { CachedProduct } from '@/shared/storage/database';
-import { sqliteChatPersistence } from '@/shared/storage/database';
+import { flushChatPersistence, sqliteChatPersistence } from '@/shared/storage/database';
 
 import { ASK_USER_SKIP_MESSAGE } from './ask-user';
 import { AskUserCard } from './ask-user-card';
@@ -29,7 +29,7 @@ import type { RetailerId } from './chat-composer-types';
 import { chatErrorPresentation } from './chat-errors';
 import { cancelRunThenStop } from './chat-http';
 import { createStableChatMessageId } from './message-id';
-import type { DisplayMessage } from './message-list';
+import type { DisplayMessage, DisplayMessageMergeCache } from './message-list';
 import {
   activeAskUserRequest,
   fromHistoricalMessage,
@@ -69,6 +69,10 @@ export const ConversationScreen = ({
   const assetId = useRef<string | null>(null);
   const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
   const responseFinishedRef = useRef(false);
+  const liveDisplayCacheRef = useRef(
+    new Map<string, Readonly<{ message: UIMessage; display: DisplayMessage }>>(),
+  );
+  const displayMessageMergeCacheRef = useRef<DisplayMessageMergeCache>(new Map());
   const connection = useMemo(
     () =>
       xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
@@ -95,6 +99,7 @@ export const ConversationScreen = ({
     connection,
     onFinish: () => {
       responseFinishedRef.current = true;
+      void flushChatPersistence(id).catch(() => undefined);
       void client.refetchQueries({ include: [ConversationsDocument] });
     },
     threadId: id,
@@ -107,12 +112,29 @@ export const ConversationScreen = ({
     () => (historicalMessages ?? []).map(fromHistoricalMessage),
     [historicalMessages],
   );
-  const liveDisplayMessages = useMemo(
-    () => chat.messages.map(fromLiveMessage),
-    [chat.messages],
-  );
+  const liveDisplayMessages = useMemo(() => {
+    const previous = liveDisplayCacheRef.current;
+    const next = new Map<
+      string,
+      Readonly<{ message: UIMessage; display: DisplayMessage }>
+    >();
+    const messages = chat.messages.map((message) => {
+      const cached = previous.get(message.id);
+      const display =
+        cached?.message === message ? cached.display : fromLiveMessage(message);
+      next.set(message.id, { message, display });
+      return display;
+    });
+    liveDisplayCacheRef.current = next;
+    return messages;
+  }, [chat.messages]);
   const displayMessages = useMemo(
-    () => mergeDisplayMessages(historicalDisplayMessages, liveDisplayMessages),
+    () =>
+      mergeDisplayMessages(
+        historicalDisplayMessages,
+        liveDisplayMessages,
+        displayMessageMergeCacheRef.current,
+      ),
     [historicalDisplayMessages, liveDisplayMessages],
   );
   const activeAskUser = activeAskUserRequest(displayMessages);
@@ -143,6 +165,13 @@ export const ConversationScreen = ({
   useEffect(() => {
     onMessagesChange?.(displayMessages);
   }, [displayMessages, onMessagesChange]);
+
+  useEffect(
+    () => () => {
+      void flushChatPersistence(id).catch(() => undefined);
+    },
+    [id],
+  );
 
   const errorPresentation = chat.error ? chatErrorPresentation(chat.error) : null;
 

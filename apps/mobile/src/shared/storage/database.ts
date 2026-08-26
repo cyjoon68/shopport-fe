@@ -29,6 +29,28 @@ type Draft = Readonly<{
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const cachedProductStringFields = [
+  'id',
+  'title',
+  'imageUrl',
+  'providerId',
+  'providerName',
+  'amountMinor',
+  'shippingMinor',
+  'totalMinor',
+  'currency',
+  'outboundUrl',
+  'observedAt',
+] as const;
+
+const isCachedProduct = (value: unknown): value is CachedProduct =>
+  isRecord(value) &&
+  cachedProductStringFields.every((field) => typeof value[field] === 'string') &&
+  typeof value.isAffiliate === 'boolean' &&
+  typeof value.isInStock === 'boolean' &&
+  typeof value.isSaved === 'boolean' &&
+  (value.deliveryExpectedAt === null || typeof value.deliveryExpectedAt === 'string');
+
 const isPersistedChat = (value: unknown): value is ChatPersistedState =>
   isRecord(value) &&
   Array.isArray(value.messages) &&
@@ -39,12 +61,20 @@ const isPersistedChat = (value: unknown): value is ChatPersistedState =>
       (message.role === 'system' ||
         message.role === 'user' ||
         message.role === 'assistant') &&
-      Array.isArray(message.parts),
+      Array.isArray(message.parts) &&
+      message.parts.every((part) => isRecord(part) && typeof part.type === 'string'),
   );
 
-const reviveDates = (_key: string, value: unknown): unknown => {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u.test(value)) {
-    return new Date(value);
+const serializedDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
+
+const reviveDates = (key: string, value: unknown): unknown => {
+  if (
+    key === 'createdAt' &&
+    typeof value === 'string' &&
+    serializedDatePattern.test(value)
+  ) {
+    const date = new Date(value);
+    return Number.isNaN(date.valueOf()) ? value : date;
   }
   return value;
 };
@@ -91,6 +121,110 @@ let databasePromise: Promise<SQLiteDatabase> | undefined;
 const database = (): Promise<SQLiteDatabase> => {
   databasePromise ??= initialize();
   return databasePromise;
+};
+
+type PendingChatWrite = {
+  removed: boolean;
+  state: ChatPersistedState;
+  timer: ReturnType<typeof setTimeout> | undefined;
+  write: Promise<void> | undefined;
+  writingState: ChatPersistedState | undefined;
+};
+
+const chatPersistenceDelayMilliseconds = 250;
+const pendingChatWrites = new Map<string, PendingChatWrite>();
+
+const writeChatState = async (id: string, state: ChatPersistedState): Promise<void> => {
+  const db = await database();
+  await db.runAsync(
+    'INSERT OR REPLACE INTO chat_cache (id, payload, updated_at) VALUES (?, ?, ?)',
+    id,
+    JSON.stringify(state),
+    Date.now(),
+  );
+  await db.runAsync(`
+    DELETE FROM chat_cache
+    WHERE id NOT IN (
+      SELECT id FROM chat_cache ORDER BY updated_at DESC LIMIT 50
+    )
+  `);
+};
+
+const writePendingChat = (id: string, pending: PendingChatWrite): Promise<void> => {
+  if (pending.removed) return Promise.resolve();
+  if (pending.write && pending.writingState === pending.state) return pending.write;
+  const state = pending.state;
+  const previous = pending.write?.catch(() => undefined) ?? Promise.resolve();
+  const write = previous.then(() =>
+    pending.removed ? undefined : writeChatState(id, state),
+  );
+  pending.write = write;
+  pending.writingState = state;
+  void write
+    .finally(() => {
+      if (pending.write !== write) return;
+      pending.write = undefined;
+      pending.writingState = undefined;
+      if (
+        pendingChatWrites.get(id) === pending &&
+        (pending.removed || (pending.state === state && !pending.timer))
+      )
+        pendingChatWrites.delete(id);
+    })
+    .catch(() => undefined);
+  return write;
+};
+
+const scheduleChatWrite = (id: string, pending: PendingChatWrite): void => {
+  if (pending.timer) return;
+  pending.timer = setTimeout(() => {
+    pending.timer = undefined;
+    void writePendingChat(id, pending).catch(() => undefined);
+  }, chatPersistenceDelayMilliseconds);
+};
+
+const queueChatWrite = (id: string, state: ChatPersistedState): void => {
+  const pending = pendingChatWrites.get(id);
+  if (pending && !pending.removed) {
+    pending.state = state;
+    scheduleChatWrite(id, pending);
+    return;
+  }
+  const next = {
+    removed: false,
+    state,
+    timer: undefined,
+    write: undefined,
+    writingState: undefined,
+  } satisfies PendingChatWrite;
+  pendingChatWrites.set(id, next);
+  scheduleChatWrite(id, next);
+};
+
+export const flushChatPersistence = async (id: string): Promise<void> => {
+  const pending = pendingChatWrites.get(id);
+  if (!pending || pending.removed) return;
+  if (pending.timer) {
+    clearTimeout(pending.timer);
+    pending.timer = undefined;
+  }
+  const state = pending.state;
+  await writePendingChat(id, pending);
+  if (pendingChatWrites.get(id) === pending && pending.state !== state)
+    await flushChatPersistence(id);
+};
+
+const discardPendingChatWrites = async (): Promise<void> => {
+  const pending = [...pendingChatWrites.values()];
+  pending.forEach((entry) => {
+    entry.removed = true;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = undefined;
+  });
+  await Promise.all(
+    pending.flatMap(({ write }) => (write ? [write.catch(() => undefined)] : [])),
+  );
+  pendingChatWrites.clear();
 };
 
 export const readPinnedConversationIds = async (): Promise<Array<string>> => {
@@ -150,9 +284,7 @@ export const readCachedProducts = async (): Promise<Array<CachedProduct>> => {
   );
   return rows.flatMap(({ payload }) => {
     const parsed = parseJson(payload);
-    return isRecord(parsed) && typeof parsed.id === 'string'
-      ? [parsed as CachedProduct]
-      : [];
+    return isCachedProduct(parsed) ? [parsed] : [];
   });
 };
 
@@ -200,6 +332,7 @@ export const deleteDraft = async (conversationId: string): Promise<void> => {
 };
 
 export const clearPrivateStorage = async (): Promise<void> => {
+  await discardPendingChatWrites();
   const db = await database();
   await db.execAsync(`
     DELETE FROM conversation_pin;
@@ -211,6 +344,8 @@ export const clearPrivateStorage = async (): Promise<void> => {
 
 export const sqliteChatPersistence: ChatClientPersistence = {
   getItem: async (id) => {
+    const pending = pendingChatWrites.get(id);
+    if (pending && !pending.removed) return pending.state;
     const db = await database();
     const row = await db.getFirstAsync<{ payload: string }>(
       'SELECT payload FROM chat_cache WHERE id = ?',
@@ -220,22 +355,16 @@ export const sqliteChatPersistence: ChatClientPersistence = {
     const parsed = parseJson(row.payload, true);
     return isPersistedChat(parsed) ? parsed : null;
   },
-  setItem: async (id, state) => {
-    const db = await database();
-    await db.runAsync(
-      'INSERT OR REPLACE INTO chat_cache (id, payload, updated_at) VALUES (?, ?, ?)',
-      id,
-      JSON.stringify(state),
-      Date.now(),
-    );
-    await db.runAsync(`
-      DELETE FROM chat_cache
-      WHERE id NOT IN (
-        SELECT id FROM chat_cache ORDER BY updated_at DESC LIMIT 50
-      )
-    `);
-  },
+  setItem: queueChatWrite,
   removeItem: async (id) => {
+    const pending = pendingChatWrites.get(id);
+    if (pending) {
+      pending.removed = true;
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.timer = undefined;
+      await pending.write?.catch(() => undefined);
+      if (pendingChatWrites.get(id) === pending) pendingChatWrites.delete(id);
+    }
     const db = await database();
     await db.runAsync('DELETE FROM chat_cache WHERE id = ?', id);
   },

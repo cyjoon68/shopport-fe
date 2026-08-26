@@ -44,6 +44,7 @@ let mockConversationOnProductSelect:
 let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
+let mockFoundProductsRenderCount = 0;
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -121,6 +122,7 @@ jest.mock('@/features/catalog/found-products-screen', () => {
       presentation?: 'catalog' | 'recommendations';
       scope?: 'all-conversations' | 'conversation';
     }) => {
+      mockFoundProductsRenderCount += 1;
       mockFoundProductsRecommendations = conversationRecommendations;
       mockFoundProductsPresentation = presentation;
       mockFoundProductsScope = scope;
@@ -167,6 +169,7 @@ const mockedUseMutation = useMutation as jest.MockedFunction<typeof useMutation>
 describe('chat screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedUseMutation.mockReset();
     mockSearchParams = {};
     mockTabChange = undefined;
     mockUnread = undefined;
@@ -175,6 +178,7 @@ describe('chat screen', () => {
     mockFoundProductsRecommendations = undefined;
     mockFoundProductsPresentation = undefined;
     mockFoundProductsScope = undefined;
+    mockFoundProductsRenderCount = 0;
   });
 
   it('opens the drawer from the top-left menu button', () => {
@@ -250,6 +254,35 @@ describe('chat screen', () => {
     act(() => mockTabChange?.('상품'));
 
     expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
+  });
+
+  it('does not rerender the product tab for streamed text-only updates', () => {
+    const createConversation = jest.fn();
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockSearchParams = { id: 'conversation-1' };
+    render(<ChatScreen />);
+    const assistant = {
+      askUsers: [],
+      id: 'assistant-1',
+      images: [],
+      products: [],
+      recommendations: [],
+      role: 'assistant',
+      status: 'PENDING',
+      text: '첫 토큰',
+      tools: [],
+    } satisfies DisplayMessage;
+
+    act(() => mockConversationOnMessagesChange?.([assistant]));
+    const rendersAfterFirstToken = mockFoundProductsRenderCount;
+    act(() =>
+      mockConversationOnMessagesChange?.([{ ...assistant, text: '두 번째 토큰' }]),
+    );
+
+    expect(mockFoundProductsRenderCount).toBe(rendersAfterFirstToken);
   });
 
   it('shows conversation products on the products tab when FoundProducts query is empty', async () => {
