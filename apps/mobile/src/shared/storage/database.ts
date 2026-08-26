@@ -2,29 +2,7 @@ import type { ChatClientPersistence, ChatPersistedState } from '@tanstack/ai-cli
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { openDatabaseAsync } from 'expo-sqlite';
 
-export type CachedProduct = Readonly<{
-  id: string;
-  title: string;
-  imageUrl: string;
-  providerId: string;
-  providerName: string;
-  amountMinor: string;
-  shippingMinor: string;
-  totalMinor: string;
-  currency: string;
-  isAffiliate: boolean;
-  isInStock: boolean;
-  outboundUrl: string;
-  deliveryExpectedAt: string | null;
-  observedAt: string;
-  isSaved: boolean;
-}>;
-
-type Draft = Readonly<{
-  text: string;
-  assetId: string | null;
-  assetUri: string | null;
-}>;
+import type { CachedProduct, Draft, PendingChatWrite } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -121,14 +99,6 @@ let databasePromise: Promise<SQLiteDatabase> | undefined;
 const database = (): Promise<SQLiteDatabase> => {
   databasePromise ??= initialize();
   return databasePromise;
-};
-
-type PendingChatWrite = {
-  removed: boolean;
-  state: ChatPersistedState;
-  timer: ReturnType<typeof setTimeout> | undefined;
-  write: Promise<void> | undefined;
-  writingState: ChatPersistedState | undefined;
 };
 
 const chatPersistenceDelayMilliseconds = 250;

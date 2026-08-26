@@ -1,1 +1,1 @@
-export { FavoritesScreen as default } from '@/features/favorites/favorites-screen';
+export { FavoritesScreen as default } from '@/screens/favorites/favorites-screen';

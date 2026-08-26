@@ -1,1 +1,1 @@
-export { UploadedImagesScreen as default } from '@/features/chat/uploaded-images-screen';
+export { UploadedImagesScreen as default } from '@/screens/chat/uploaded-images-screen';

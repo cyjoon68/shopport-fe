@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { useReducedTransparency } from '@/shared/accessibility/use-reduced-transparency';
+import { useReducedTransparency } from '@/shared/accessibility/hooks';
 
 type GlassButtonProps = Readonly<{
   accessibilityHint?: string | undefined;
