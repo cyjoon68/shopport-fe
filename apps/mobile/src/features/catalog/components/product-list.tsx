@@ -24,9 +24,10 @@ export const ProductList = ({
   const { status } = useSession();
   const online = useOnline();
   const includesAllConversations = scope === 'all-conversations';
-  const { loadMore, recommendations: queryRecommendations } = useFoundProductRecommendations(
-    includesAllConversations && status === 'authenticated' && online,
-  );
+  const { loadMore, recommendations: queryRecommendations } =
+    useFoundProductRecommendations(
+      includesAllConversations && status === 'authenticated' && online,
+    );
   const [cachedRecommendations, setCachedRecommendations] = useState<
     Array<RecommendedProduct>
   >([]);

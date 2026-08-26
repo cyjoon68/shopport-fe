@@ -44,9 +44,7 @@ export const selectAndUploadAsset = async (
   try {
     const result = await new File(selected.uri).upload(upload.uploadUrl, {
       httpMethod: 'PUT',
-      headers: Object.fromEntries(
-        upload.headers.map(({ name, value }) => [name, value]),
-      ),
+      headers: Object.fromEntries(upload.headers.map(({ name, value }) => [name, value])),
       mimeType: contentType,
       signal: controller.signal,
     });
