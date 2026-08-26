@@ -14,8 +14,24 @@ export type AskUserRequest = Readonly<{
 
 export type UploadedAsset = Readonly<{ id: string; uri: string }>;
 
+export type ConversationActionProps = Readonly<{
+  conversation: Readonly<{ id: string; title: string }>;
+  onDeleted: (conversationId: string) => void;
+  online: boolean;
+  pinned: boolean;
+  onPinnedChange: (conversationId: string, pinned: boolean) => void;
+  onRefresh: () => Promise<unknown>;
+}>;
+
+export type RenameConversationDialogProps = Readonly<{
+  initialTitle: string;
+  onDismiss: () => void;
+  onSubmit: (title: string) => Promise<boolean>;
+  visible: boolean;
+}>;
+
 export type Attachment = UploadedAsset &
-  Readonly<{ state: 'checking' | 'processing' | 'ready' | 'timeout' }>;
+  Readonly<{ state: 'checking' | 'processing' | 'ready' | 'rejected' | 'timeout' }>;
 
 export type RetailerId = 'oliveyoung' | 'daiso';
 
@@ -34,8 +50,10 @@ export type PollOptions = Readonly<{
 export type ChatRunOptions = Readonly<{
   assetId: MutableRefObject<string | null>;
   conversationId: string;
+  online: boolean;
   onFinish: () => void;
   providerIds: MutableRefObject<ReadonlyArray<RetailerId> | undefined>;
+  remoteWorkRef: MutableRefObject<boolean>;
 }>;
 
 export type UploadedImage = Readonly<{
@@ -52,6 +70,7 @@ export type ChatComposerProps = Readonly<{
   quickActionsEnabled?: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
   onStop: () => Promise<void>;
+  remoteWorkRef?: MutableRefObject<boolean> | undefined;
   sendInitialDraft?: boolean;
 }>;
 
@@ -67,7 +86,7 @@ export type ChatComposerViewProps = Readonly<{
   providerIds?: ReadonlyArray<RetailerId> | undefined;
   quickActionsEnabled: boolean;
   remove: () => Promise<void>;
-  send: () => Promise<void>;
+  send: () => Promise<boolean>;
   sendDisabled: boolean;
   setText: (text: string) => void;
   text: string;
@@ -115,7 +134,7 @@ export type NewChatFooterProps = Readonly<{
   loading: boolean;
   onAttach: () => Promise<void>;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
-  onSend: () => Promise<void>;
+  onSend: () => Promise<void | boolean>;
   onStop?: () => Promise<void>;
   providerIds?: ReadonlyArray<RetailerId> | undefined;
   quickActionsEnabled?: boolean;
@@ -219,6 +238,7 @@ export type ComposerActionsArgs = Readonly<{
   loading: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
   online: boolean;
+  remoteWorkRef: MutableRefObject<boolean>;
   state: ComposerState;
 }>;
 

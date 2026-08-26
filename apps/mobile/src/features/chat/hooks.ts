@@ -1,9 +1,20 @@
+import { useMutation } from '@apollo/client/react';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Animated, AppState, Keyboard, Platform } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 
-import { deleteDraft, readDraft, saveDraft } from '@/shared/storage/database';
+import {
+  DeleteConversationDocument,
+  RenameConversationDocument,
+} from '@/graphql/generated/graphql';
+import {
+  deleteDraft,
+  readDraft,
+  saveDraft,
+  setConversationPinned,
+  sqliteChatPersistence,
+} from '@/shared/storage';
 
 import {
   pollAssetUntilSettled,
@@ -16,7 +27,149 @@ import type {
   ComposerActionsArgs,
   ComposerLifecycle,
   ComposerState,
+  ConversationActionProps,
 } from './types';
+
+export const useConversationActions = ({
+  conversation,
+  onDeleted,
+  online,
+  pinned,
+  onPinnedChange,
+  onRefresh,
+}: ConversationActionProps): {
+  remove: () => void;
+  rename: (title: string) => Promise<boolean>;
+  togglePin: () => void;
+} => {
+  const activeRef = useRef(true);
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  const [renameConversation] = useMutation(RenameConversationDocument);
+  const [deleteConversation] = useMutation(DeleteConversationDocument);
+
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
+
+  const togglePin = (): void => {
+    if (!activeRef.current) return;
+    const nextPinned = !pinned;
+    void setConversationPinned(conversation.id, nextPinned)
+      .then(() => {
+        if (activeRef.current) onPinnedChange(conversation.id, nextPinned);
+      })
+      .catch(() => {
+        if (activeRef.current) Alert.alert('오류', '고정 상태를 저장하지 못했습니다.');
+      });
+  };
+
+  const rename = async (title: string): Promise<boolean> => {
+    if (!activeRef.current) return false;
+    if (!onlineRef.current) {
+      Alert.alert('오프라인', '대화 이름 변경은 온라인에서 할 수 있습니다.');
+      return false;
+    }
+    const nextTitle = title.trim();
+    if (!nextTitle) return false;
+    try {
+      const result = await renameConversation({
+        variables: { input: { id: conversation.id, title: nextTitle } },
+      });
+      if (!activeRef.current) return false;
+      const payload = result.data?.renameConversation;
+      const message = payload?.userErrors
+        .find(({ message: candidate }) => candidate.trim())
+        ?.message.trim();
+      if (!payload?.conversation || payload.userErrors.length > 0) {
+        Alert.alert('이름 변경 실패', message ?? '다시 시도해 주세요.');
+        return false;
+      }
+      if (onlineRef.current) {
+        try {
+          await onRefresh();
+        } catch {
+          Alert.alert(
+            '이름 변경 완료',
+            '서버에서 이름은 변경됐지만 목록을 새로 고치지 못했습니다.',
+          );
+        }
+      }
+      return true;
+    } catch {
+      if (activeRef.current) Alert.alert('이름 변경 실패', '다시 시도해 주세요.');
+      return false;
+    }
+  };
+
+  const remove = (): void => {
+    if (!activeRef.current) return;
+    if (!onlineRef.current) {
+      Alert.alert('오프라인', '대화 삭제는 온라인에서 할 수 있습니다.');
+      return;
+    }
+    Alert.alert('대화를 삭제할까요?', '메시지와 첨부 이미지도 함께 삭제됩니다.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          if (!activeRef.current || !onlineRef.current) return;
+          void deleteConversation({ variables: { input: { id: conversation.id } } })
+            .then(async (result) => {
+              const payload = result.data?.deleteConversation;
+              if (!payload?.success) {
+                if (activeRef.current && onlineRef.current)
+                  Alert.alert(
+                    '삭제 실패',
+                    payload?.userErrors[0]?.message ?? '다시 시도해 주세요.',
+                  );
+                return;
+              }
+              if (activeRef.current && onlineRef.current) onDeleted(conversation.id);
+              const cleanupResults = await Promise.allSettled([
+                sqliteChatPersistence.removeItem(conversation.id),
+                setConversationPinned(conversation.id, false),
+                deleteDraft(conversation.id),
+              ]);
+              const cacheCleanupFailed = cleanupResults.some(
+                ({ status }) => status === 'rejected',
+              );
+              if (!activeRef.current || !onlineRef.current) return;
+              try {
+                await onRefresh();
+              } catch {
+                if (!activeRef.current || !onlineRef.current) return;
+                Alert.alert(
+                  '삭제 완료',
+                  cacheCleanupFailed
+                    ? '서버에서 삭제되었지만 기기 캐시와 목록을 새로 고치지 못했습니다.'
+                    : '서버에서 삭제되었지만 목록을 새로 고치지 못했습니다.',
+                );
+                return;
+              }
+              if (!activeRef.current || !onlineRef.current) return;
+              if (cacheCleanupFailed) {
+                Alert.alert(
+                  '삭제 완료',
+                  '서버에서 삭제되었지만 기기 캐시를 정리하지 못했습니다.',
+                );
+              }
+            })
+            .catch(() => {
+              if (activeRef.current && onlineRef.current)
+                Alert.alert('삭제 실패', '다시 시도해 주세요.');
+            });
+        },
+      },
+    ]);
+  };
+
+  return { remove, rename, togglePin };
+};
 
 const isCurrentComposerConversation = (
   lifecycle: ComposerLifecycle,
@@ -83,7 +236,9 @@ export const useComposerState = (
       return;
     }
     if (result === 'REJECTED') {
-      setAsset((current) => (current?.id === id ? null : current));
+      setAsset((current) =>
+        current?.id === id ? { ...current, state: 'rejected' } : current,
+      );
       Alert.alert(
         '이미지 처리 실패',
         '이미지를 처리할 수 없습니다. 다른 이미지를 선택해 주세요.',
@@ -246,13 +401,15 @@ export const useComposerState = (
 
   useEffect(() => {
     const current = assetRef.current;
-    if (online && current && current.state !== 'ready') void verifyAsset(current);
+    if (online && current && current.state !== 'ready' && current.state !== 'rejected')
+      void verifyAsset(current);
   }, [asset?.id, online]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (status) => {
       const current = assetRef.current;
-      if (status === 'active' && online && current) void verifyAsset(current);
+      if (status === 'active' && online && current && current.state !== 'rejected')
+        void verifyAsset(current);
     });
     return () => subscription.remove();
   }, [online]);
@@ -274,7 +431,11 @@ export const useComposerState = (
   };
 };
 
-const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
+const bestEffortRemoveUploadedAsset = async (
+  id: string,
+  remoteWorkRef: ComposerActionsArgs['remoteWorkRef'],
+): Promise<void> => {
+  if (!remoteWorkRef.current) return;
   try {
     await removeUploadedAsset(id);
   } catch {
@@ -288,14 +449,190 @@ export const useComposerActions = ({
   loading,
   onSend,
   online,
+  remoteWorkRef,
   state,
 }: ComposerActionsArgs) => {
+  const sendInFlightRef = useRef(false);
+  const initialDraftRetiredRef = useRef(false);
+  const submittedDraftRef = useRef<{
+    conversationId: string;
+    revision: number;
+  } | null>(null);
+  const pendingRestoreRef = useRef<{
+    conversationId: string;
+    revision: number;
+  } | null>(null);
+  const restoreInFlightRef = useRef(false);
+  const draftRevisionRef = useRef({
+    assetId: state.asset?.id ?? null,
+    conversationId,
+    revision: 0,
+    text: state.text,
+  });
+  const draftCandidate = {
+    assetId: state.asset?.id ?? null,
+    conversationId,
+    text: state.text,
+  };
+  const latestRef = useRef({
+    allowFreeText,
+    asset: state.asset,
+    conversationId,
+    draftReadyFor: state.draftReadyFor,
+    loading,
+    online,
+    revision: draftRevisionRef.current.revision,
+    text: state.text,
+    uploading: state.uploading,
+  });
+  const latestCandidate = {
+    allowFreeText,
+    asset: state.asset,
+    conversationId,
+    draftReadyFor: state.draftReadyFor,
+    loading,
+    online,
+    text: state.text,
+    uploading: state.uploading,
+  };
+  useLayoutEffect(() => {
+    const previousDraft = draftRevisionRef.current;
+    const changed =
+      previousDraft.conversationId !== draftCandidate.conversationId ||
+      previousDraft.text !== draftCandidate.text ||
+      previousDraft.assetId !== draftCandidate.assetId;
+    const nextDraft = changed
+      ? {
+          ...draftCandidate,
+          revision: previousDraft.revision + 1,
+        }
+      : previousDraft;
+    if (changed) {
+      draftRevisionRef.current = nextDraft;
+      submittedDraftRef.current = null;
+    }
+    latestRef.current = { ...latestCandidate, revision: nextDraft.revision };
+  });
   const currentSnapshot = () => ({
     generation: state.lifecycleRef.current.generation,
     version: state.lifecycleRef.current.version,
   });
   const isCurrent = ({ generation, version }: ReturnType<typeof currentSnapshot>) =>
     state.isCurrentConversation(conversationId, version, generation);
+  const isEligible = (snapshot: typeof latestRef.current): boolean =>
+    snapshot.allowFreeText &&
+    snapshot.conversationId === conversationId &&
+    snapshot.draftReadyFor === conversationId &&
+    Boolean(snapshot.text.trim() || snapshot.asset) &&
+    snapshot.online &&
+    !snapshot.loading &&
+    !snapshot.uploading &&
+    (!snapshot.asset || snapshot.asset.state === 'ready');
+  const matchesDraft = (snapshot: typeof latestRef.current, revision: number): boolean =>
+    snapshot.conversationId === conversationId &&
+    snapshot.draftReadyFor === conversationId &&
+    snapshot.revision === revision;
+  const saveLatestDraft = async (): Promise<boolean> => {
+    if (restoreInFlightRef.current) return false;
+    restoreInFlightRef.current = true;
+    try {
+      while (true) {
+        const current = latestRef.current;
+        if (current.conversationId !== conversationId) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+        try {
+          await saveDraft(conversationId, {
+            text: current.text,
+            assetId: current.asset?.id ?? null,
+            assetUri: current.asset?.uri ?? null,
+          });
+        } catch {
+          if (latestRef.current.conversationId === conversationId) {
+            pendingRestoreRef.current = {
+              conversationId,
+              revision: current.revision,
+            };
+            if (isCurrent(currentSnapshot()))
+              Alert.alert(
+                '초안 저장 실패',
+                '메시지는 전송되었지만 최신 초안을 저장하지 못했습니다.',
+              );
+          }
+          return false;
+        }
+        const latest = latestRef.current;
+        if (latest.conversationId !== conversationId) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+        if (latest.revision === current.revision) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+      }
+    } finally {
+      restoreInFlightRef.current = false;
+      const pending = pendingRestoreRef.current;
+      const latest = latestRef.current;
+      if (
+        pending &&
+        pending.conversationId === conversationId &&
+        latest.conversationId === conversationId &&
+        latest.revision !== pending.revision
+      )
+        void saveLatestDraft();
+    }
+  };
+
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    const latest = latestRef.current;
+    if (
+      pending &&
+      pending.conversationId === conversationId &&
+      latest.conversationId === conversationId &&
+      latest.revision !== pending.revision
+    )
+      void saveLatestDraft();
+  }, [conversationId, state.asset?.id, state.text]);
+
+  const cleanupSubmittedDraft = async (
+    expected: ReturnType<typeof currentSnapshot>,
+    revision: number,
+  ): Promise<boolean> => {
+    const current = latestRef.current;
+    if (current.conversationId === conversationId && !matchesDraft(current, revision)) {
+      const saved = await saveLatestDraft();
+      if (!saved) initialDraftRetiredRef.current = true;
+      return saved;
+    }
+    try {
+      await state.deleteDraft(conversationId);
+    } catch {
+      if (isCurrent(expected))
+        Alert.alert(
+          '초안 정리 실패',
+          '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
+        );
+      return false;
+    }
+    const latest = latestRef.current;
+    if (latest.conversationId === conversationId && !matchesDraft(latest, revision)) {
+      await saveLatestDraft();
+      return true;
+    }
+    if (isCurrent(expected) && matchesDraft(latest, revision)) {
+      state.assetRef.current = null;
+      state.setText('');
+      state.setAsset(null);
+    }
+    return true;
+  };
 
   const attach = async (): Promise<void> => {
     const expected = currentSnapshot();
@@ -311,29 +648,30 @@ export const useComposerActions = ({
       if (!uploaded) return;
       uploadedId = uploaded.id;
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
       const previous = state.assetRef.current;
       const previousId = previous?.id ?? null;
       if (previous) {
+        if (!remoteWorkRef.current) return;
         await removeUploadedAsset(previous.id);
         if (!isCurrent(expected) || state.assetRef.current?.id !== previousId) {
-          await bestEffortRemoveUploadedAsset(uploaded.id);
+          await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
           uploadedId = null;
           return;
         }
       }
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
       const next: Attachment = { ...uploaded, state: 'processing' };
       if (Platform.OS === 'ios') await Haptics.selectionAsync();
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
@@ -341,7 +679,7 @@ export const useComposerActions = ({
       state.setAsset(next);
       uploadedId = null;
     } catch (error) {
-      if (uploadedId) await bestEffortRemoveUploadedAsset(uploadedId);
+      if (uploadedId) await bestEffortRemoveUploadedAsset(uploadedId, remoteWorkRef);
       if (isCurrent(expected))
         Alert.alert(
           '이미지 첨부 실패',
@@ -361,6 +699,7 @@ export const useComposerActions = ({
       return;
     }
     try {
+      if (!remoteWorkRef.current) return;
       await removeUploadedAsset(current.id);
     } catch (error) {
       if (isCurrent(expected) && state.assetRef.current?.id === current.id) {
@@ -376,51 +715,67 @@ export const useComposerActions = ({
     state.setAsset(null);
   };
 
-  const send = async (): Promise<void> => {
+  const send = async (): Promise<boolean> => {
     const expected = currentSnapshot();
-    if (state.draftReadyFor !== conversationId) return;
-    const currentText = state.text;
-    const currentAsset = state.asset;
-    const trimmed = currentText.trim();
-    if (
-      !allowFreeText ||
-      (!trimmed && !currentAsset) ||
-      !online ||
-      loading ||
-      state.uploading ||
-      (currentAsset && currentAsset.state !== 'ready')
-    )
-      return;
+    const current = latestRef.current;
+    const trimmed = current.text.trim();
+    const assetId = current.asset?.id ?? null;
+    if (sendInFlightRef.current) return false;
+    const submitted = submittedDraftRef.current;
+    const retryingSubmittedDraft =
+      submitted &&
+      submitted.conversationId === conversationId &&
+      submitted.revision === current.revision;
+    if (!retryingSubmittedDraft && !isEligible(current)) return false;
+    sendInFlightRef.current = true;
     try {
-      if (currentAsset) {
-        const status = await readAssetStatus(currentAsset.id);
-        if (!isCurrent(expected)) return;
+      if (retryingSubmittedDraft)
+        return cleanupSubmittedDraft(expected, current.revision);
+      if (current.asset) {
+        const status = await readAssetStatus(current.asset.id);
+        if (
+          !isCurrent(expected) ||
+          !isEligible(latestRef.current) ||
+          !matchesDraft(latestRef.current, current.revision)
+        )
+          return false;
         if (status !== 'READY') {
           if (status === 'REJECTED')
-            state.applyProcessingResult(currentAsset.id, 'REJECTED');
-          else void state.verifyAsset(currentAsset);
-          return;
+            state.applyProcessingResult(current.asset.id, 'REJECTED');
+          else void state.verifyAsset(current.asset);
+          return false;
         }
       }
-      if (!isCurrent(expected)) return;
+      if (
+        !isCurrent(expected) ||
+        !isEligible(latestRef.current) ||
+        !matchesDraft(latestRef.current, current.revision)
+      )
+        return false;
       if (Platform.OS === 'ios')
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (!isCurrent(expected)) return;
-      await onSend(trimmed, currentAsset?.id ?? null);
-      if (!isCurrent(expected)) return;
-      state.setText('');
-      state.setAsset(null);
-      await state.deleteDraft(conversationId);
+      if (
+        !isCurrent(expected) ||
+        !isEligible(latestRef.current) ||
+        !matchesDraft(latestRef.current, current.revision)
+      )
+        return false;
+      await onSend(trimmed, assetId);
+      submittedDraftRef.current = { conversationId, revision: current.revision };
+      return cleanupSubmittedDraft(expected, current.revision);
     } catch (error) {
       if (isCurrent(expected))
         Alert.alert(
           '메시지 전송 실패',
           error instanceof Error ? error.message : '다시 시도해 주세요.',
         );
+      return false;
+    } finally {
+      sendInFlightRef.current = false;
     }
   };
 
-  return { attach, remove, send };
+  return { attach, initialDraftRetiredRef, remove, send };
 };
 
 export const useKeyboardLift = (): Animated.Value => {

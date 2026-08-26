@@ -47,6 +47,43 @@ describe('product tool result', () => {
     ).toEqual([]);
   });
 
+  it.each([
+    'not a url',
+    '/products/tumbler',
+    'javascript:alert(1)',
+    'http://example.com/products/tumbler',
+    'https://user:password@example.com/products/tumbler',
+    '   ',
+  ])('rejects an unsafe outbound URL: %s', (outboundUrl) => {
+    expect(
+      productsFromToolResult({
+        kind: 'product_cards',
+        products: [{ ...product, offer: { ...product.offer, outboundUrl } }],
+      }),
+    ).toEqual([]);
+  });
+
+  it('normalizes a valid HTTPS outbound URL', () => {
+    expect(
+      productsFromToolResult({
+        kind: 'product_cards',
+        products: [
+          {
+            ...product,
+            offer: {
+              ...product.offer,
+              outboundUrl: '  https://EXAMPLE.com/products/a tumbler?color=sky blue  ',
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        outboundUrl: 'https://example.com/products/a%20tumbler?color=sky%20blue',
+      }),
+    ]);
+  });
+
   it('reads only valid structured AI summaries', () => {
     expect(
       productRecommendationSummariesFromToolResult(

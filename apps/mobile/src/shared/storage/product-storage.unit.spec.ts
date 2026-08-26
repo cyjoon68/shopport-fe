@@ -1,0 +1,48 @@
+const mockGetAllAsync = jest.fn();
+const mockDatabase = {
+  execAsync: jest.fn(() => Promise.resolve()),
+  getAllAsync: mockGetAllAsync,
+  getFirstAsync: jest.fn(),
+  runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(),
+};
+
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(() => Promise.resolve(mockDatabase)),
+}));
+
+import { readCachedProducts } from './product-storage';
+
+const cachedProduct = {
+  id: 'product-3',
+  title: '정상 상품',
+  imageUrl: 'https://example.com/product.jpg',
+  providerId: 'provider-1',
+  providerName: '판매처',
+  amountMinor: '10000',
+  shippingMinor: '0',
+  totalMinor: '10000',
+  currency: 'KRW',
+  isAffiliate: false,
+  isInStock: true,
+  outboundUrl: 'https://example.com/product',
+  deliveryExpectedAt: null,
+  observedAt: '2026-08-16T00:00:00.000Z',
+  isSaved: false,
+};
+
+describe('product storage', () => {
+  beforeEach(() => {
+    mockGetAllAsync.mockReset();
+  });
+
+  it('ignores corrupted product cache rows', async () => {
+    mockGetAllAsync.mockResolvedValue([
+      { payload: '{broken' },
+      { payload: JSON.stringify({ id: 'product-3', title: '불완전한 상품' }) },
+      { payload: JSON.stringify(cachedProduct) },
+    ]);
+
+    await expect(readCachedProducts()).resolves.toEqual([cachedProduct]);
+  });
+});

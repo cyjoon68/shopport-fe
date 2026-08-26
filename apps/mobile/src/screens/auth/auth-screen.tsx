@@ -1,6 +1,6 @@
 import { Screen } from '@shopport/ui';
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -10,7 +10,9 @@ import { GlassActionButton } from '@/shared/ui/glass-button';
 export const AuthScreen = () => {
   const { error, login, status } = useSession();
   const [busy, setBusy] = useState(false);
-  if (status === 'authenticated') return <Redirect href="/" />;
+  const running = useRef(false);
+  if (status === 'authenticated' || status === 'offline-authenticated')
+    return <Redirect href="/" />;
   if (status === 'booting') {
     return (
       <Screen testID="auth-booting">
@@ -21,9 +23,17 @@ export const AuthScreen = () => {
     );
   }
   const run = async (): Promise<void> => {
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
-    await login();
-    setBusy(false);
+    try {
+      await login();
+    } catch {
+      return;
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
   };
   return (
     <Screen testID="auth-screen">

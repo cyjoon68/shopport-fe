@@ -1,9 +1,14 @@
 import type { render } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 
-import { readDraft, saveDraft } from '@/shared/storage/database';
+import { useOnline } from '@/providers/network-provider';
+import { deleteDraft, readDraft, saveDraft } from '@/shared/storage';
 
-import { pollAssetUntilSettled, removeUploadedAsset } from '../../../api/fetchers';
+import {
+  pollAssetUntilSettled,
+  readAssetStatus,
+  removeUploadedAsset,
+} from '../../../api/fetchers';
 import { selectAndUploadAsset } from '../../../attachments';
 import { ChatComposer } from '../chat-composer';
 
@@ -14,7 +19,9 @@ export type DraftValue = Readonly<{
 }>;
 
 export const mockedReadDraft = readDraft as jest.MockedFunction<typeof readDraft>;
+export const mockedDeleteDraft = deleteDraft as jest.MockedFunction<typeof deleteDraft>;
 export const mockedSaveDraft = saveDraft as jest.MockedFunction<typeof saveDraft>;
+export const mockedUseOnline = useOnline as jest.MockedFunction<typeof useOnline>;
 export const mockedRemoveUploadedAsset = removeUploadedAsset as jest.MockedFunction<
   typeof removeUploadedAsset
 >;
@@ -23,6 +30,9 @@ export const mockedSelectAndUploadAsset = selectAndUploadAsset as jest.MockedFun
 >;
 export const mockedPollAssetUntilSettled = pollAssetUntilSettled as jest.MockedFunction<
   typeof pollAssetUntilSettled
+>;
+export const mockedReadAssetStatus = readAssetStatus as jest.MockedFunction<
+  typeof readAssetStatus
 >;
 export const mockedImpactAsync = Haptics.impactAsync as jest.MockedFunction<
   typeof Haptics.impactAsync
@@ -67,12 +77,19 @@ export const flushPromises = async (): Promise<void> => {
 
 export const resetComposerMocks = (): void => {
   jest.useFakeTimers();
+  mockedUseOnline.mockReturnValue(true);
   mockedReadDraft.mockReset();
   mockedReadDraft.mockResolvedValue({ text: '', assetId: null, assetUri: null });
+  mockedDeleteDraft.mockReset();
+  mockedDeleteDraft.mockResolvedValue(undefined);
   mockedSaveDraft.mockClear();
-  mockedRemoveUploadedAsset.mockClear();
+  mockedRemoveUploadedAsset.mockReset();
+  mockedRemoveUploadedAsset.mockResolvedValue(undefined);
   mockedSelectAndUploadAsset.mockReset();
   mockedPollAssetUntilSettled.mockReset();
+  mockedPollAssetUntilSettled.mockResolvedValue('READY');
+  mockedReadAssetStatus.mockReset();
+  mockedReadAssetStatus.mockResolvedValue('READY');
   mockedImpactAsync.mockReset();
   mockedImpactAsync.mockResolvedValue(undefined);
 };

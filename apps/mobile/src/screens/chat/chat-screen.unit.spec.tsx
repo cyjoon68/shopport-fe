@@ -1,14 +1,27 @@
 import { useMutation } from '@apollo/client/react';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import { print } from 'graphql';
-import { createElement as mockCreateElement } from 'react';
-import { Alert, Text as mockNativeText } from 'react-native';
+import {
+  type ComponentType,
+  createElement as mockCreateElement,
+  Fragment as mockFragment,
+  type ReactNode,
+} from 'react';
+import { Alert, Linking, Text as mockNativeText } from 'react-native';
 
-import type { ChatTab, DisplayMessage } from '@/features/chat';
+import type { SessionStatus } from '@/features/auth';
+import {
+  type ChatTab,
+  type DisplayMessage,
+  removeUploadedAsset,
+  selectAndUploadAsset,
+} from '@/features/chat';
 import {
   ConversationsDocument,
   CreateConversationDocument,
 } from '@/graphql/generated/graphql';
+import { saveDraft } from '@/shared/storage';
 
 import { ChatScreen } from './chat-screen';
 
@@ -40,13 +53,47 @@ let mockConversationOnProductSelect:
       isSaved: boolean;
     }) => void)
   | undefined;
+let mockConversationRemoteWorkRef: { current: boolean } | undefined;
 let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
 let mockFoundProductsRenderCount = 0;
+let mockSessionStatus: SessionStatus = 'authenticated';
+let mockOnline = true;
+let mockEffectiveOnline: boolean | undefined;
+const mockMutate = jest.fn();
+const mockedRemoveUploadedAsset = jest.mocked(removeUploadedAsset);
+const mockedSaveDraft = jest.mocked(saveDraft);
+const mockedSelectAndUploadAsset = jest.mocked(selectAndUploadAsset);
+const mockedImpactAsync = jest.mocked(Haptics.impactAsync);
+
+const deferred = <T,>() => {
+  let reject!: (error: Error) => void;
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    reject = rejectPromise;
+    resolve = resolvePromise;
+  });
+  return { promise, reject, resolve };
+};
+
+const conversationMutationResult = {
+  data: {
+    createConversation: {
+      conversation: {
+        id: 'conversation-1',
+        title: '새 대화',
+        createdAt: '2026-08-16T00:00:00.000Z',
+        updatedAt: '2026-08-16T00:00:00.000Z',
+      },
+      userErrors: [],
+    },
+  },
+};
 
 jest.mock('expo-router', () => ({
-  Redirect: () => null,
+  Redirect: ({ href }: { href: string }) =>
+    mockCreateElement(mockNativeText, { testID: 'redirect' }, href),
   router: {
     push: (argument: unknown) => mockPush(argument),
     setParams: (params: Record<string, string | undefined>) => mockSetParams(params),
@@ -80,6 +127,7 @@ jest.mock('./conversation-screen', () => ({
   ConversationScreen: ({
     onMessagesChange,
     onProductSelect,
+    remoteWorkRef,
   }: {
     onMessagesChange?: (messages: ReadonlyArray<DisplayMessage>) => void;
     onProductSelect?: (product: {
@@ -99,9 +147,11 @@ jest.mock('./conversation-screen', () => ({
       observedAt: string;
       isSaved: boolean;
     }) => void;
+    remoteWorkRef?: { current: boolean };
   }) => {
     mockConversationOnMessagesChange = onMessagesChange;
     mockConversationOnProductSelect = onProductSelect;
+    mockConversationRemoteWorkRef = remoteWorkRef;
     return mockCreateElement(
       mockNativeText,
       { testID: 'conversation-screen' },
@@ -111,6 +161,9 @@ jest.mock('./conversation-screen', () => ({
 }));
 
 jest.mock('@/features/catalog', () => {
+  const ProductCard = jest.requireActual<{
+    ProductCard: ComponentType<{ product: DisplayMessage['products'][number] }>;
+  }>('@/features/catalog/components/product-card').ProductCard;
   return {
     ProductList: ({
       conversationRecommendations,
@@ -126,9 +179,18 @@ jest.mock('@/features/catalog', () => {
       mockFoundProductsPresentation = presentation;
       mockFoundProductsScope = scope;
       return mockCreateElement(
-        mockNativeText,
-        { testID: 'found-products-content' },
-        conversationRecommendations?.[0]?.product.title ?? '상품',
+        mockFragment,
+        null,
+        mockCreateElement(
+          mockNativeText,
+          { testID: 'found-products-content' },
+          conversationRecommendations?.[0]?.product.title ?? '상품',
+        ),
+        conversationRecommendations?.[0]
+          ? mockCreateElement(ProductCard, {
+              product: conversationRecommendations[0].product,
+            })
+          : null,
       );
     },
   };
@@ -145,23 +207,33 @@ jest.mock(
 );
 
 jest.mock('@/features/auth', () => ({
-  useSession: () => ({ status: 'authenticated' }),
+  useSession: () => ({ status: mockSessionStatus }),
 }));
 
 jest.mock('@/providers/network-provider', () => ({
-  useOnline: () => true,
+  NetworkBoundary: ({ children, online }: { children: ReactNode; online: boolean }) => {
+    mockEffectiveOnline = online;
+    return children;
+  },
+  useOnline: () => mockEffectiveOnline ?? mockOnline,
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
+  cacheProducts: jest.fn(() => Promise.resolve()),
   saveDraft: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('@/shared/accessibility/hooks', () => ({
+  useReducedMotion: () => false,
   useReducedTransparency: () => false,
 }));
 
 jest.mock('@/features/chat/attachments', () => ({
   selectAndUploadAsset: jest.fn(),
+}));
+
+jest.mock('@/features/chat/api/fetchers', () => ({
+  removeUploadedAsset: jest.fn(),
 }));
 
 jest.mock('expo-haptics', () => ({
@@ -175,15 +247,151 @@ describe('chat screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedUseMutation.mockReset();
+    mockedRemoveUploadedAsset.mockReset();
+    mockedRemoveUploadedAsset.mockResolvedValue(undefined);
+    mockedSaveDraft.mockReset();
+    mockedSaveDraft.mockResolvedValue(undefined);
+    mockedSelectAndUploadAsset.mockReset();
+    mockedImpactAsync.mockReset();
+    mockedImpactAsync.mockResolvedValue(undefined);
     mockSearchParams = {};
     mockTabChange = undefined;
     mockUnread = undefined;
     mockConversationOnMessagesChange = undefined;
     mockConversationOnProductSelect = undefined;
+    mockConversationRemoteWorkRef = undefined;
     mockFoundProductsRecommendations = undefined;
     mockFoundProductsPresentation = undefined;
     mockFoundProductsScope = undefined;
     mockFoundProductsRenderCount = 0;
+    mockSessionStatus = 'authenticated';
+    mockOnline = true;
+    mockEffectiveOnline = undefined;
+    mockedUseMutation.mockReturnValue([
+      mockMutate,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+  });
+
+  it('renders no private or cached content while the session is booting', () => {
+    mockSessionStatus = 'booting';
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+    expect(screen.queryByTestId('found-products-content')).toBeNull();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+  });
+
+  it('redirects guests before private hooks or content mount', () => {
+    mockSessionStatus = 'guest';
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+  });
+
+  it('keeps mounted bootstrap transitions behind the effective network boundary', () => {
+    mockSessionStatus = 'booting';
+    const screen = render(<ChatScreen />);
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+
+    mockSessionStatus = 'guest';
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+
+    mockSessionStatus = 'authenticated';
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+    expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
+  });
+
+  it('updates the existing conversation remote policy before an early session return', () => {
+    mockSearchParams = { id: 'conversation-1' };
+    const screen = render(<ChatScreen />);
+    const retainedRemoteWorkRef = mockConversationRemoteWorkRef;
+
+    expect(retainedRemoteWorkRef?.current).toBe(true);
+    mockSessionStatus = 'guest';
+    screen.rerender(<ChatScreen />);
+
+    expect(retainedRemoteWorkRef?.current).toBe(false);
+  });
+
+  it('permits remote conversation work only for an online authenticated session', () => {
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+    expect(mockedUseMutation).toHaveBeenCalledWith(
+      CreateConversationDocument,
+      expect.any(Object),
+    );
+  });
+
+  it('renders the offline-authenticated cache surface without enabling actions', () => {
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+    expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
+    act(() => mockTabChange?.('상품'));
+    expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
+  });
+
+  it('blocks cached product actions when a mounted chat becomes offline-authenticated', () => {
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    mockSearchParams = { id: 'conversation-1' };
+    const screen = render(<ChatScreen />);
+    const product = {
+      id: 'product-1',
+      title: '립밤',
+      imageUrl: 'https://example.com/lipbalm.jpg',
+      providerId: 'oliveyoung',
+      providerName: '올리브영',
+      amountMinor: '3000',
+      shippingMinor: '0',
+      totalMinor: '3000',
+      currency: 'KRW',
+      isAffiliate: false,
+      isInStock: true,
+      outboundUrl: 'https://example.com/product',
+      deliveryExpectedAt: null,
+      observedAt: '2026-08-26T00:00:00.000Z',
+      isSaved: false,
+    } as const;
+    act(() =>
+      mockConversationOnMessagesChange?.([
+        {
+          askUsers: [],
+          id: 'assistant-1',
+          images: [],
+          products: [product],
+          recommendations: [{ product, aiSummary: '추천' }],
+          role: 'assistant',
+          status: 'COMPLETED',
+          text: '추천',
+          tools: [],
+        },
+      ]),
+    );
+    act(() => mockConversationOnProductSelect?.(product));
+
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+    fireEvent.press(screen.getByLabelText('립밤 찜'));
+    fireEvent.press(screen.getByLabelText('립밤 구매 링크'));
+
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(openUrl).not.toHaveBeenCalled();
   });
 
   it('opens the drawer from the top-left menu button', () => {
@@ -421,6 +629,169 @@ describe('chat screen', () => {
       '대화를 만들 수 없습니다.',
     );
     alertSpy.mockRestore();
+  });
+
+  it('cleans an uploaded asset when draft handoff rejects without masking the error', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-1',
+      uri: 'file://asset-1.png',
+    });
+    mockedSaveDraft.mockRejectedValue(new Error('초안을 저장하지 못했습니다.'));
+    mockedRemoveUploadedAsset.mockRejectedValue(new Error('cleanup unavailable'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockedRemoveUploadedAsset).toHaveBeenCalledWith('asset-1'),
+    );
+    expect(alertSpy).toHaveBeenCalledWith(
+      '이미지 첨부 실패',
+      '초안을 저장하지 못했습니다.',
+    );
+    expect(screen.queryByTestId('conversation-screen')).toBeNull();
+  });
+
+  it('cleans an upload that resolves after ChatContent unmounts without stale work', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const upload = deferred<{ id: string; uri: string } | null>();
+    mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+    expect(mockedSelectAndUploadAsset).toHaveBeenCalledWith('conversation-1');
+    screen.unmount();
+
+    await act(async () => {
+      upload.resolve({ id: 'asset-stale', uri: 'file://asset-stale.png' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockedRemoveUploadedAsset).toHaveBeenCalledWith('asset-stale');
+    expect(mockedSaveDraft).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { nextStatus: 'guest', surface: 'guest' },
+    { nextStatus: 'booting', surface: 'booting' },
+  ] as const)(
+    'does no remote or local continuation after authenticated-to-$surface transition',
+    async ({ nextStatus }) => {
+      const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+      mockedUseMutation.mockReturnValue([
+        createConversation,
+        { called: false, client: {}, loading: false, reset: jest.fn() },
+      ] as ReturnType<typeof useMutation>);
+      const upload = deferred<{ id: string; uri: string } | null>();
+      mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const screen = render(<ChatScreen />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('이미지 첨부'));
+        await Promise.resolve();
+      });
+      expect(mockedSelectAndUploadAsset).toHaveBeenCalledWith('conversation-1');
+
+      mockSessionStatus = nextStatus;
+      screen.rerender(<ChatScreen />);
+      await act(async () => {
+        upload.resolve({ id: `asset-${nextStatus}`, uri: 'file://asset.png' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
+      expect(mockedSaveDraft).not.toHaveBeenCalled();
+      expect(mockedImpactAsync).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('conversation-screen')).toBeNull();
+      expect(alertSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not start abandoned-asset cleanup after the effective policy goes offline', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-offline',
+      uri: 'file://asset-offline.png',
+    });
+    const handoff = deferred<void>();
+    mockedSaveDraft.mockReturnValue(handoff.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mockedSaveDraft).toHaveBeenCalledTimes(1));
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+
+    await act(async () => {
+      handoff.reject(new Error('초안을 저장하지 못했습니다.'));
+      await Promise.resolve();
+    });
+
+    expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      '이미지 첨부 실패',
+      '초안을 저장하지 못했습니다.',
+    );
+  });
+
+  it('transfers asset ownership after draft handoff before later UI work', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-handed-off',
+      uri: 'file://asset-handed-off.png',
+    });
+    mockedImpactAsync.mockRejectedValue(new Error('haptic unavailable'));
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('conversation-screen')).toBeOnTheScreen(),
+    );
+    expect(mockedSaveDraft).toHaveBeenCalledWith('conversation-1', {
+      assetId: 'asset-handed-off',
+      assetUri: 'file://asset-handed-off.png',
+      text: '',
+    });
+    expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
   });
 
   it('keeps the conversation on the chat screen after creation', async () => {

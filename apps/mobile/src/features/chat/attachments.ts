@@ -21,12 +21,25 @@ export const selectAndUploadAsset = async (
     selectionLimit: 1,
   });
   if (result.canceled) return null;
-  const selected = result.assets[0];
+  const selected = result.assets?.[0];
   if (!selected) return null;
-  if (!selected.fileSize || selected.fileSize > maxBytes) {
+  if (typeof selected.uri !== 'string' || !selected.uri.trim())
+    throw new Error('이미지 파일을 찾을 수 없습니다.');
+  if (
+    typeof selected.fileSize !== 'number' ||
+    !Number.isFinite(selected.fileSize) ||
+    selected.fileSize <= 0 ||
+    selected.fileSize > maxBytes
+  ) {
     throw new Error('이미지는 15MB 이하여야 합니다.');
   }
-  if (selected.width * selected.height > maxPixels) {
+  if (
+    !Number.isFinite(selected.width) ||
+    selected.width <= 0 ||
+    !Number.isFinite(selected.height) ||
+    selected.height <= 0 ||
+    selected.width * selected.height > maxPixels
+  ) {
     throw new Error('이미지는 20MP 이하여야 합니다.');
   }
   const contentType = selected.mimeType?.toLowerCase() ?? '';
@@ -39,22 +52,37 @@ export const selectAndUploadAsset = async (
     String(selected.fileSize),
   );
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), uploadTimeoutMilliseconds);
+  let nativeUploadPromise: ReturnType<File['upload']> | undefined;
+  let timedOut = false;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   let uploaded = false;
   try {
-    const result = await new File(selected.uri).upload(upload.uploadUrl, {
+    nativeUploadPromise = new File(selected.uri).upload(upload.uploadUrl, {
       httpMethod: 'PUT',
       headers: Object.fromEntries(upload.headers.map(({ name, value }) => [name, value])),
       mimeType: contentType,
       signal: controller.signal,
     });
-    uploaded = result.status >= 200 && result.status < 300;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new Error('upload timeout'));
+      }, uploadTimeoutMilliseconds);
+    });
+    const uploadResult = await Promise.race([nativeUploadPromise, timeoutPromise]);
+    uploaded = uploadResult.status >= 200 && uploadResult.status < 300;
   } catch {
     uploaded = false;
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
   }
   if (!uploaded) {
+    if (timedOut && nativeUploadPromise)
+      void nativeUploadPromise.then(
+        () => undefined,
+        () => undefined,
+      );
     await bestEffortRemoveUploadedAsset(upload.asset.id);
     throw new Error('이미지를 업로드하지 못했습니다.');
   }

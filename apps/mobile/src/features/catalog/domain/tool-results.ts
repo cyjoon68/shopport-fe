@@ -10,6 +10,17 @@ const stringField = (record: Record<string, unknown>, field: string): string | n
   return typeof value === 'string' ? value : null;
 };
 
+const httpsUrl = (value: string): string | null => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 const parseProduct = (value: unknown): CachedProduct | null => {
   if (!isRecord(value) || !isRecord(value.provider) || !isRecord(value.offer))
     return null;
@@ -26,7 +37,8 @@ const parseProduct = (value: unknown): CachedProduct | null => {
   const shippingMinor = stringField(shipping, 'amountMinor');
   const totalMinor = stringField(total, 'amountMinor');
   const currency = stringField(total, 'currency');
-  const outboundUrl = stringField(value.offer, 'outboundUrl');
+  const rawOutboundUrl = stringField(value.offer, 'outboundUrl');
+  const outboundUrl = rawOutboundUrl ? httpsUrl(rawOutboundUrl) : null;
   const observedAt = stringField(value.offer, 'observedAt');
   const deliveryExpectedAt = value.offer.deliveryExpectedAt;
   if (

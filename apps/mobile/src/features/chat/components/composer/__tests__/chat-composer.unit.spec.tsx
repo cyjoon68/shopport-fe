@@ -1,8 +1,8 @@
 jest.mock('@/providers/network-provider', () => ({
-  useOnline: () => true,
+  useOnline: jest.fn(),
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   deleteDraft: jest.fn(() => Promise.resolve()),
   readDraft: jest.fn(),
   saveDraft: jest.fn(() => Promise.resolve()),
@@ -30,4 +30,6 @@ jest.mock('expo-image', () => ({
 }));
 
 import '../testing/attachment-cases';
-import '../testing/draft-cases';
+import '../testing/composer-policy-cases';
+import '../testing/draft-replacement-cases';
+import '../testing/initial-draft-cases';

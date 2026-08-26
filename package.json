@@ -16,6 +16,7 @@
     "lint": "pnpm --filter @shopport/mobile lint",
     "start": "pnpm --filter @shopport/mobile start",
     "test": "pnpm --filter @shopport/mobile test && node --test scripts/audit-policy.test.mjs",
+    "test:coverage": "pnpm --filter @shopport/mobile test:coverage && node --test scripts/audit-policy.test.mjs",
     "typecheck": "pnpm -r --if-present typecheck"
   }
 }

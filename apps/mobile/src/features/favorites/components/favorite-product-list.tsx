@@ -36,7 +36,7 @@ export const FavoriteProductList = () => {
             title="찜한 상품이 없습니다"
           />
         }
-        onEndReached={loadMore}
+        onEndReached={() => void loadMore().catch(() => undefined)}
         renderItem={renderProduct}
       />
     </View>

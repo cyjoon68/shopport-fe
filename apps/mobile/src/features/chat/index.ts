@@ -11,6 +11,7 @@ export { ChatNewConversation } from './components/composer/chat-new-conversation
 export { AskUserSheet } from './components/conversation/ask-user-sheet';
 export { MessageList } from './components/conversation/message-list';
 export { ChatScreenHeader } from './components/header/chat-screen-header';
+export { RenameConversationDialog } from './components/rename-dialog/rename-conversation-dialog';
 export { retailerIds } from './constants';
 export { chatErrorPresentation } from './domain/errors';
 export { createStableChatMessageId } from './domain/message-id';
@@ -21,13 +22,20 @@ export {
   hasSameChatScreenProjection,
   mergeDisplayMessages,
 } from './domain/models';
-export { useComposerActions, useComposerState, useKeyboardLift } from './hooks';
+export {
+  useComposerActions,
+  useComposerState,
+  useConversationActions,
+  useKeyboardLift,
+} from './hooks';
 export type {
   AskUserRequest,
   Attachment,
   ChatComposerProps,
   ChatTab,
+  ConversationActionProps,
   DisplayMessage,
+  RenameConversationDialogProps,
   RetailerId,
   UploadedAsset,
   UploadedImage,

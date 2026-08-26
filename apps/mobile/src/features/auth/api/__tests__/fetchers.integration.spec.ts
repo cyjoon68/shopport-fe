@@ -1,5 +1,5 @@
 import { SessionExpiredError } from '../../domain/errors';
-import { authenticate, rotateTokens } from '../fetchers';
+import { authenticate, revokeSession, rotateTokens } from '../fetchers';
 
 describe('authentication HTTP contract', () => {
   afterEach(() => {
@@ -80,6 +80,16 @@ describe('authentication HTTP contract', () => {
     fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
     await expect(rotateTokens('valid.token')).rejects.not.toBeInstanceOf(
       SessionExpiredError,
+    );
+  });
+
+  it('rejects a failed logout response', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 500 }));
+
+    await expect(revokeSession('session.secret')).rejects.toThrow(
+      '서버 로그아웃을 완료하지 못했습니다.',
     );
   });
 });

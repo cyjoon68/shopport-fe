@@ -9,7 +9,7 @@ import {
   type TextStyle,
 } from 'react-native';
 
-import { cacheProducts } from '@/shared/storage/database';
+import { cacheProducts } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import { ProductCard } from '../product-card';
@@ -42,7 +42,7 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => mockOnline,
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   cacheProducts: jest.fn(() => Promise.resolve()),
 }));
 
@@ -112,9 +112,27 @@ describe('product card links', () => {
     );
   });
 
+  it('handles a malformed cached link without an unhandled rejection', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(
+      <ProductCard product={{ ...product, outboundUrl: 'not a url' }} />,
+    );
+
+    fireEvent.press(screen.getByLabelText('텀블러 구매 링크'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        '구매 링크를 열 수 없어요',
+        '다시 시도해 주세요.',
+      ),
+    );
+    expect(openURL).not.toHaveBeenCalled();
+  });
+
   it('saves a product and updates the action state', async () => {
     const saveProduct = jest.fn().mockResolvedValue({
-      data: { saveProduct: { userErrors: [] } },
+      data: { saveProduct: { product: { id: 'product-1' }, userErrors: [] } },
     });
     const mutationState = {
       called: false,
@@ -137,6 +155,26 @@ describe('product card links', () => {
     expect(jest.mocked(cacheProducts)).toHaveBeenCalledWith([
       { ...product, isSaved: true },
     ]);
+  });
+
+  it('keeps the saved state when the mutation returns no product or user error', async () => {
+    const saveProduct = jest.fn().mockResolvedValue({
+      data: { saveProduct: { product: null, userErrors: [] } },
+    });
+    mockedUseMutation.mockReturnValue([
+      saveProduct,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ProductCard product={product} />);
+
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('찜 변경 실패', '찜을 변경하지 못했습니다.'),
+    );
+    expect(screen.getByTestId('sf:bookmark')).toBeOnTheScreen();
+    expect(jest.mocked(cacheProducts)).not.toHaveBeenCalled();
   });
 
   it('reflects saved-state changes from a refreshed parent query', () => {

@@ -15,30 +15,58 @@ export const ChatComposer = ({
   onStop,
   providerIds,
   quickActionsEnabled = true,
+  remoteWorkRef: parentRemoteWorkRef,
   sendInitialDraft = false,
 }: ChatComposerProps) => {
   const online = useOnline();
+  const localRemoteWorkRef = useRef(online);
+  localRemoteWorkRef.current = online;
+  const remoteWorkRef = parentRemoteWorkRef ?? localRemoteWorkRef;
   const state = useComposerState(conversationId, online);
-  const { attach, remove, send } = useComposerActions({
+  const { attach, initialDraftRetiredRef, remove, send } = useComposerActions({
     allowFreeText,
     conversationId,
     loading,
     onSend,
     online,
+    remoteWorkRef,
     state,
   });
-  const initialDraftPendingRef = useRef(sendInitialDraft);
+  const initialDraftSendingRef = useRef(false);
+  const initialDraftSentRef = useRef(false);
 
   useEffect(() => {
     if (
-      !initialDraftPendingRef.current ||
+      !sendInitialDraft ||
+      initialDraftSendingRef.current ||
+      initialDraftSentRef.current ||
       state.draftReadyFor !== conversationId ||
-      !state.text.trim()
+      !online ||
+      loading ||
+      state.uploading ||
+      (!state.text.trim() && !state.asset) ||
+      Boolean(state.asset && state.asset.state !== 'ready')
     )
       return;
-    initialDraftPendingRef.current = false;
-    void send();
-  }, [conversationId, send, state.draftReadyFor, state.text]);
+    initialDraftSendingRef.current = true;
+    void send()
+      .then((sent) => {
+        if (sent || initialDraftRetiredRef.current) initialDraftSentRef.current = true;
+      })
+      .finally(() => {
+        initialDraftSendingRef.current = false;
+      });
+  }, [
+    conversationId,
+    loading,
+    online,
+    send,
+    sendInitialDraft,
+    state.asset,
+    state.draftReadyFor,
+    state.text,
+    state.uploading,
+  ]);
 
   const draftReady = state.draftReadyFor === conversationId;
   const visibleAsset = draftReady ? state.asset : null;

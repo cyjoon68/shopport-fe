@@ -23,10 +23,16 @@ const renderImage = ({ item }: Readonly<{ item: UploadedImage }>) => (
 
 export const UploadedImagesScreen = () => {
   const { status } = useSession();
-  const online = useOnline();
-  const { images, loadMore } = useUploadedImages(status === 'authenticated' && online);
+  const networkOnline = useOnline();
 
+  if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
+
+  return <UploadedImagesContent online={status === 'authenticated' && networkOnline} />;
+};
+
+const UploadedImagesContent = ({ online }: Readonly<{ online: boolean }>) => {
+  const { images, loadMore } = useUploadedImages(online);
 
   return (
     <Screen testID="uploaded-images-screen">
@@ -46,7 +52,7 @@ export const UploadedImagesScreen = () => {
           />
         }
         numColumns={3}
-        onEndReached={loadMore}
+        onEndReached={() => void loadMore().catch(() => undefined)}
         renderItem={renderImage}
       />
     </Screen>

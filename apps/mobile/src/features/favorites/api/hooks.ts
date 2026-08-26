@@ -1,14 +1,17 @@
 import { useQuery } from '@apollo/client/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { productFromFragment } from '@/features/catalog/domain/models';
 import { SavedProductsDocument } from '@/graphql/generated/graphql';
-import { cacheProducts, readCachedProducts } from '@/shared/storage/database';
+import { cacheProducts, readCachedProducts } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 const pageSize = 20;
 
 export const useSavedProducts = (enabled: boolean) => {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const activeCursorsRef = useRef(new Set<string>());
   const { data, fetchMore } = useQuery(SavedProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -36,10 +39,17 @@ export const useSavedProducts = (enabled: boolean) => {
   }, [productEdges]);
 
   const products = productEdges?.map(({ node }) => productFromFragment(node));
-  const loadMore = (): void => {
+  const loadMore = async (): Promise<void> => {
+    if (!enabledRef.current) return;
     const pageInfo = data?.savedProducts.pageInfo;
-    if (pageInfo?.hasNextPage)
-      void fetchMore({ variables: { after: pageInfo.endCursor, first: pageSize } });
+    const cursor = pageInfo?.endCursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorsRef.current.has(cursor)) return;
+    activeCursorsRef.current.add(cursor);
+    try {
+      await fetchMore({ variables: { after: cursor, first: pageSize } });
+    } finally {
+      activeCursorsRef.current.delete(cursor);
+    }
   };
   return { loadMore, products: products ?? cachedProducts };
 };

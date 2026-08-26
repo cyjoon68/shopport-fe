@@ -2,22 +2,22 @@ import { useQuery } from '@apollo/client/react';
 import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import { DrawerContentScrollView } from 'expo-router/drawer';
-import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
+import { RenameConversationDialog, useConversationActions } from '@/features/chat';
 import { readFragment } from '@/graphql/generated';
 import {
   ConversationsDocument,
   ConversationSummaryFragmentDoc,
 } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
-import { readPinnedConversationIds } from '@/shared/storage/database';
+import { readPinnedConversationIds } from '@/shared/storage';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { conversationHref } from '../conversation-href';
-import { useConversationActionHandlers } from '../hooks';
 import type {
   ConversationLinkProps,
   DrawerConversation,
@@ -58,7 +58,8 @@ const ConversationLink = ({
   onRefresh,
 }: ConversationLinkProps) => {
   const { theme } = useUnistyles();
-  const { remove, rename, togglePin } = useConversationActionHandlers({
+  const [renameVisible, setRenameVisible] = useState(false);
+  const { remove, rename, togglePin } = useConversationActions({
     conversation,
     onDeleted,
     onPinnedChange,
@@ -68,42 +69,54 @@ const ConversationLink = ({
   });
 
   return (
-    <Link asChild href={conversationHref(conversation.id)}>
-      <Link.Trigger>
-        <Pressable
-          accessible
-          accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
-          accessibilityLabel={conversation.title}
-          accessibilityRole="button"
-          onPress={onOpen}
-          style={styles.conversation}
-        >
-          <View style={styles.conversationContent}>
-            <Text allowFontScaling numberOfLines={1} style={styles.conversationTitle}>
-              {conversation.title}
-            </Text>
-            {pinned ? (
-              <Image
-                contentFit="contain"
-                source="sf:pin.fill"
-                style={styles.pinSymbol}
-                tintColor={theme.colors.textMuted}
-              />
-            ) : null}
-          </View>
-        </Pressable>
-      </Link.Trigger>
-      <Link.Preview />
-      <Link.Menu>
-        <Link.MenuAction
-          icon={pinned ? 'pin.slash' : 'pin.fill'}
-          onPress={togglePin}
-          title={pinned ? '고정 해제' : '고정'}
-        />
-        <Link.MenuAction icon="pencil" onPress={rename} title="이름 바꾸기" />
-        <Link.MenuAction destructive icon="trash" onPress={remove} title="삭제" />
-      </Link.Menu>
-    </Link>
+    <Fragment>
+      <Link asChild href={conversationHref(conversation.id)}>
+        <Link.Trigger>
+          <Pressable
+            accessible
+            accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
+            accessibilityLabel={conversation.title}
+            accessibilityRole="button"
+            onPress={onOpen}
+            style={styles.conversation}
+          >
+            <View style={styles.conversationContent}>
+              <Text allowFontScaling numberOfLines={1} style={styles.conversationTitle}>
+                {conversation.title}
+              </Text>
+              {pinned ? (
+                <Image
+                  contentFit="contain"
+                  source="sf:pin.fill"
+                  style={styles.pinSymbol}
+                  tintColor={theme.colors.textMuted}
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        </Link.Trigger>
+        <Link.Preview />
+        <Link.Menu>
+          <Link.MenuAction
+            icon={pinned ? 'pin.slash' : 'pin.fill'}
+            onPress={togglePin}
+            title={pinned ? '고정 해제' : '고정'}
+          />
+          <Link.MenuAction
+            icon="pencil"
+            onPress={() => setRenameVisible(true)}
+            title="이름 바꾸기"
+          />
+          <Link.MenuAction destructive icon="trash" onPress={remove} title="삭제" />
+        </Link.Menu>
+      </Link>
+      <RenameConversationDialog
+        initialTitle={conversation.title}
+        onDismiss={() => setRenameVisible(false)}
+        onSubmit={rename}
+        visible={renameVisible}
+      />
+    </Fragment>
   );
 };
 
@@ -111,10 +124,15 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const { theme } = useUnistyles();
   const { status } = useSession();
   const online = useOnline();
+  const enabled = status === 'authenticated' && online;
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const mountedRef = useRef(true);
+  const activeCursorsRef = useRef(new Set<string>());
   const [pinnedIds, setPinnedIds] = useState<ReadonlySet<string>>(new Set());
-  const { data, refetch } = useQuery(ConversationsDocument, {
+  const { data, fetchMore, refetch } = useQuery(ConversationsDocument, {
     fetchPolicy: 'cache-and-network',
-    skip: status !== 'authenticated',
+    skip: !enabled,
   });
   const conversationItems =
     data?.conversations.edges.map(({ node }) => {
@@ -124,6 +142,12 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const conversations: ReadonlyArray<DrawerConversation> = [...conversationItems].sort(
     (left, right) => Number(pinnedIds.has(right.id)) - Number(pinnedIds.has(left.id)),
   );
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (status !== 'authenticated') return;
     void readPinnedConversationIds()
@@ -154,6 +178,19 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const signalDeletedConversation = (conversationId: string): void => {
     navigation.closeDrawer();
     router.setParams({ deletedConversationId: conversationId });
+  };
+
+  const loadMore = async (): Promise<void> => {
+    if (!mountedRef.current || !enabledRef.current) return;
+    const pageInfo = data?.conversations.pageInfo;
+    const cursor = pageInfo?.endCursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorsRef.current.has(cursor)) return;
+    activeCursorsRef.current.add(cursor);
+    try {
+      await fetchMore({ variables: { after: cursor } });
+    } finally {
+      activeCursorsRef.current.delete(cursor);
+    }
   };
 
   if (status !== 'authenticated') return null;
@@ -222,6 +259,23 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
             최근 대화가 없습니다.
           </Text>
         )}
+        {data?.conversations.pageInfo.hasNextPage ? (
+          <Pressable
+            accessibilityLabel="대화 더 불러오기"
+            accessibilityRole="button"
+            onPress={() =>
+              void loadMore().catch(() => {
+                if (mountedRef.current && enabledRef.current)
+                  Alert.alert('대화 불러오기 실패', '다시 시도해 주세요.');
+              })
+            }
+            style={styles.loadMore}
+          >
+            <Text allowFontScaling style={styles.loadMoreLabel}>
+              더 보기
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </DrawerContentScrollView>
   );
@@ -279,5 +333,15 @@ const styles = StyleSheet.create((theme) => ({
   conversationTitle: { color: theme.colors.text, fontSize: 15, lineHeight: 21 },
   pinSymbol: { height: 16, width: 16 },
   empty: { color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 },
+  loadMore: {
+    alignItems: 'center',
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.interaction.minTouchTarget,
+    paddingHorizontal: theme.spacing.md,
+  },
+  loadMoreLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
   pressed: { opacity: 0.58 },
 }));
