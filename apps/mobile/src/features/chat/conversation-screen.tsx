@@ -2,16 +2,7 @@ import { useApolloClient, useQuery } from '@apollo/client/react';
 import { type UIMessage, useChat, xhrHttpStream } from '@tanstack/ai-react';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { getAccessToken } from '@/features/auth/auth-token';
@@ -23,20 +14,20 @@ import type { CachedProduct } from '@/shared/storage/database';
 import { flushChatPersistence, sqliteChatPersistence } from '@/shared/storage/database';
 
 import { ASK_USER_SKIP_MESSAGE } from './ask-user';
-import { AskUserCard } from './ask-user-card';
+import { AskUserSheet } from './ask-user-sheet';
 import { ChatComposer } from './chat-composer';
 import type { RetailerId } from './chat-composer-types';
 import { chatErrorPresentation } from './chat-errors';
 import { cancelRunThenStop } from './chat-http';
 import { createStableChatMessageId } from './message-id';
-import type { DisplayMessage, DisplayMessageMergeCache } from './message-list';
+import { MessageList } from './message-list';
+import type { DisplayMessage, DisplayMessageMergeCache } from './message-model';
 import {
   activeAskUserRequest,
   fromHistoricalMessage,
   fromLiveMessage,
   mergeDisplayMessages,
-  MessageList,
-} from './message-list';
+} from './message-model';
 
 type ConversationScreenProps = Readonly<{
   conversationId?: string;
@@ -261,60 +252,13 @@ export const ConversationScreen = ({
         </Text>
       ) : null}
       {activeAskUser ? (
-        <Modal
-          animationType="slide"
-          onRequestClose={() => void skipAskUser()}
-          presentationStyle="overFullScreen"
-          transparent
+        <AskUserSheet
+          loading={chat.isLoading}
+          onDismiss={skipAskUser}
+          onSelect={answerAskUser}
+          request={activeAskUser.request}
           visible={askSheetOpen}
-        >
-          <View style={styles.sheetRoot}>
-            <Pressable
-              accessible={false}
-              importantForAccessibility="no"
-              onPress={() => void skipAskUser()}
-              style={styles.sheetBackdrop}
-            />
-            <SafeAreaView
-              accessibilityViewIsModal
-              edges={['bottom']}
-              style={styles.sheet}
-              testID="ask-user-sheet"
-            >
-              <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <Text
-                  allowFontScaling
-                  maxFontSizeMultiplier={2.5}
-                  style={styles.sheetTitle}
-                >
-                  Shopport의 추가 질문
-                </Text>
-                <Pressable
-                  accessibilityLabel="추가 질문 닫기"
-                  accessibilityRole="button"
-                  onPress={() => void skipAskUser()}
-                  style={styles.sheetClose}
-                >
-                  <Text style={styles.sheetCloseLabel}>닫기</Text>
-                </Pressable>
-              </View>
-              <ScrollView
-                contentContainerStyle={styles.sheetContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                style={styles.sheetScroll}
-              >
-                <AskUserCard
-                  disabled={chat.isLoading}
-                  disabledMessage={chat.isLoading ? '답변을 보내는 중이에요' : undefined}
-                  onSelect={answerAskUser}
-                  request={activeAskUser.request}
-                />
-              </ScrollView>
-            </SafeAreaView>
-          </View>
-        </Modal>
+        />
       ) : null}
       <ChatComposer
         allowFreeText={activeAskUser?.request.allowFreeText ?? true}
@@ -343,53 +287,5 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     padding: theme.spacing.sm,
     textAlign: 'center',
-  },
-  sheetRoot: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.scrim,
-  },
-  sheet: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderTopLeftRadius: theme.radii.lg,
-    borderTopRightRadius: theme.radii.lg,
-    borderWidth: 1,
-    gap: theme.spacing.md,
-    maxHeight: theme.layout.conversationSheet.maxHeight,
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-  },
-  sheetScroll: { flexShrink: 1 },
-  sheetContent: { paddingBottom: theme.spacing.md },
-  sheetHandle: {
-    alignSelf: 'center',
-    backgroundColor: theme.colors.textMuted,
-    borderRadius: theme.radii.pill,
-    height: theme.spacing.xs,
-    width: theme.layout.conversationSheet.handleWidth,
-  },
-  sheetHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sheetTitle: {
-    color: theme.colors.text,
-    fontWeight: '600',
-    ...theme.typography.conversation.sheetTitle,
-  },
-  sheetClose: {
-    alignItems: 'center',
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.interaction.minTouchTarget,
-    paddingHorizontal: theme.spacing.md,
-  },
-  sheetCloseLabel: {
-    color: theme.colors.text,
-    ...theme.typography.conversation.sheetAction,
   },
 }));

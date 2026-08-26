@@ -11,7 +11,7 @@ import {
 
 import { ChatScreen } from './chat-screen';
 import type { ChatTab } from './chat-segmented-control';
-import type { DisplayMessage } from './message-list';
+import type { DisplayMessage } from './message-model';
 
 const mockPush = jest.fn<void, [unknown]>();
 const mockSetParams = jest.fn<void, [Record<string, string | undefined>]>();

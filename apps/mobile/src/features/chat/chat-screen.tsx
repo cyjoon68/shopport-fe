@@ -1,13 +1,11 @@
 import { useMutation } from '@apollo/client/react';
 import { Screen } from '@shopport/ui';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { StyleSheet } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth/session-provider';
 import { FoundProductsContent } from '@/features/catalog/found-products-screen';
@@ -20,74 +18,19 @@ import {
 import { useOnline } from '@/providers/network-provider';
 import type { CachedProduct } from '@/shared/storage/database';
 import { saveDraft } from '@/shared/storage/database';
-import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { selectAndUploadAsset } from './asset-upload';
 import { type RetailerId, retailerIds } from './chat-composer-types';
 import { ChatNewConversation } from './chat-new-conversation';
-import { ChatSegmentedControl, type ChatTab } from './chat-segmented-control';
+import { ChatScreenHeader } from './chat-screen-header';
+import { hasSameChatScreenProjection } from './chat-screen-projection';
+import type { ChatTab } from './chat-segmented-control';
 import { ConversationScreen } from './conversation-screen';
-import type { DisplayMessage } from './message-list';
+import type { DisplayMessage } from './message-model';
 
 type UnreadState = Readonly<{ chat: boolean; products: boolean }>;
 
-const cachedProductKeys = [
-  'id',
-  'title',
-  'imageUrl',
-  'providerId',
-  'providerName',
-  'amountMinor',
-  'shippingMinor',
-  'totalMinor',
-  'currency',
-  'isAffiliate',
-  'isInStock',
-  'outboundUrl',
-  'deliveryExpectedAt',
-  'observedAt',
-  'isSaved',
-] as const satisfies ReadonlyArray<keyof CachedProduct>;
-
-const sameProduct = (left: CachedProduct, right: CachedProduct): boolean =>
-  cachedProductKeys.every((key) => left[key] === right[key]);
-
-const sameProducts = (
-  left: ReadonlyArray<CachedProduct>,
-  right: ReadonlyArray<CachedProduct>,
-): boolean =>
-  left.length === right.length &&
-  left.every((product, index) => {
-    const other = right[index];
-    return other ? sameProduct(product, other) : false;
-  });
-
-const sameMessageProjection = (
-  left: ReadonlyArray<DisplayMessage>,
-  right: ReadonlyArray<DisplayMessage>,
-): boolean =>
-  left.length === right.length &&
-  left.every((message, index) => {
-    const other = right[index];
-    return (
-      other !== undefined &&
-      message.id === other.id &&
-      message.role === other.role &&
-      sameProducts(message.products, other.products) &&
-      message.recommendations.length === other.recommendations.length &&
-      message.recommendations.every((recommendation, recommendationIndex) => {
-        const nextRecommendation = other.recommendations[recommendationIndex];
-        return (
-          nextRecommendation !== undefined &&
-          recommendation.aiSummary === nextRecommendation.aiSummary &&
-          sameProduct(recommendation.product, nextRecommendation.product)
-        );
-      })
-    );
-  });
-
 export const ChatScreen = () => {
-  const { theme } = useUnistyles();
   const { status } = useSession();
   const online = useOnline();
   const { deletedConversationId, id: routeId } = useLocalSearchParams<{
@@ -177,7 +120,9 @@ export const ChatScreen = () => {
   }, [conversationId, messages, selectedTab]);
 
   const handleMessagesChange = useCallback((next: ReadonlyArray<DisplayMessage>) => {
-    setMessages((current) => (sameMessageProjection(current, next) ? current : next));
+    setMessages((current) =>
+      hasSameChatScreenProjection(current, next) ? current : next,
+    );
   }, []);
 
   const selectTab = useCallback((next: ChatTab): void => {
@@ -257,43 +202,20 @@ export const ChatScreen = () => {
     router.push('/');
   };
 
+  const openFavorites = (): void => {
+    router.push('/favorites');
+  };
+
   return (
     <Screen testID="chat-screen">
       <View style={styles.root}>
-        <SafeAreaView edges={['top']} style={styles.header}>
-          <GlassButton
-            accessibilityLabel="메뉴 열기"
-            hitSlop={8}
-            onPress={openDrawer}
-            style={styles.headerButton}
-          >
-            <Image
-              contentFit="contain"
-              source="sf:sidebar.left"
-              style={styles.headerSymbol}
-              tintColor={theme.colors.text}
-            />
-          </GlassButton>
-          <ChatSegmentedControl
-            onValueChange={selectTab}
-            testID="chat-segmented-control"
-            unread={{ 채팅: unread.chat, 상품: unread.products }}
-            value={selectedTab}
-          />
-          <GlassButton
-            accessibilityLabel="저장한 상품 보기"
-            hitSlop={8}
-            onPress={() => router.push('/favorites')}
-            style={styles.headerButton}
-          >
-            <Image
-              contentFit="contain"
-              source="sf:bookmark"
-              style={styles.headerSymbol}
-              tintColor={theme.colors.text}
-            />
-          </GlassButton>
-        </SafeAreaView>
+        <ChatScreenHeader
+          onOpenDrawer={openDrawer}
+          onOpenFavorites={openFavorites}
+          onValueChange={selectTab}
+          unread={{ 채팅: unread.chat, 상품: unread.products }}
+          value={selectedTab}
+        />
         <View style={styles.content}>
           <View style={selectedTab === '채팅' ? styles.visible : styles.hidden}>
             {conversationId ? (
@@ -335,20 +257,6 @@ export const ChatScreen = () => {
 
 const styles = StyleSheet.create((theme) => ({
   root: { flex: 1, gap: theme.spacing.md, padding: theme.spacing.md },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  headerButton: {
-    alignItems: 'center',
-    borderCurve: 'continuous',
-    borderRadius: theme.radii.pill,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  headerSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },
   content: { flex: 1 },
   visible: { flex: 1 },
   hidden: { display: 'none' },

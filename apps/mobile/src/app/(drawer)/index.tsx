@@ -1,1 +1,1 @@
-export { ChatScreen as default } from '@/features/chat/chat-screen';
+export { ChatScreen as default } from '@/features/chat';

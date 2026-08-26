@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { View as mockNativeView } from 'react-native';
 
-import type { DisplayMessage } from './message-list';
+import type { DisplayMessage } from './message-model';
 
 type FlashListProps = Readonly<{
   data: ReadonlyArray<DisplayMessage>;

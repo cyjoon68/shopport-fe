@@ -55,6 +55,10 @@ jest.mock('@/shared/storage/database', () => ({
 }));
 
 jest.mock('./message-list', () => ({
+  MessageList: () => null,
+}));
+
+jest.mock('./message-model', () => ({
   activeAskUserRequest: () => null,
   fromHistoricalMessage: (message: unknown) => message,
   fromLiveMessage: (message: unknown) => message,
@@ -62,7 +66,6 @@ jest.mock('./message-list', () => ({
     history: ReadonlyArray<unknown>,
     messages: ReadonlyArray<unknown>,
   ) => [...history, ...messages],
-  MessageList: () => null,
 }));
 
 jest.mock('./chat-composer', () => ({
