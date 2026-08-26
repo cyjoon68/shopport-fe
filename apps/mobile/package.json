@@ -13,6 +13,7 @@
     "start": "node scripts/with-env.mjs expo start --dev-client",
     "ios": "node scripts/with-env.mjs expo run:ios",
     "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "test:integration": "jest --runInBand --testPathPatterns=integration",
     "test:unit": "jest --runInBand --testPathPatterns=unit",
     "typecheck": "tsc --noEmit"
