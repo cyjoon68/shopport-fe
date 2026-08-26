@@ -41,6 +41,14 @@ export type DisplayMessage = Readonly<{
   tools: ReadonlyArray<DisplayTool>;
 }>;
 
+type DisplayMessageMergeCacheEntry = Readonly<{
+  historical: DisplayMessage;
+  live: DisplayMessage;
+  merged: DisplayMessage;
+}>;
+
+export type DisplayMessageMergeCache = Map<string, DisplayMessageMergeCacheEntry>;
+
 const visibleMessageText = (text: string): string =>
   text.trim() === ASK_USER_SKIP_MESSAGE ? '' : text;
 
@@ -213,9 +221,11 @@ const mergeDisplayMessage = (
 export const mergeDisplayMessages = (
   historical: ReadonlyArray<DisplayMessage>,
   live: ReadonlyArray<DisplayMessage>,
+  cache?: DisplayMessageMergeCache,
 ): Array<DisplayMessage> => {
   const merged = [...historical];
   const positions = new Map(merged.map((message, index) => [message.id, index]));
+  const nextCache = cache ? new Map<string, DisplayMessageMergeCacheEntry>() : undefined;
   for (const message of live) {
     const position = positions.get(message.id);
     if (position === undefined) {
@@ -223,8 +233,24 @@ export const mergeDisplayMessages = (
       merged.push(message);
     } else {
       const previous = merged[position];
-      if (previous) merged[position] = mergeDisplayMessage(previous, message);
+      if (previous) {
+        const cached = cache?.get(message.id);
+        const result =
+          cached?.historical === previous && cached.live === message
+            ? cached.merged
+            : mergeDisplayMessage(previous, message);
+        merged[position] = result;
+        nextCache?.set(message.id, {
+          historical: previous,
+          live: message,
+          merged: result,
+        });
+      }
     }
+  }
+  if (cache && nextCache) {
+    cache.clear();
+    nextCache.forEach((entry, id) => cache.set(id, entry));
   }
   return merged;
 };

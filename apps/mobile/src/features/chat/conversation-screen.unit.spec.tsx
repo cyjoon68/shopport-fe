@@ -49,7 +49,10 @@ jest.mock('@/features/auth/session-provider', () => ({
 
 jest.mock('@/providers/network-provider', () => ({ useOnline: () => true }));
 
-jest.mock('@/shared/storage/database', () => ({ sqliteChatPersistence: {} }));
+jest.mock('@/shared/storage/database', () => ({
+  flushChatPersistence: jest.fn(() => Promise.resolve()),
+  sqliteChatPersistence: {},
+}));
 
 jest.mock('./message-list', () => ({
   activeAskUserRequest: () => null,
