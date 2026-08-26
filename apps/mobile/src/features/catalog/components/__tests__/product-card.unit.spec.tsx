@@ -9,7 +9,7 @@ import {
   type TextStyle,
 } from 'react-native';
 
-import { cacheProducts } from '@/shared/storage/database';
+import { cacheProducts } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import { ProductCard } from '../product-card';
@@ -42,7 +42,7 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => mockOnline,
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   cacheProducts: jest.fn(() => Promise.resolve()),
 }));
 

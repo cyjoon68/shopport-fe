@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { productFromFragment } from '@/features/catalog/domain/models';
 import { SavedProductsDocument } from '@/graphql/generated/graphql';
-import { cacheProducts, readCachedProducts } from '@/shared/storage/database';
+import { cacheProducts, readCachedProducts } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 const pageSize = 20;

@@ -50,7 +50,7 @@ jest.mock('@/features/auth', () => ({
 
 jest.mock('@/providers/network-provider', () => ({ useOnline: () => true }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   flushChatPersistence: jest.fn(() => Promise.resolve()),
   sqliteChatPersistence: {},
 }));

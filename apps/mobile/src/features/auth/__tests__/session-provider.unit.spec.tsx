@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { clearPrivateStorage } from '@/shared/storage/database';
+import { clearPrivateStorage } from '@/shared/storage';
 
 import { rotateTokens } from '../api/fetchers';
 import { deleteRefreshToken } from '../auth-token';
@@ -16,7 +16,7 @@ jest.mock('@/providers/apollo-client', () => ({
 
 jest.mock('@/providers/network-provider', () => ({ useOnline: () => true }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   clearPrivateStorage: jest.fn(() => Promise.resolve()),
 }));
 

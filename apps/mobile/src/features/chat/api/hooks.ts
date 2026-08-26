@@ -12,7 +12,7 @@ import {
   UploadedImagesDocument,
 } from '@/graphql/generated/graphql';
 import { environment } from '@/shared/config/environment';
-import { flushChatPersistence, sqliteChatPersistence } from '@/shared/storage/database';
+import { flushChatPersistence, sqliteChatPersistence } from '@/shared/storage';
 
 import type { ChatRunOptions, UploadedImage } from '../types';
 

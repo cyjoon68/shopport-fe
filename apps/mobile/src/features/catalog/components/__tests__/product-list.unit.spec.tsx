@@ -7,7 +7,7 @@ import {
 } from 'react';
 
 import { FoundProductsDocument } from '@/graphql/generated/graphql';
-import { readCachedChatMessages } from '@/shared/storage/database';
+import { readCachedChatMessages } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import type { RecommendedProduct } from '../../types';
@@ -79,7 +79,7 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => true,
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   readCachedChatMessages: jest.fn(() => Promise.resolve([])),
 }));
 

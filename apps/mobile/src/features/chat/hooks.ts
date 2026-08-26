@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, AppState, Keyboard, Platform } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 
-import { deleteDraft, readDraft, saveDraft } from '@/shared/storage/database';
+import { deleteDraft, readDraft, saveDraft } from '@/shared/storage';
 
 import {
   pollAssetUntilSettled,

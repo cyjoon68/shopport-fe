@@ -20,7 +20,7 @@ import {
 } from '@/features/chat';
 import { useCreateConversation } from '@/features/chat/api/hooks';
 import { useOnline } from '@/providers/network-provider';
-import { saveDraft } from '@/shared/storage/database';
+import { saveDraft } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import { ConversationScreen } from './conversation-screen';

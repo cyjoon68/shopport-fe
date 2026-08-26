@@ -1,7 +1,7 @@
 import type { render } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 
-import { readDraft, saveDraft } from '@/shared/storage/database';
+import { readDraft, saveDraft } from '@/shared/storage';
 
 import { pollAssetUntilSettled, removeUploadedAsset } from '../../../api/fetchers';
 import { selectAndUploadAsset } from '../../../attachments';

@@ -1,49 +1,170 @@
-import type { ChatClientPersistence, ChatPersistedState } from '@tanstack/ai-client';
-import type { SQLiteDatabase } from 'expo-sqlite';
-import { openDatabaseAsync } from 'expo-sqlite';
+import type {
+  ChatClientPersistence,
+  ChatPersistedState,
+  MessagePart,
+  ToolCallState,
+  ToolResultState,
+} from '@tanstack/ai-client';
 
-import type { CachedProduct, Draft, PendingChatWrite } from './types';
+import { database } from './connection';
+import type { Draft, PendingChatWrite } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const cachedProductStringFields = [
-  'id',
-  'title',
-  'imageUrl',
-  'providerId',
-  'providerName',
-  'amountMinor',
-  'shippingMinor',
-  'totalMinor',
-  'currency',
-  'outboundUrl',
-  'observedAt',
-] as const;
+const serializedDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
 
-const isCachedProduct = (value: unknown): value is CachedProduct =>
+const toolCallStates = {
+  'awaiting-input': true,
+  'input-streaming': true,
+  'input-complete': true,
+  'approval-requested': true,
+  'approval-responded': true,
+  complete: true,
+  error: true,
+} satisfies Record<ToolCallState, true>;
+
+const toolResultStates = {
+  streaming: true,
+  complete: true,
+  error: true,
+} satisfies Record<ToolResultState, true>;
+
+const isToolCallState = (value: unknown): value is ToolCallState =>
+  typeof value === 'string' && Object.hasOwn(toolCallStates, value);
+
+const isToolResultState = (value: unknown): value is ToolResultState =>
+  typeof value === 'string' && Object.hasOwn(toolResultStates, value);
+
+const isUrl = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'data:'
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isBase64 = (value: unknown): value is string => {
+  if (typeof value !== 'string' || value.length === 0 || /\s/u.test(value)) return false;
+  try {
+    atob(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const isContentSource = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  switch (value.type) {
+    case 'url':
+      return (
+        isUrl(value.value) &&
+        (value.mimeType === undefined || typeof value.mimeType === 'string')
+      );
+    case 'data':
+      return (
+        isBase64(value.value) &&
+        typeof value.mimeType === 'string' &&
+        value.mimeType.length > 0
+      );
+    default:
+      return false;
+  }
+};
+
+const isContentPart = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  switch (value.type) {
+    case 'text':
+      return typeof value.content === 'string';
+    case 'image':
+    case 'audio':
+    case 'video':
+    case 'document':
+      return isContentSource(value.source);
+    default:
+      return false;
+  }
+};
+
+const isApproval = (value: unknown): boolean =>
   isRecord(value) &&
-  cachedProductStringFields.every((field) => typeof value[field] === 'string') &&
-  typeof value.isAffiliate === 'boolean' &&
-  typeof value.isInStock === 'boolean' &&
-  typeof value.isSaved === 'boolean' &&
-  (value.deliveryExpectedAt === null || typeof value.deliveryExpectedAt === 'string');
+  typeof value.id === 'string' &&
+  typeof value.needsApproval === 'boolean' &&
+  (value.approved === undefined || typeof value.approved === 'boolean');
+
+const isPersistedPart = (value: unknown): value is MessagePart => {
+  if (!isRecord(value)) return false;
+  switch (value.type) {
+    case 'text':
+      return typeof value.content === 'string';
+    case 'image':
+      return isContentSource(value.source);
+    case 'tool-call':
+      return (
+        typeof value.id === 'string' &&
+        typeof value.name === 'string' &&
+        typeof value.arguments === 'string' &&
+        isToolCallState(value.state) &&
+        (value.approval === undefined || isApproval(value.approval))
+      );
+    case 'tool-result':
+      return (
+        typeof value.toolCallId === 'string' &&
+        (typeof value.content === 'string' ||
+          (Array.isArray(value.content) && value.content.every(isContentPart))) &&
+        isToolResultState(value.state) &&
+        (value.error === undefined || typeof value.error === 'string')
+      );
+    case 'thinking':
+      return typeof value.content === 'string';
+    default:
+      return false;
+  }
+};
+
+const isPendingInterrupt = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.reason === 'string' &&
+  (value.message === undefined || typeof value.message === 'string') &&
+  (value.toolCallId === undefined || typeof value.toolCallId === 'string') &&
+  (value.responseSchema === undefined || isRecord(value.responseSchema)) &&
+  (value.expiresAt === undefined || typeof value.expiresAt === 'string') &&
+  (value.metadata === undefined || isRecord(value.metadata));
+
+const isResume = (value: unknown): boolean =>
+  isRecord(value) &&
+  isRecord(value.resumeState) &&
+  typeof value.resumeState.threadId === 'string' &&
+  value.resumeState.threadId.length > 0 &&
+  typeof value.resumeState.runId === 'string' &&
+  value.resumeState.runId.length > 0 &&
+  (value.pendingInterrupts === undefined ||
+    (Array.isArray(value.pendingInterrupts) &&
+      value.pendingInterrupts.every(isPendingInterrupt)));
+
+const isPersistedMessage = (
+  value: unknown,
+): value is ChatPersistedState['messages'][number] =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  (value.role === 'system' || value.role === 'user' || value.role === 'assistant') &&
+  Array.isArray(value.parts) &&
+  value.parts.every(isPersistedPart) &&
+  (value.createdAt === undefined ||
+    (value.createdAt instanceof Date && !Number.isNaN(value.createdAt.valueOf())));
 
 const isPersistedChat = (value: unknown): value is ChatPersistedState =>
   isRecord(value) &&
   Array.isArray(value.messages) &&
-  value.messages.every(
-    (message) =>
-      isRecord(message) &&
-      typeof message.id === 'string' &&
-      (message.role === 'system' ||
-        message.role === 'user' ||
-        message.role === 'assistant') &&
-      Array.isArray(message.parts) &&
-      message.parts.every((part) => isRecord(part) && typeof part.type === 'string'),
-  );
-
-const serializedDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
+  value.messages.every(isPersistedMessage) &&
+  (value.resume === undefined || isResume(value.resume));
 
 const reviveDates = (key: string, value: unknown): unknown => {
   if (
@@ -52,53 +173,21 @@ const reviveDates = (key: string, value: unknown): unknown => {
     serializedDatePattern.test(value)
   ) {
     const date = new Date(value);
-    return Number.isNaN(date.valueOf()) ? value : date;
+    if (Number.isNaN(date.valueOf())) return value;
+    const serialized = date.toISOString();
+    return serialized !== value && serialized.replace('.000Z', 'Z') !== value
+      ? value
+      : date;
   }
   return value;
 };
 
-const parseJson = (value: string, revive = false): unknown => {
+const parseJson = (value: string): unknown => {
   try {
-    return JSON.parse(value, revive ? reviveDates : undefined) as unknown;
+    return JSON.parse(value, reviveDates) as unknown;
   } catch {
     return null;
   }
-};
-
-const initialize = async (): Promise<SQLiteDatabase> => {
-  const db = await openDatabaseAsync('shopport.db');
-  await db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS conversation_pin (
-      conversation_id TEXT PRIMARY KEY NOT NULL,
-      pinned_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS product_cache (
-      id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS draft (
-      conversation_id TEXT PRIMARY KEY NOT NULL,
-      text TEXT NOT NULL,
-      asset_id TEXT,
-      asset_uri TEXT,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS chat_cache (
-      id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `);
-  return db;
-};
-
-let databasePromise: Promise<SQLiteDatabase> | undefined;
-
-const database = (): Promise<SQLiteDatabase> => {
-  databasePromise ??= initialize();
-  return databasePromise;
 };
 
 const chatPersistenceDelayMilliseconds = 250;
@@ -184,7 +273,7 @@ export const flushChatPersistence = async (id: string): Promise<void> => {
     await flushChatPersistence(id);
 };
 
-const discardPendingChatWrites = async (): Promise<void> => {
+export const discardPendingChatWrites = async (): Promise<void> => {
   const pending = [...pendingChatWrites.values()];
   pending.forEach((entry) => {
     entry.removed = true;
@@ -224,40 +313,6 @@ export const setConversationPinned = async (
   );
 };
 
-export const cacheProducts = async (
-  products: ReadonlyArray<CachedProduct>,
-): Promise<void> => {
-  const db = await database();
-  const now = Date.now();
-  await db.withTransactionAsync(async () => {
-    for (const product of products.slice(0, 100)) {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO product_cache (id, payload, updated_at) VALUES (?, ?, ?)',
-        product.id,
-        JSON.stringify(product),
-        now,
-      );
-    }
-    await db.runAsync(`
-      DELETE FROM product_cache
-      WHERE id NOT IN (
-        SELECT id FROM product_cache ORDER BY updated_at DESC LIMIT 100
-      )
-    `);
-  });
-};
-
-export const readCachedProducts = async (): Promise<Array<CachedProduct>> => {
-  const db = await database();
-  const rows = await db.getAllAsync<{ payload: string }>(
-    'SELECT payload FROM product_cache ORDER BY updated_at DESC LIMIT 100',
-  );
-  return rows.flatMap(({ payload }) => {
-    const parsed = parseJson(payload);
-    return isCachedProduct(parsed) ? [parsed] : [];
-  });
-};
-
 export const readCachedChatMessages = async (): Promise<
   ChatPersistedState['messages']
 > => {
@@ -266,7 +321,7 @@ export const readCachedChatMessages = async (): Promise<
     'SELECT payload FROM chat_cache ORDER BY updated_at DESC LIMIT 50',
   );
   return rows.flatMap(({ payload }) => {
-    const parsed = parseJson(payload, true);
+    const parsed = parseJson(payload);
     return isPersistedChat(parsed) ? parsed.messages : [];
   });
 };
@@ -301,17 +356,6 @@ export const deleteDraft = async (conversationId: string): Promise<void> => {
   await db.runAsync('DELETE FROM draft WHERE conversation_id = ?', conversationId);
 };
 
-export const clearPrivateStorage = async (): Promise<void> => {
-  await discardPendingChatWrites();
-  const db = await database();
-  await db.execAsync(`
-    DELETE FROM conversation_pin;
-    DELETE FROM product_cache;
-    DELETE FROM draft;
-    DELETE FROM chat_cache;
-  `);
-};
-
 export const sqliteChatPersistence: ChatClientPersistence = {
   getItem: async (id) => {
     const pending = pendingChatWrites.get(id);
@@ -322,7 +366,7 @@ export const sqliteChatPersistence: ChatClientPersistence = {
       id,
     );
     if (!row) return null;
-    const parsed = parseJson(row.payload, true);
+    const parsed = parseJson(row.payload);
     return isPersistedChat(parsed) ? parsed : null;
   },
   setItem: queueChatWrite,

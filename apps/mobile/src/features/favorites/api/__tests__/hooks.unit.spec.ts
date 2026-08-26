@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client/react';
 import { renderHook, waitFor } from '@testing-library/react-native';
 
 import { SavedProductsDocument } from '@/graphql/generated/graphql';
-import { readCachedProducts } from '@/shared/storage/database';
+import { readCachedProducts } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import { useSavedProducts } from '../hooks';
@@ -29,7 +29,7 @@ jest.mock('@apollo/client/react', () => ({
   useQuery: jest.fn(() => ({ data: undefined, fetchMore: jest.fn() })),
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   cacheProducts: jest.fn(),
   readCachedProducts: jest.fn(() => Promise.resolve([mockProduct])),
 }));

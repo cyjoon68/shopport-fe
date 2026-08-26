@@ -13,7 +13,7 @@ import {
   ConversationSummaryFragmentDoc,
 } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
-import { readPinnedConversationIds } from '@/shared/storage/database';
+import { readPinnedConversationIds } from '@/shared/storage';
 import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { conversationHref } from '../conversation-href';

@@ -6,7 +6,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
 import { useOnline } from '@/providers/network-provider';
-import { readCachedChatMessages } from '@/shared/storage/database';
+import { readCachedChatMessages } from '@/shared/storage';
 
 import { useFoundProductRecommendations } from '../api/hooks';
 import { productsFromToolResult } from '../domain/tool-results';

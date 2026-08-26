@@ -9,7 +9,7 @@ import {
   deleteDraft,
   setConversationPinned,
   sqliteChatPersistence,
-} from '@/shared/storage/database';
+} from '@/shared/storage';
 
 import type { ConversationActionHandlersProps } from './types';
 

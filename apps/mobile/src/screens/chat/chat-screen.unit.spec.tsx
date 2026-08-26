@@ -152,7 +152,7 @@ jest.mock('@/providers/network-provider', () => ({
   useOnline: () => true,
 }));
 
-jest.mock('@/shared/storage/database', () => ({
+jest.mock('@/shared/storage', () => ({
   saveDraft: jest.fn(() => Promise.resolve()),
 }));
 

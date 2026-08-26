@@ -2,7 +2,7 @@ import { createContext, useEffect, useEffectEvent, useState } from 'react';
 
 import { apolloClient } from '@/providers/apollo-client';
 import { useOnline } from '@/providers/network-provider';
-import { clearPrivateStorage } from '@/shared/storage/database';
+import { clearPrivateStorage } from '@/shared/storage';
 
 import { authenticate, revokeSession, rotateTokens } from './api/fetchers';
 import {
