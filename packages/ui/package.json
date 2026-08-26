@@ -15,14 +15,14 @@
     "@shopport/typescript-config": "workspace:*",
     "@types/react": "~19.2.2",
     "react": "19.2.3",
-    "react-native": "0.86.2",
+    "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-unistyles": "3.3.0",
     "typescript": "6.0.3"
   },
   "peerDependencies": {
     "react": "19.2.3",
-    "react-native": "0.86.2",
+    "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-unistyles": "3.3.0"
   }

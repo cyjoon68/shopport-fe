@@ -44,5 +44,6 @@ describe('production app configuration', () => {
       reactCompiler: true,
       typedRoutes: true,
     });
+    expect(configure(context).plugins).toContain('expo-sqlite');
   });
 });
