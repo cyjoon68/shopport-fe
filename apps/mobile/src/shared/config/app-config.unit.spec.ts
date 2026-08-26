@@ -40,6 +40,9 @@ describe('production app configuration', () => {
     expect(() => configure(context)).toThrow('EXPO_PUBLIC_PRIVACY_POLICY_URL');
 
     process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL = 'https://shopport.example/privacy';
-    expect(() => configure(context)).not.toThrow();
+    expect(configure(context).experiments).toMatchObject({
+      reactCompiler: true,
+      typedRoutes: true,
+    });
   });
 });

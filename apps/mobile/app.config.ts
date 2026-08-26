@@ -84,7 +84,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
     ],
-    experiments: { typedRoutes: true },
+    experiments: { reactCompiler: true, typedRoutes: true },
     extra: {
       apiUrl: apiUrl ?? 'http://127.0.0.1:4000',
       sentryDsn: environmentValue('EXPO_PUBLIC_SENTRY_DSN') ?? '',

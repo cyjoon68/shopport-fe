@@ -4,10 +4,7 @@ import * as Crypto from 'expo-crypto';
 
 import { environment } from '@/shared/config/environment';
 
-type IdentityCredential = Readonly<{
-  identityToken: string;
-  nonce: string;
-}>;
+import type { IdentityCredential } from './types';
 
 const initializeKakao = async (): Promise<void> => {
   if (!environment.kakaoNativeAppKey) {

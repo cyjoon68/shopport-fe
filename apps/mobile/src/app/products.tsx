@@ -1,1 +1,1 @@
-export { FoundProductsScreen as default } from '@/features/catalog/found-products-screen';
+export { FoundProductsScreen as default } from '@/screens/catalog/found-products-screen';

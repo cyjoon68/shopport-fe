@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { AppProviders } from '@/providers/app-providers';
-import { useReducedMotion } from '@/shared/accessibility/use-reduced-motion';
+import { useReducedMotion } from '@/shared/accessibility/hooks';
 
 const RootStack = () => {
   const reducedMotion = useReducedMotion();
