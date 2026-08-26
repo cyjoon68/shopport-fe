@@ -55,6 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-router',
       ['expo-dev-client', { toolsButton: false }],
       'expo-secure-store',
+      'expo-sqlite',
       [
         'expo-image-picker',
         {
