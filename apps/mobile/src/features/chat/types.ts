@@ -68,7 +68,7 @@ export type ChatComposerViewProps = Readonly<{
   providerIds?: ReadonlyArray<RetailerId> | undefined;
   quickActionsEnabled: boolean;
   remove: () => Promise<void>;
-  send: () => Promise<void>;
+  send: () => Promise<boolean>;
   sendDisabled: boolean;
   setText: (text: string) => void;
   text: string;
@@ -116,7 +116,7 @@ export type NewChatFooterProps = Readonly<{
   loading: boolean;
   onAttach: () => Promise<void>;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
-  onSend: () => Promise<void>;
+  onSend: () => Promise<void | boolean>;
   onStop?: () => Promise<void>;
   providerIds?: ReadonlyArray<RetailerId> | undefined;
   quickActionsEnabled?: boolean;

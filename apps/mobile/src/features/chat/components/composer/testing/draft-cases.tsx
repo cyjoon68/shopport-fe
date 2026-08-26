@@ -8,6 +8,7 @@ import {
   deferred,
   flushPromises,
   inputValue,
+  mockedReadAssetStatus,
   mockedReadDraft,
   mockedSaveDraft,
   resetComposerMocks,
@@ -80,6 +81,103 @@ describe('chat composer draft isolation', () => {
     await act(flushPromises);
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
+  });
+
+  it('sends an image-only initial draft once its asset is ready', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    mockedReadAssetStatus.mockResolvedValue('READY');
+    const onSend = jest.fn(() => Promise.resolve());
+
+    render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSend).toHaveBeenCalledWith('', 'asset-a');
+  });
+
+  it('sends a text-and-image initial draft once its asset is ready', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '이 가방 찾아줘',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    mockedReadAssetStatus.mockResolvedValue('READY');
+    const onSend = jest.fn(() => Promise.resolve());
+
+    render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSend).toHaveBeenCalledWith('이 가방 찾아줘', 'asset-a');
+  });
+
+  it('does not repeat an initial image draft send while it is pending across a rerender', async () => {
+    const send = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    mockedReadAssetStatus.mockResolvedValue('READY');
+    const onSend = jest.fn(() => send.promise);
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      send.resolve();
+      await flushPromises();
+    });
   });
 
   it('keeps the draft pending and clears it after the send succeeds', async () => {

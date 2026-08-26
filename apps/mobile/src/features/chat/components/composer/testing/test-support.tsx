@@ -3,7 +3,11 @@ import * as Haptics from 'expo-haptics';
 
 import { readDraft, saveDraft } from '@/shared/storage';
 
-import { pollAssetUntilSettled, removeUploadedAsset } from '../../../api/fetchers';
+import {
+  pollAssetUntilSettled,
+  readAssetStatus,
+  removeUploadedAsset,
+} from '../../../api/fetchers';
 import { selectAndUploadAsset } from '../../../attachments';
 import { ChatComposer } from '../chat-composer';
 
@@ -23,6 +27,9 @@ export const mockedSelectAndUploadAsset = selectAndUploadAsset as jest.MockedFun
 >;
 export const mockedPollAssetUntilSettled = pollAssetUntilSettled as jest.MockedFunction<
   typeof pollAssetUntilSettled
+>;
+export const mockedReadAssetStatus = readAssetStatus as jest.MockedFunction<
+  typeof readAssetStatus
 >;
 export const mockedImpactAsync = Haptics.impactAsync as jest.MockedFunction<
   typeof Haptics.impactAsync
@@ -73,6 +80,9 @@ export const resetComposerMocks = (): void => {
   mockedRemoveUploadedAsset.mockClear();
   mockedSelectAndUploadAsset.mockReset();
   mockedPollAssetUntilSettled.mockReset();
+  mockedPollAssetUntilSettled.mockResolvedValue('READY');
+  mockedReadAssetStatus.mockReset();
+  mockedReadAssetStatus.mockResolvedValue('READY');
   mockedImpactAsync.mockReset();
   mockedImpactAsync.mockResolvedValue(undefined);
 };

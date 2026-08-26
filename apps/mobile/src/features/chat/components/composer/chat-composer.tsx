@@ -27,18 +27,41 @@ export const ChatComposer = ({
     online,
     state,
   });
-  const initialDraftPendingRef = useRef(sendInitialDraft);
+  const initialDraftSendingRef = useRef(false);
+  const initialDraftSentRef = useRef(false);
 
   useEffect(() => {
     if (
-      !initialDraftPendingRef.current ||
+      !sendInitialDraft ||
+      initialDraftSendingRef.current ||
+      initialDraftSentRef.current ||
       state.draftReadyFor !== conversationId ||
-      !state.text.trim()
+      !online ||
+      loading ||
+      state.uploading ||
+      (!state.text.trim() && !state.asset) ||
+      Boolean(state.asset && state.asset.state !== 'ready')
     )
       return;
-    initialDraftPendingRef.current = false;
-    void send();
-  }, [conversationId, send, state.draftReadyFor, state.text]);
+    initialDraftSendingRef.current = true;
+    void send()
+      .then((sent) => {
+        if (sent) initialDraftSentRef.current = true;
+      })
+      .finally(() => {
+        initialDraftSendingRef.current = false;
+      });
+  }, [
+    conversationId,
+    loading,
+    online,
+    send,
+    sendInitialDraft,
+    state.asset,
+    state.draftReadyFor,
+    state.text,
+    state.uploading,
+  ]);
 
   const draftReady = state.draftReadyFor === conversationId;
   const visibleAsset = draftReady ? state.asset : null;

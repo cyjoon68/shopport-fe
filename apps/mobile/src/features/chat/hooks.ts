@@ -376,9 +376,9 @@ export const useComposerActions = ({
     state.setAsset(null);
   };
 
-  const send = async (): Promise<void> => {
+  const send = async (): Promise<boolean> => {
     const expected = currentSnapshot();
-    if (state.draftReadyFor !== conversationId) return;
+    if (state.draftReadyFor !== conversationId) return false;
     const currentText = state.text;
     const currentAsset = state.asset;
     const trimmed = currentText.trim();
@@ -390,33 +390,38 @@ export const useComposerActions = ({
       state.uploading ||
       (currentAsset && currentAsset.state !== 'ready')
     )
-      return;
+      return false;
     try {
       if (currentAsset) {
         const status = await readAssetStatus(currentAsset.id);
-        if (!isCurrent(expected)) return;
+        if (!isCurrent(expected)) return false;
         if (status !== 'READY') {
           if (status === 'REJECTED')
             state.applyProcessingResult(currentAsset.id, 'REJECTED');
           else void state.verifyAsset(currentAsset);
-          return;
+          return false;
         }
       }
-      if (!isCurrent(expected)) return;
+      if (!isCurrent(expected)) return false;
       if (Platform.OS === 'ios')
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (!isCurrent(expected)) return;
+      if (!isCurrent(expected)) return false;
       await onSend(trimmed, currentAsset?.id ?? null);
-      if (!isCurrent(expected)) return;
-      state.setText('');
-      state.setAsset(null);
+      if (!isCurrent(expected)) return false;
       await state.deleteDraft(conversationId);
+      if (isCurrent(expected)) {
+        state.assetRef.current = null;
+        state.setText('');
+        state.setAsset(null);
+      }
+      return true;
     } catch (error) {
       if (isCurrent(expected))
         Alert.alert(
           '메시지 전송 실패',
           error instanceof Error ? error.message : '다시 시도해 주세요.',
         );
+      return false;
     }
   };
 
