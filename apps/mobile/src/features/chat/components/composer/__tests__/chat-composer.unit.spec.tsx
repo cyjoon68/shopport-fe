@@ -30,4 +30,6 @@ jest.mock('expo-image', () => ({
 }));
 
 import '../testing/attachment-cases';
-import '../testing/draft-cases';
+import '../testing/composer-policy-cases';
+import '../testing/draft-replacement-cases';
+import '../testing/initial-draft-cases';
