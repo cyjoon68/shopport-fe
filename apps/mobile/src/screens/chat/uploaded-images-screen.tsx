@@ -52,7 +52,7 @@ const UploadedImagesContent = ({ online }: Readonly<{ online: boolean }>) => {
           />
         }
         numColumns={3}
-        onEndReached={loadMore}
+        onEndReached={() => void loadMore().catch(() => undefined)}
         renderItem={renderImage}
       />
     </Screen>

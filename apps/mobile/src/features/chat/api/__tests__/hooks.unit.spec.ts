@@ -130,8 +130,55 @@ describe('useUploadedImages', () => {
     const retainedLoadMore = result.current.loadMore;
 
     rerender({ enabled: false });
-    retainedLoadMore();
+    void retainedLoadMore();
 
     expect(fetchMore).not.toHaveBeenCalled();
+  });
+
+  it('suppresses a duplicate cursor while fetchMore is in flight', async () => {
+    let resolveFetchMore!: () => void;
+    const fetchMore = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFetchMore = resolve;
+        }),
+    );
+    mockedUseQuery.mockReturnValue({
+      data: {
+        conversations: {
+          edges: [],
+          pageInfo: { endCursor: 'cursor-1', hasNextPage: true },
+        },
+      },
+      fetchMore,
+    } as never);
+    const { result } = renderHook(() => useUploadedImages(true));
+
+    const first = result.current.loadMore();
+    await expect(result.current.loadMore()).resolves.toBeUndefined();
+    expect(fetchMore).toHaveBeenCalledTimes(1);
+    resolveFetchMore();
+    await first;
+  });
+
+  it('allows retrying the same cursor after fetchMore rejects', async () => {
+    const fetchMore = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('pagination failed'))
+      .mockResolvedValueOnce(undefined);
+    mockedUseQuery.mockReturnValue({
+      data: {
+        conversations: {
+          edges: [],
+          pageInfo: { endCursor: 'cursor-1', hasNextPage: true },
+        },
+      },
+      fetchMore,
+    } as never);
+    const { result } = renderHook(() => useUploadedImages(true));
+
+    await expect(result.current.loadMore()).rejects.toThrow('pagination failed');
+    await expect(result.current.loadMore()).resolves.toBeUndefined();
+    expect(fetchMore).toHaveBeenCalledTimes(2);
   });
 });

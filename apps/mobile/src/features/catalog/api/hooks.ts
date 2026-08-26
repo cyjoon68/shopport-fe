@@ -15,6 +15,7 @@ const pageSize = 20;
 export const useFoundProductRecommendations = (enabled: boolean) => {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const activeCursorRef = useRef<string | null>(null);
   const { data, fetchMore } = useQuery(FoundProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -30,11 +31,17 @@ export const useFoundProductRecommendations = (enabled: boolean) => {
         ),
       ),
     ) ?? [];
-  const loadMore = (): void => {
+  const loadMore = async (): Promise<void> => {
     if (!enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
-    if (pageInfo?.hasNextPage)
-      void fetchMore({ variables: { after: pageInfo.endCursor, first: pageSize } });
+    const cursor = pageInfo?.endCursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorRef.current === cursor) return;
+    activeCursorRef.current = cursor;
+    try {
+      await fetchMore({ variables: { after: cursor, first: pageSize } });
+    } finally {
+      if (activeCursorRef.current === cursor) activeCursorRef.current = null;
+    }
   };
   return { loadMore, recommendations };
 };
@@ -46,9 +53,15 @@ export const useUpdateSavedProduct = () => {
   return async (productId: string, isSaved: boolean): Promise<string | null> => {
     if (isSaved) {
       const result = await unsaveProduct({ variables: { input: { productId } } });
-      return result.data?.unsaveProduct.userErrors[0]?.message ?? null;
+      const payload = result.data?.unsaveProduct;
+      if (!payload || payload.userErrors.length > 0)
+        return payload?.userErrors[0]?.message || '찜을 변경하지 못했습니다.';
+      return payload.product ? null : '찜을 변경하지 못했습니다.';
     }
     const result = await saveProduct({ variables: { input: { productId } } });
-    return result.data?.saveProduct.userErrors[0]?.message ?? null;
+    const payload = result.data?.saveProduct;
+    if (!payload || payload.userErrors.length > 0)
+      return payload?.userErrors[0]?.message || '찜을 변경하지 못했습니다.';
+    return payload.product ? null : '찜을 변경하지 못했습니다.';
   };
 };

@@ -127,4 +127,15 @@ describe('uploaded images screen session policy', () => {
 
     expect(mockFetchMore).not.toHaveBeenCalled();
   });
+
+  it('consumes an expected pagination rejection from the list callback', async () => {
+    mockFetchMore.mockRejectedValueOnce(new Error('pagination failed'));
+    render(<UploadedImagesScreen />);
+
+    mockEndReached?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockFetchMore).toHaveBeenCalledTimes(1);
+  });
 });

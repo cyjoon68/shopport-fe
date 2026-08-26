@@ -122,7 +122,7 @@ export const ProductList = ({
             title="찾은 상품이 없습니다"
           />
         }
-        onEndReached={loadMore}
+        onEndReached={() => void loadMore().catch(() => undefined)}
         numColumns={1}
         ref={listRef}
         renderItem={renderRecommendation}

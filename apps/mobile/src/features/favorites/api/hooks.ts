@@ -11,6 +11,7 @@ const pageSize = 20;
 export const useSavedProducts = (enabled: boolean) => {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const activeCursorRef = useRef<string | null>(null);
   const { data, fetchMore } = useQuery(SavedProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -38,11 +39,17 @@ export const useSavedProducts = (enabled: boolean) => {
   }, [productEdges]);
 
   const products = productEdges?.map(({ node }) => productFromFragment(node));
-  const loadMore = (): void => {
+  const loadMore = async (): Promise<void> => {
     if (!enabledRef.current) return;
     const pageInfo = data?.savedProducts.pageInfo;
-    if (pageInfo?.hasNextPage)
-      void fetchMore({ variables: { after: pageInfo.endCursor, first: pageSize } });
+    const cursor = pageInfo?.endCursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorRef.current === cursor) return;
+    activeCursorRef.current = cursor;
+    try {
+      await fetchMore({ variables: { after: cursor, first: pageSize } });
+    } finally {
+      if (activeCursorRef.current === cursor) activeCursorRef.current = null;
+    }
   };
   return { loadMore, products: products ?? cachedProducts };
 };

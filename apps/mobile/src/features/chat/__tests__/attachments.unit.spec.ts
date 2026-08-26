@@ -40,7 +40,7 @@ const selectedAsset = {
   width: 10,
 };
 
-const mockSuccessfulSelection = (): void => {
+const mockSelection = (asset: unknown = selectedAsset): void => {
   mockedRequestMediaLibraryPermissionsAsync.mockResolvedValue({
     canAskAgain: true,
     expires: 'never',
@@ -48,8 +48,25 @@ const mockSuccessfulSelection = (): void => {
     status: ImagePicker.PermissionStatus.GRANTED,
   });
   mockedLaunchImageLibraryAsync.mockResolvedValue({
-    assets: [selectedAsset],
+    assets: asset === null ? [] : [asset],
     canceled: false,
+  } as never);
+};
+
+const mockSuccessfulSelection = (): void => mockSelection();
+
+const mockUploadCreation = (id = 'asset-1'): void => {
+  mockedMutate.mockResolvedValueOnce({
+    data: {
+      createAssetUpload: {
+        upload: {
+          asset: { id },
+          headers: [],
+          uploadUrl: `https://upload.example/${id}`,
+        },
+        userErrors: [],
+      },
+    },
   });
 };
 
@@ -68,7 +85,121 @@ describe('asset deletion payload validation', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  it('fails before opening the picker when media permission is denied', async () => {
+    mockedRequestMediaLibraryPermissionsAsync.mockResolvedValue({
+      canAskAgain: false,
+      expires: 'never',
+      granted: false,
+      status: 'denied',
+    } as never);
+
+    await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(
+      '사진 접근 권한이 필요합니다.',
+    );
+    expect(mockedLaunchImageLibraryAsync).not.toHaveBeenCalled();
+    expect(mockedMutate).not.toHaveBeenCalled();
+  });
+
+  it('returns null when image selection is canceled', async () => {
+    mockedRequestMediaLibraryPermissionsAsync.mockResolvedValue({
+      canAskAgain: true,
+      expires: 'never',
+      granted: true,
+      status: ImagePicker.PermissionStatus.GRANTED,
+    });
+    mockedLaunchImageLibraryAsync.mockResolvedValue({ assets: null, canceled: true });
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toBeNull();
+    expect(mockedMutate).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the picker reports an empty selection', async () => {
+    mockSelection(null);
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toBeNull();
+    expect(mockedMutate).not.toHaveBeenCalled();
+  });
+
+  it('returns null when a non-canceled picker result has no assets array', async () => {
+    mockSelection();
+    mockedLaunchImageLibraryAsync.mockResolvedValue({
+      assets: null,
+      canceled: false,
+    } as never);
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toBeNull();
+    expect(mockedMutate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a missing URI', { ...selectedAsset, uri: '' }, '이미지 파일을 찾을 수 없습니다.'],
+    [
+      'a missing size',
+      { ...selectedAsset, fileSize: undefined },
+      '이미지는 15MB 이하여야 합니다.',
+    ],
+    [
+      'an empty file',
+      { ...selectedAsset, fileSize: 0 },
+      '이미지는 15MB 이하여야 합니다.',
+    ],
+    [
+      'an oversized file',
+      { ...selectedAsset, fileSize: 15 * 1024 * 1024 + 1 },
+      '이미지는 15MB 이하여야 합니다.',
+    ],
+    [
+      'an oversized pixel count',
+      { ...selectedAsset, height: 4_001, width: 5_000 },
+      '이미지는 20MP 이하여야 합니다.',
+    ],
+    [
+      'missing dimensions',
+      { ...selectedAsset, height: undefined, width: undefined },
+      '이미지는 20MP 이하여야 합니다.',
+    ],
+    [
+      'an unsupported MIME type',
+      { ...selectedAsset, mimeType: 'image/gif' },
+      'JPEG, PNG, HEIC 이미지만 사용할 수 있습니다.',
+    ],
+  ])('rejects picker metadata with %s', async (_case, asset, message) => {
+    mockSelection(asset);
+
+    await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(message);
+    expect(mockedMutate).not.toHaveBeenCalled();
+    expect(mockedFile).not.toHaveBeenCalled();
+  });
+
+  it('normalizes an allowed MIME type before creating and streaming the upload', async () => {
+    mockSelection({ ...selectedAsset, mimeType: 'IMAGE/PNG' });
+    mockUpload.mockResolvedValue({ body: '', headers: {}, status: 200 });
+    mockUploadCreation('asset-normalized');
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toEqual({
+      id: 'asset-normalized',
+      uri: selectedAsset.uri,
+    });
+
+    expect(mockedMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          input: {
+            byteSize: '128',
+            contentType: 'image/png',
+            conversationId: 'conversation-1',
+          },
+        },
+      }),
+    );
+    expect(mockUpload).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ mimeType: 'image/png' }),
+    );
   });
 
   it('resolves only when the delete payload explicitly succeeds', async () => {
@@ -204,6 +335,81 @@ describe('asset deletion payload validation', () => {
 
     await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(
       '이미지를 업로드하지 못했습니다.',
+    );
+  });
+
+  it('times out an uploader that ignores abort and cleans up the allocated asset', async () => {
+    jest.useFakeTimers();
+    mockSuccessfulSelection();
+    let rejectUpload!: (error: Error) => void;
+    mockUpload.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectUpload = reject;
+        }),
+    );
+    mockUploadCreation('asset-timeout');
+    mockedMutate.mockRejectedValueOnce(new Error('cleanup unavailable'));
+
+    const selection = selectAndUploadAsset('conversation-1');
+    const outcome = selection.then(
+      () => 'resolved',
+      (error: unknown) => (error instanceof Error ? error.message : 'unknown error'),
+    );
+    await jest.advanceTimersByTimeAsync(0);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+    const signal = mockUpload.mock.calls[0]?.[1]?.signal;
+
+    await jest.advanceTimersByTimeAsync(60_000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(await Promise.race([outcome, Promise.resolve('pending')])).toBe(
+      '이미지를 업로드하지 못했습니다.',
+    );
+    expect(signal?.aborted).toBe(true);
+    expect(mockedMutate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ variables: { input: { id: 'asset-timeout' } } }),
+    );
+    expect(jest.getTimerCount()).toBe(0);
+
+    rejectUpload(new Error('late native rejection'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it('clears the upload timer and leaves its controller inactive after success', async () => {
+    jest.useFakeTimers();
+    mockSuccessfulSelection();
+    mockUpload.mockResolvedValue({ body: '', headers: {}, status: 200 });
+    mockUploadCreation('asset-success');
+
+    await expect(selectAndUploadAsset('conversation-1')).resolves.toEqual({
+      id: 'asset-success',
+      uri: selectedAsset.uri,
+    });
+    const signal = mockUpload.mock.calls[0]?.[1]?.signal;
+
+    expect(jest.getTimerCount()).toBe(0);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(signal?.aborted).toBe(false);
+  });
+
+  it('cleans up an allocated asset when the native uploader rejects', async () => {
+    mockSuccessfulSelection();
+    mockUpload.mockRejectedValue(new Error('native upload failed'));
+    mockUploadCreation('asset-rejected');
+    mockedMutate.mockResolvedValueOnce({
+      data: { deleteAsset: { success: true, userErrors: [] } },
+    });
+
+    await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(
+      '이미지를 업로드하지 못했습니다.',
+    );
+    expect(mockedMutate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ variables: { input: { id: 'asset-rejected' } } }),
     );
   });
 });

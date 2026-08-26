@@ -56,12 +56,12 @@ export const ProductCard = ({
       Alert.alert('오프라인', '구매 링크는 온라인에서 열 수 있습니다.');
       return;
     }
-    const url = new URL(product.outboundUrl);
-    if (url.protocol !== 'https:') {
-      Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
-      return;
-    }
     try {
+      const url = new URL(product.outboundUrl);
+      if (url.protocol !== 'https:' || url.username || url.password) {
+        Alert.alert('안전하지 않은 링크', '구매 링크를 열 수 없습니다.');
+        return;
+      }
       await Linking.openURL(url.toString());
     } catch {
       Alert.alert('구매 링크를 열 수 없어요', '다시 시도해 주세요.');

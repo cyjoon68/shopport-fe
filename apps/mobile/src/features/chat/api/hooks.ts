@@ -117,6 +117,7 @@ export const useChatRun = ({
 export const useUploadedImages = (enabled: boolean) => {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const activeCursorRef = useRef<string | null>(null);
   const { data, fetchMore } = useQuery(UploadedImagesDocument, {
     variables: { first: 20 },
     fetchPolicy: 'cache-and-network',
@@ -133,11 +134,17 @@ export const useUploadedImages = (enabled: boolean) => {
       ),
     ) ?? [];
   const images = [...new Map(imageResults.map((image) => [image.id, image])).values()];
-  const loadMore = (): void => {
+  const loadMore = async (): Promise<void> => {
     if (!enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
-    if (pageInfo?.hasNextPage)
-      void fetchMore({ variables: { after: pageInfo.endCursor, first: 20 } });
+    const cursor = pageInfo?.endCursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorRef.current === cursor) return;
+    activeCursorRef.current = cursor;
+    try {
+      await fetchMore({ variables: { after: cursor, first: 20 } });
+    } finally {
+      if (activeCursorRef.current === cursor) activeCursorRef.current = null;
+    }
   };
   return { images, loadMore };
 };
