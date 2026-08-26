@@ -388,6 +388,151 @@ describe('chat composer draft isolation', () => {
     expect(mockedDeleteDraft).toHaveBeenCalledTimes(2);
   });
 
+  it('does not auto-send a newer draft preserved before deletion', async () => {
+    const response = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '처음 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => response.promise);
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '보존할 B 초안');
+    await act(async () => {
+      response.resolve();
+      await flushPromises();
+    });
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: '보존할 B 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+    expect(inputValue(screen)).toBe('보존할 B 초안');
+
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(2);
+    expect(onSend).toHaveBeenLastCalledWith('보존할 B 초안', null);
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a newer draft pending when pre-delete preservation fails', async () => {
+    const response = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '처음 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedSaveDraft
+      .mockRejectedValueOnce(new Error('저장 실패'))
+      .mockResolvedValue(undefined);
+    const onSend = jest.fn(() => response.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '보존 실패 B');
+    await act(async () => {
+      response.resolve();
+      await flushPromises();
+    });
+
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: '보존 실패 B',
+      assetId: null,
+      assetUri: null,
+    });
+    expect(alertSpy).toHaveBeenCalledWith(
+      '초안 저장 실패',
+      '메시지는 전송되었지만 최신 초안을 저장하지 못했습니다.',
+    );
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+    expect(inputValue(screen)).toBe('보존 실패 B');
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '복구 C');
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedSaveDraft).toHaveBeenLastCalledWith('A', {
+      text: '복구 C',
+      assetId: null,
+      assetUri: null,
+    });
+    alertSpy.mockRestore();
+  });
+
   it('does not auto-send a restored newer draft after deletion completes', async () => {
     const cleanup = deferred<void>();
     mockedReadDraft.mockResolvedValue({

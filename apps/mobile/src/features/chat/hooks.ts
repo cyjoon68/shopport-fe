@@ -295,6 +295,7 @@ export const useComposerActions = ({
   state,
 }: ComposerActionsArgs) => {
   const sendInFlightRef = useRef(false);
+  const initialDraftRetiredRef = useRef(false);
   const submittedDraftRef = useRef<{
     conversationId: string;
     revision: number;
@@ -448,16 +449,9 @@ export const useComposerActions = ({
   ): Promise<boolean> => {
     const current = latestRef.current;
     if (current.conversationId === conversationId && !matchesDraft(current, revision)) {
-      try {
-        await saveLatestDraft();
-      } catch {
-        if (isCurrent(expected))
-          Alert.alert(
-            '초안 정리 실패',
-            '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
-          );
-      }
-      return false;
+      const saved = await saveLatestDraft();
+      if (!saved) initialDraftRetiredRef.current = true;
+      return saved;
     }
     try {
       await state.deleteDraft(conversationId);
@@ -621,7 +615,7 @@ export const useComposerActions = ({
     }
   };
 
-  return { attach, remove, send };
+  return { attach, initialDraftRetiredRef, remove, send };
 };
 
 export const useKeyboardLift = (): Animated.Value => {

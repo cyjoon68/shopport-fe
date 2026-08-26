@@ -19,7 +19,7 @@ export const ChatComposer = ({
 }: ChatComposerProps) => {
   const online = useOnline();
   const state = useComposerState(conversationId, online);
-  const { attach, remove, send } = useComposerActions({
+  const { attach, initialDraftRetiredRef, remove, send } = useComposerActions({
     allowFreeText,
     conversationId,
     loading,
@@ -46,7 +46,7 @@ export const ChatComposer = ({
     initialDraftSendingRef.current = true;
     void send()
       .then((sent) => {
-        if (sent) initialDraftSentRef.current = true;
+        if (sent || initialDraftRetiredRef.current) initialDraftSentRef.current = true;
       })
       .finally(() => {
         initialDraftSendingRef.current = false;
