@@ -28,6 +28,7 @@ export const SessionContext = createContext<SessionContextValue | null>(null);
 const refreshRetryMilliseconds = 5_000;
 const localCleanupWarning = '로그아웃했지만 기기 데이터를 모두 정리하지 못했습니다.';
 const revocationWarning = '서버 로그아웃은 완료하지 못했지만 기기 세션은 제거했습니다.';
+let credentialMutationTail: Promise<void> = Promise.resolve();
 
 export const SessionProvider = ({ children }: SessionProviderProps) => {
   const online = useOnline();
@@ -39,11 +40,14 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     generation: number;
     promise: Promise<void>;
   } | null>(null);
-  const credentialMutationRef = useRef<Promise<void>>(Promise.resolve());
+  const logoutFlightRef = useRef<{
+    generation: number;
+    promise: Promise<void>;
+  } | null>(null);
 
   const serializeCredentialMutation = <T,>(operation: () => Promise<T>): Promise<T> => {
-    const result = credentialMutationRef.current.then(operation, operation);
-    credentialMutationRef.current = result.then(
+    const result = credentialMutationTail.then(operation, operation);
+    credentialMutationTail = result.then(
       () => undefined,
       () => undefined,
     );
@@ -143,6 +147,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   );
 
   const bootstrap = useEffectEvent(async (): Promise<void> => {
+    if (status === 'guest') return;
     const captured = generationRef.current;
     try {
       const refreshToken = await readRefreshToken();
@@ -216,31 +221,38 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = (): Promise<void> => {
+    const existing = logoutFlightRef.current;
+    if (existing?.generation === generationRef.current) return existing.promise;
     const { generation, storageClose } = beginGuestSession();
-    const refreshToken = serializeCredentialMutation(readRefreshToken);
-    const secureStoreCleanup = serializeCredentialMutation(deleteRefreshToken);
-    const revocation = refreshToken.then((token) =>
-      token ? revokeSession(token) : undefined,
-    );
-    const results = await Promise.allSettled([
-      revocation,
-      secureStoreCleanup,
-      apolloClient.clearStore(),
-      finishPrivateCleanup(storageClose),
-    ]);
-    if (generation !== generationRef.current) return;
-    const localCleanupFailed = results
-      .slice(1)
-      .some((result) => result.status === 'rejected');
-    setStatus('guest');
-    setError(
-      localCleanupFailed
-        ? localCleanupWarning
-        : results[0]?.status === 'rejected'
-          ? revocationWarning
-          : null,
-    );
+    const promise = (async (): Promise<void> => {
+      const refreshToken = serializeCredentialMutation(readRefreshToken);
+      const secureStoreCleanup = serializeCredentialMutation(deleteRefreshToken);
+      const revocation = refreshToken.then((token) =>
+        token ? revokeSession(token) : undefined,
+      );
+      const results = await Promise.allSettled([
+        revocation,
+        secureStoreCleanup,
+        apolloClient.clearStore(),
+        finishPrivateCleanup(storageClose),
+      ]);
+      if (generation !== generationRef.current) return;
+      const localCleanupFailed = results
+        .slice(1)
+        .some((result) => result.status === 'rejected');
+      setStatus('guest');
+      setError(
+        localCleanupFailed
+          ? localCleanupWarning
+          : results[0]?.status === 'rejected'
+            ? revocationWarning
+            : null,
+      );
+    })();
+    logoutFlightRef.current = { generation, promise };
+    void promise.catch(() => undefined);
+    return promise;
   };
 
   const value = { error, login, logout, status };
