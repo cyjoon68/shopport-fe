@@ -15,7 +15,7 @@ import {
   fromLiveMessage,
   mergeDisplayMessages,
   mergeMessages,
-} from './message-list';
+} from './message-model';
 
 const product = {
   id: 'product-1',
