@@ -54,5 +54,6 @@ export const rotateTokens = async (refreshToken: string): Promise<TokenPair> => 
 };
 
 export const revokeSession = async (refreshToken: string): Promise<void> => {
-  await post('/v1/auth/logout', { refreshToken });
+  const response = await post('/v1/auth/logout', { refreshToken });
+  if (!response.ok) throw new Error('서버 로그아웃을 완료하지 못했습니다.');
 };
