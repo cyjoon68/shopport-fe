@@ -4,6 +4,7 @@ import { print } from 'graphql';
 import { createElement as mockCreateElement } from 'react';
 import { Alert, Text as mockNativeText } from 'react-native';
 
+import type { SessionStatus } from '@/features/auth';
 import type { ChatTab, DisplayMessage } from '@/features/chat';
 import {
   ConversationsDocument,
@@ -44,9 +45,12 @@ let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefi
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
 let mockFoundProductsRenderCount = 0;
+let mockSessionStatus: SessionStatus = 'authenticated';
+let mockOnline = true;
 
 jest.mock('expo-router', () => ({
-  Redirect: () => null,
+  Redirect: ({ href }: { href: string }) =>
+    mockCreateElement(mockNativeText, { testID: 'redirect' }, href),
   router: {
     push: (argument: unknown) => mockPush(argument),
     setParams: (params: Record<string, string | undefined>) => mockSetParams(params),
@@ -145,11 +149,11 @@ jest.mock(
 );
 
 jest.mock('@/features/auth', () => ({
-  useSession: () => ({ status: 'authenticated' }),
+  useSession: () => ({ status: mockSessionStatus }),
 }));
 
 jest.mock('@/providers/network-provider', () => ({
-  useOnline: () => true,
+  useOnline: () => mockOnline,
 }));
 
 jest.mock('@/shared/storage', () => ({
@@ -184,6 +188,54 @@ describe('chat screen', () => {
     mockFoundProductsPresentation = undefined;
     mockFoundProductsScope = undefined;
     mockFoundProductsRenderCount = 0;
+    mockSessionStatus = 'authenticated';
+    mockOnline = true;
+    mockedUseMutation.mockReturnValue([
+      jest.fn(),
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+  });
+
+  it('renders no private or cached content while the session is booting', () => {
+    mockSessionStatus = 'booting';
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+    expect(screen.queryByTestId('found-products-content')).toBeNull();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+  });
+
+  it('redirects guests before private hooks or content mount', () => {
+    mockSessionStatus = 'guest';
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+    expect(screen.queryByTestId('chat-screen')).toBeNull();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+  });
+
+  it('permits remote conversation work only for an online authenticated session', () => {
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+    expect(mockedUseMutation).toHaveBeenCalledWith(
+      CreateConversationDocument,
+      expect.any(Object),
+    );
+  });
+
+  it('renders the offline-authenticated cache surface without enabling actions', () => {
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+
+    const screen = render(<ChatScreen />);
+
+    expect(screen.getByTestId('chat-screen')).toBeOnTheScreen();
+    expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
+    act(() => mockTabChange?.('상품'));
+    expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
   });
 
   it('opens the drawer from the top-left menu button', () => {

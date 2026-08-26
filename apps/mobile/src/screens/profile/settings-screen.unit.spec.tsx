@@ -9,7 +9,7 @@ import {
   View as mockView,
 } from 'react-native';
 
-import { kakaoAccountEmail } from '@/features/auth';
+import { kakaoAccountEmail, type SessionStatus } from '@/features/auth';
 
 import { SettingsScreen } from './settings-screen';
 
@@ -18,9 +18,12 @@ const mockUpdateViewer = jest.fn();
 const mockDeleteAccount = jest.fn();
 const mockOpenUrl = jest.spyOn(Linking, 'openURL');
 let mockMutationCall = 0;
+let mockStatus: SessionStatus = 'authenticated';
+let mockOnline = true;
 
 jest.mock('expo-router', () => ({
-  Redirect: () => null,
+  Redirect: ({ href }: { href: string }) =>
+    mockCreateElement(mockText, { testID: 'redirect' }, href),
   router: { replace: jest.fn() },
 }));
 
@@ -31,18 +34,18 @@ jest.mock('@apollo/client/react', () => ({
 
 jest.mock('@/features/auth', () => ({
   kakaoAccountEmail: jest.fn(),
-  useSession: () => ({ logout: mockLogout, status: 'authenticated' }),
+  useSession: () => ({ logout: mockLogout, status: mockStatus }),
 }));
 
-jest.mock('@/providers/network-provider', () => ({ useOnline: () => true }));
+jest.mock('@/providers/network-provider', () => ({ useOnline: () => mockOnline }));
 
 jest.mock('@/shared/config/environment', () => ({
   environment: { privacyPolicyUrl: 'https://example.com/privacy' },
 }));
 
 jest.mock('@shopport/ui', () => ({
-  Screen: ({ children }: { children: ReactNode }) =>
-    mockCreateElement(mockView, null, children),
+  Screen: ({ children, testID }: { children: ReactNode; testID?: string }) =>
+    mockCreateElement(mockView, { testID }, children),
   SectionTitle: ({ children }: { children: ReactNode }) =>
     mockCreateElement(mockText, null, children),
 }));
@@ -77,6 +80,8 @@ const mockedKakaoAccountEmail = kakaoAccountEmail as jest.MockedFunction<
 describe('settings screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockStatus = 'authenticated';
+    mockOnline = true;
     mockedUseQuery.mockReturnValue({
       data: { viewer: { displayName: '기존 닉네임' } },
     } as unknown as ReturnType<typeof useQuery>);
@@ -102,6 +107,53 @@ describe('settings screen', () => {
     mockDeleteAccount.mockResolvedValue({
       data: { deleteViewerAccount: { success: true, userErrors: [] } },
     });
+  });
+
+  it('does not mount private profile hooks or content while booting', () => {
+    mockStatus = 'booting';
+
+    const screen = render(<SettingsScreen />);
+
+    expect(screen.queryByTestId('settings-screen')).toBeNull();
+    expect(mockedUseQuery).not.toHaveBeenCalled();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+    expect(mockedKakaoAccountEmail).not.toHaveBeenCalled();
+  });
+
+  it('redirects guests before private profile hooks mount', () => {
+    mockStatus = 'guest';
+
+    const screen = render(<SettingsScreen />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+    expect(mockedUseQuery).not.toHaveBeenCalled();
+    expect(mockedUseMutation).not.toHaveBeenCalled();
+    expect(mockedKakaoAccountEmail).not.toHaveBeenCalled();
+  });
+
+  it('uses Apollo cache only and disables remote updates while offline-authenticated', () => {
+    mockStatus = 'offline-authenticated';
+    mockOnline = true;
+
+    const screen = render(<SettingsScreen />);
+
+    expect(mockedUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ fetchPolicy: 'cache-only', skip: false }),
+    );
+    expect(mockedKakaoAccountEmail).not.toHaveBeenCalled();
+    fireEvent.changeText(screen.getByLabelText('닉네임'), '오프라인 변경');
+    expect(screen.getByLabelText('닉네임 저장')).toBeDisabled();
+  });
+
+  it('enables remote profile reads for online authenticated sessions', async () => {
+    render(<SettingsScreen />);
+
+    await waitFor(() => expect(mockedKakaoAccountEmail).toHaveBeenCalledTimes(1));
+    expect(mockedUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ fetchPolicy: 'cache-and-network', skip: false }),
+    );
   });
 
   it('updates the nickname and displays the Kakao account email', async () => {

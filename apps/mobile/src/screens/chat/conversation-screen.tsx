@@ -19,7 +19,7 @@ import {
   type RetailerId,
 } from '@/features/chat';
 import { useChatRun, useConversationHistory } from '@/features/chat/api/hooks';
-import { useOnline } from '@/providers/network-provider';
+import { NetworkBoundary, useOnline } from '@/providers/network-provider';
 
 import type { ConversationScreenProps, ConversationScreenRouteParams } from './types';
 
@@ -37,7 +37,37 @@ export const ConversationScreen = ({
   const id = conversationId ?? (typeof routeId === 'string' ? routeId : '');
   const initialSend = initialSendProp ?? routeSend === '1';
   const { status } = useSession();
-  const online = useOnline();
+  const networkOnline = useOnline();
+
+  if (status === 'booting') return null;
+  if (status === 'guest') return <Redirect href="/auth" />;
+  if (!id) return <Redirect href="/" />;
+
+  return (
+    <ConversationContent
+      conversationId={id}
+      initialSend={initialSend}
+      onMessagesChange={onMessagesChange}
+      onProductSelect={onProductSelect}
+      onProviderReset={onProviderReset}
+      onProviderToggle={onProviderToggle}
+      online={status === 'authenticated' && networkOnline}
+      providerIds={providerIds}
+    />
+  );
+};
+
+const ConversationContent = ({
+  conversationId: id,
+  initialSend,
+  onMessagesChange,
+  onProductSelect,
+  onProviderReset,
+  onProviderToggle,
+  online,
+  providerIds,
+}: Omit<ConversationScreenProps, 'conversationId' | 'initialSend'> &
+  Readonly<{ conversationId: string; initialSend: boolean; online: boolean }>) => {
   const assetId = useRef<string | null>(null);
   const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
   const responseFinishedRef = useRef(false);
@@ -99,9 +129,6 @@ export const ConversationScreen = ({
   useEffect(() => {
     if (errorPresentation?.route) router.push(errorPresentation.route);
   }, [errorPresentation?.route]);
-
-  if (status === 'guest') return <Redirect href="/auth" />;
-  if (!id) return <Redirect href="/" />;
 
   const send = async (text: string, nextAssetId: string | null): Promise<void> => {
     assetId.current = nextAssetId;
@@ -181,7 +208,7 @@ export const ConversationScreen = ({
           {errorPresentation.message}
         </Text>
       ) : null}
-      {activeAskUser ? (
+      {online && activeAskUser ? (
         <AskUserSheet
           loading={isLoading}
           onDismiss={skipAskUser}
@@ -190,20 +217,22 @@ export const ConversationScreen = ({
           visible={askSheetOpen}
         />
       ) : null}
-      <ChatComposer
-        allowFreeText={activeAskUser?.request.allowFreeText ?? true}
-        key={id}
-        conversationId={id}
-        loading={isLoading}
-        onProviderToggle={onProviderToggle}
-        onSend={send}
-        onStop={stop}
-        providerIds={providerIds}
-        quickActionsEnabled={
-          !historyLoading && !activeAskUser && displayMessages.length === 0
-        }
-        sendInitialDraft={initialSend}
-      />
+      <NetworkBoundary online={online}>
+        <ChatComposer
+          allowFreeText={activeAskUser?.request.allowFreeText ?? true}
+          key={id}
+          conversationId={id}
+          loading={isLoading}
+          onProviderToggle={onProviderToggle}
+          onSend={send}
+          onStop={stop}
+          providerIds={providerIds}
+          quickActionsEnabled={
+            !historyLoading && !activeAskUser && displayMessages.length === 0
+          }
+          sendInitialDraft={initialSend}
+        />
+      </NetworkBoundary>
     </View>
   );
 };

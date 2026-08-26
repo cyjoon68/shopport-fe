@@ -28,7 +28,15 @@ import type { ChatScreenRouteParams, ChatScreenUnreadState } from './types';
 
 export const ChatScreen = () => {
   const { status } = useSession();
-  const online = useOnline();
+  const networkOnline = useOnline();
+
+  if (status === 'booting') return null;
+  if (status === 'guest') return <Redirect href="/auth" />;
+
+  return <ChatContent online={status === 'authenticated' && networkOnline} />;
+};
+
+const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
   const { deletedConversationId, id: routeId } =
     useLocalSearchParams<ChatScreenRouteParams>();
   const routeConversationId =
@@ -178,8 +186,6 @@ export const ChatScreen = () => {
       setLoading(false);
     }
   };
-
-  if (status === 'guest') return <Redirect href="/auth" />;
 
   const openDrawer = (): void => {
     if (typeof navigation.openDrawer === 'function') {

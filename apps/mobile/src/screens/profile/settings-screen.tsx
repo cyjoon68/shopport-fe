@@ -16,9 +16,22 @@ import { environment } from '@/shared/config/environment';
 import { GlassActionButton } from '@/shared/ui/glass-button';
 
 export const SettingsScreen = () => {
+  const { status } = useSession();
+
+  if (status === 'booting') return null;
+  if (status === 'guest') return <Redirect href="/auth" />;
+
+  return <SettingsContent />;
+};
+
+const SettingsContent = () => {
   const { logout, status } = useSession();
   const online = useOnline();
-  const { data } = useQuery(ViewerDocument, { skip: status !== 'authenticated' });
+  const remoteEnabled = status === 'authenticated' && online;
+  const { data } = useQuery(ViewerDocument, {
+    fetchPolicy: remoteEnabled ? 'cache-and-network' : 'cache-only',
+    skip: false,
+  });
   const [updateViewer, { loading: updating }] = useMutation(UpdateViewerDocument);
   const [deleteAccount] = useMutation(DeleteViewerAccountDocument);
   const [nickname, setNickname] = useState('');
@@ -29,7 +42,7 @@ export const SettingsScreen = () => {
   }, [data?.viewer.displayName]);
 
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (!remoteEnabled) return;
     let active = true;
     void kakaoAccountEmail()
       .then((accountEmail) => {
@@ -41,14 +54,15 @@ export const SettingsScreen = () => {
     return () => {
       active = false;
     };
-  }, [status]);
-
-  if (status === 'guest') return <Redirect href="/auth" />;
+  }, [remoteEnabled]);
 
   const trimmedNickname = nickname.trim();
   const nicknameUnchanged = trimmedNickname === data?.viewer.displayName;
   const saveNicknameDisabled =
-    !trimmedNickname || trimmedNickname.length > 30 || nicknameUnchanged;
+    !remoteEnabled ||
+    !trimmedNickname ||
+    trimmedNickname.length > 30 ||
+    nicknameUnchanged;
 
   const saveNickname = async (): Promise<void> => {
     try {
@@ -101,7 +115,7 @@ export const SettingsScreen = () => {
   };
 
   const confirmDelete = (): void => {
-    if (!online) {
+    if (!remoteEnabled) {
       Alert.alert('오프라인', '계정 삭제는 온라인에서 할 수 있습니다.');
       return;
     }

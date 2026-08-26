@@ -7,6 +7,7 @@ import { ProductList } from '@/features/catalog';
 export const FoundProductsScreen = () => {
   const { status } = useSession();
 
+  if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
 
   return (

@@ -1,11 +1,16 @@
 import { useApolloClient, useQuery } from '@apollo/client/react';
 import { useChat } from '@tanstack/ai-react';
 import { act, render } from '@testing-library/react-native';
-import { type ComponentProps, createElement as mockCreateElement } from 'react';
+import {
+  type ComponentProps,
+  createElement as mockCreateElement,
+  type ReactNode,
+} from 'react';
 import { Text as mockText } from 'react-native';
 
+import type { SessionStatus } from '@/features/auth';
 import type { ChatComposer } from '@/features/chat';
-import { ConversationsDocument } from '@/graphql/generated/graphql';
+import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
 
 import { ConversationScreen } from './conversation-screen';
 
@@ -17,9 +22,14 @@ let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
 const mockSendMessage = jest.fn<Promise<void>, [unknown]>();
 const mockRefetchQueries = jest.fn();
+let mockSessionStatus: SessionStatus = 'authenticated';
+let mockOnline = true;
+let mockBoundaryOnline: boolean | undefined;
+let mockActiveAskUser: { id: string; request: { allowFreeText: boolean } } | null = null;
 
 jest.mock('expo-router', () => ({
-  Redirect: () => null,
+  Redirect: ({ href }: { href: string }) =>
+    mockCreateElement(mockText, { testID: 'redirect' }, href),
   router: { push: jest.fn() },
   useLocalSearchParams: () => ({}),
 }));
@@ -45,10 +55,16 @@ jest.mock(
 
 jest.mock('@/features/auth', () => ({
   getAccessToken: () => null,
-  useSession: () => ({ status: 'authenticated' }),
+  useSession: () => ({ status: mockSessionStatus }),
 }));
 
-jest.mock('@/providers/network-provider', () => ({ useOnline: () => true }));
+jest.mock('@/providers/network-provider', () => ({
+  NetworkBoundary: ({ children, online }: { children: ReactNode; online: boolean }) => {
+    mockBoundaryOnline = online;
+    return children;
+  },
+  useOnline: () => mockOnline,
+}));
 
 jest.mock('@/shared/storage', () => ({
   flushChatPersistence: jest.fn(() => Promise.resolve()),
@@ -57,7 +73,8 @@ jest.mock('@/shared/storage', () => ({
 
 jest.mock('@/features/chat', () => ({
   ASK_USER_SKIP_MESSAGE: '질문을 건너뛰고 현재 정보로 계속 진행해줘.',
-  AskUserSheet: () => null,
+  AskUserSheet: () =>
+    mockCreateElement(mockText, { testID: 'ask-user-sheet' }, 'ask-user'),
   cancelRunThenStop: jest.fn(),
   ChatComposer: (props: ComponentProps<typeof ChatComposer>) => {
     mockComposerProps = props;
@@ -66,7 +83,7 @@ jest.mock('@/features/chat', () => ({
   chatErrorPresentation: () => ({ message: '오류', route: null }),
   createStableChatMessageId: () => 'message-1',
   MessageList: () => null,
-  activeAskUserRequest: () => null,
+  activeAskUserRequest: () => mockActiveAskUser,
   fromHistoricalMessage: (message: unknown) => message,
   fromLiveMessage: (message: unknown) => message,
   mergeDisplayMessages: (
@@ -90,6 +107,10 @@ describe('conversation screen', () => {
     mockHistory = [];
     mockHistoryLoading = false;
     mockChatMessages = [];
+    mockSessionStatus = 'authenticated';
+    mockOnline = true;
+    mockBoundaryOnline = undefined;
+    mockActiveAskUser = null;
     mockSendMessage.mockReset();
     mockRefetchQueries.mockReset().mockResolvedValue([]);
     mockedUseApolloClient.mockReturnValue({
@@ -113,6 +134,56 @@ describe('conversation screen', () => {
         stop: jest.fn(),
       } as unknown as ReturnType<typeof useChat>;
     });
+  });
+
+  it('renders no private or cached conversation content while booting', () => {
+    mockSessionStatus = 'booting';
+
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    expect(screen.queryByTestId('conversation-screen')).toBeNull();
+    expect(screen.queryByTestId('chat-composer')).toBeNull();
+    expect(mockedUseQuery).not.toHaveBeenCalled();
+    expect(mockedUseChat).not.toHaveBeenCalled();
+  });
+
+  it('redirects guests before private hooks or content mount', () => {
+    mockSessionStatus = 'guest';
+
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/auth');
+    expect(mockedUseQuery).not.toHaveBeenCalled();
+    expect(mockedUseChat).not.toHaveBeenCalled();
+  });
+
+  it('enables conversation history remotely for online authenticated sessions', () => {
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    expect(mockedUseQuery).toHaveBeenCalledWith(ConversationDocument, {
+      fetchPolicy: 'cache-and-network',
+      skip: false,
+      variables: { id: 'conversation-1' },
+    });
+    expect(mockBoundaryOnline).toBe(true);
+  });
+
+  it('renders offline-authenticated local state with its GraphQL query skipped', () => {
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    mockActiveAskUser = { id: 'ask-1', request: { allowFreeText: true } };
+
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    expect(screen.getByTestId('conversation-screen')).toBeOnTheScreen();
+    expect(screen.getByTestId('chat-composer')).toBeOnTheScreen();
+    expect(mockedUseQuery).toHaveBeenCalledWith(ConversationDocument, {
+      fetchPolicy: 'cache-and-network',
+      skip: true,
+      variables: { id: 'conversation-1' },
+    });
+    expect(mockBoundaryOnline).toBe(false);
+    expect(screen.queryByTestId('ask-user-sheet')).toBeNull();
   });
 
   it('hides quick actions once the conversation has content', () => {

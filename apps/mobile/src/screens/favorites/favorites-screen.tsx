@@ -7,6 +7,7 @@ import { FavoriteProductList } from '@/features/favorites';
 export const FavoritesScreen = () => {
   const { status } = useSession();
 
+  if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
 
   return (
