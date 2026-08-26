@@ -26,6 +26,14 @@ const mockProfile = {
   updating: false,
 };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+};
+
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
     mockCreateElement(mockText, { testID: 'redirect' }, href),
@@ -121,6 +129,7 @@ describe('settings screen', () => {
     const screen = render(<SettingsScreen />);
 
     expect(screen.getByLabelText('닉네임')).toHaveProp('value', '캐시된 닉네임');
+    expect(screen.getByText('오프라인에서 확인할 수 없음')).toBeOnTheScreen();
     expect(mockedKakaoAccountEmail).not.toHaveBeenCalled();
     fireEvent.changeText(screen.getByLabelText('닉네임'), '오프라인 변경');
     expect(screen.getByLabelText('닉네임 저장')).toBeDisabled();
@@ -227,19 +236,68 @@ describe('settings screen', () => {
       | undefined;
     mockStatus = 'offline-authenticated';
     screen.rerender(<SettingsScreen />);
-    mockProfile.deleteAccount.mockResolvedValueOnce(
-      '연결을 확인하고 다시 시도해 주세요.',
-    );
+    alertSpy.mockClear();
     actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
 
     await act(async () => Promise.resolve());
-    expect(mockProfile.deleteAccount).toHaveBeenCalledTimes(1);
-    expect(alertSpy).toHaveBeenCalledWith(
-      '삭제 실패',
-      '연결을 확인하고 다시 시도해 주세요.',
-    );
+    expect(mockProfile.deleteAccount).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(mockLogout).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it.each<SessionStatus>(['guest', 'booting'])(
+    'blocks a retained native delete confirmation after settings becomes %s',
+    async (status) => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const screen = render(<SettingsScreen />);
+      await waitFor(() => expect(mockedKakaoAccountEmail).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByLabelText('회원 탈퇴'));
+      const confirmation = alertSpy.mock.calls.find(
+        ([title]) => title === '회원 탈퇴를 진행할까요?',
+      );
+      const actions = confirmation?.[2] as
+        | Array<{ text?: string; onPress?: () => void }>
+        | undefined;
+
+      mockStatus = status;
+      screen.rerender(<SettingsScreen />);
+      alertSpy.mockClear();
+      actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
+
+      await act(async () => Promise.resolve());
+      expect(mockProfile.deleteAccount).not.toHaveBeenCalled();
+      expect(mockLogout).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(alertSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not log out, navigate, or alert after a late delete success unmounts', async () => {
+    const deletion = deferred<string | null>();
+    mockProfile.deleteAccount.mockReturnValueOnce(deletion.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<SettingsScreen />);
+    await waitFor(() => expect(mockedKakaoAccountEmail).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByLabelText('회원 탈퇴'));
+    const confirmation = alertSpy.mock.calls.find(
+      ([title]) => title === '회원 탈퇴를 진행할까요?',
+    );
+    const actions = confirmation?.[2] as
+      | Array<{ text?: string; onPress?: () => void }>
+      | undefined;
+    actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
+    expect(mockProfile.deleteAccount).toHaveBeenCalledTimes(1);
+
+    mockStatus = 'guest';
+    screen.rerender(<SettingsScreen />);
+    alertSpy.mockClear();
+    deletion.resolve(null);
+    await act(async () => Promise.resolve());
+
+    expect(mockLogout).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 
   it('checks current remote permission again before saving a nickname', async () => {
@@ -253,6 +311,6 @@ describe('settings screen', () => {
     save?.();
 
     await act(async () => Promise.resolve());
-    expect(mockProfile.updateDisplayName).toHaveBeenCalledTimes(1);
+    expect(mockProfile.updateDisplayName).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client/react';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { useSession } from '@/features/auth';
 import {
@@ -20,16 +20,25 @@ export const useProfile = (): {
   const remoteEnabled = status === 'authenticated' && online;
   const remoteEnabledRef = useRef(remoteEnabled);
   remoteEnabledRef.current = remoteEnabled;
+  const activeRef = useRef(true);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
   const { data } = useQuery(ViewerDocument, {
     fetchPolicy: remoteEnabled ? 'cache-and-network' : 'cache-only',
     skip: false,
   });
   const [updateViewer, { loading: updating }] = useMutation(UpdateViewerDocument);
   const [deleteViewer] = useMutation(DeleteViewerAccountDocument);
+  const canMutate = (): boolean => activeRef.current && remoteEnabledRef.current;
   const updateDisplayName = async (displayName: string): Promise<string | null> => {
-    if (!remoteEnabledRef.current) return '연결을 확인하고 다시 시도해 주세요.';
+    if (!canMutate()) return '연결을 확인하고 다시 시도해 주세요.';
     try {
       const result = await updateViewer({ variables: { input: { displayName } } });
+      if (!canMutate()) return '연결을 확인하고 다시 시도해 주세요.';
       const payload = result.data?.updateViewer;
       if (!payload?.viewer)
         return payload?.userErrors[0]?.message ?? '다시 시도해 주세요.';
@@ -39,9 +48,10 @@ export const useProfile = (): {
     }
   };
   const deleteAccount = async (): Promise<string | null> => {
-    if (!remoteEnabledRef.current) return '연결을 확인하고 다시 시도해 주세요.';
+    if (!canMutate()) return '연결을 확인하고 다시 시도해 주세요.';
     try {
       const result = await deleteViewer();
+      if (!canMutate()) return '연결을 확인하고 다시 시도해 주세요.';
       const payload = result.data?.deleteViewerAccount;
       if (!payload?.success)
         return payload?.userErrors[0]?.message ?? '다시 시도해 주세요.';

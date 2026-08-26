@@ -1,6 +1,6 @@
 import { Screen, SectionTitle } from '@shopport/ui';
 import { Redirect, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -23,9 +23,19 @@ const SettingsContent = () => {
   const { logout, status } = useSession();
   const online = useOnline();
   const remoteEnabled = status === 'authenticated' && online;
+  const activeRef = useRef(true);
+  const remoteEnabledRef = useRef(remoteEnabled);
+  remoteEnabledRef.current = remoteEnabled;
   const { deleteAccount, displayName, updateDisplayName, updating } = useProfile();
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState<string | null | undefined>();
+
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (displayName) setNickname(displayName);
@@ -55,8 +65,10 @@ const SettingsContent = () => {
     nicknameUnchanged;
 
   const saveNickname = async (): Promise<void> => {
+    if (!activeRef.current || !remoteEnabledRef.current) return;
     const error = await updateDisplayName(trimmedNickname);
-    if (error) Alert.alert('닉네임을 변경하지 못했어요', error);
+    if (activeRef.current && remoteEnabledRef.current && error)
+      Alert.alert('닉네임을 변경하지 못했어요', error);
   };
 
   const openPrivacyPolicy = (): void => {
@@ -68,22 +80,26 @@ const SettingsContent = () => {
       return;
     }
     void Linking.openURL(environment.privacyPolicyUrl).catch(() => {
-      Alert.alert('개인정보 처리방침을 열 수 없어요', '다시 시도해 주세요.');
+      if (activeRef.current)
+        Alert.alert('개인정보 처리방침을 열 수 없어요', '다시 시도해 주세요.');
     });
   };
 
   const deleteViewer = async (): Promise<void> => {
+    if (!activeRef.current || !remoteEnabledRef.current) return;
     const error = await deleteAccount();
+    if (!activeRef.current || !remoteEnabledRef.current) return;
     if (error) {
       Alert.alert('삭제 실패', error);
       return;
     }
     await logout();
-    router.replace('/auth');
+    if (activeRef.current) router.replace('/auth');
   };
 
   const confirmDelete = (): void => {
-    if (!remoteEnabled) {
+    if (!activeRef.current) return;
+    if (!remoteEnabledRef.current) {
       Alert.alert('오프라인', '계정 삭제는 온라인에서 할 수 있습니다.');
       return;
     }
@@ -95,7 +111,9 @@ const SettingsContent = () => {
         {
           text: '회원 탈퇴',
           style: 'destructive',
-          onPress: () => void deleteViewer(),
+          onPress: () => {
+            if (activeRef.current && remoteEnabledRef.current) void deleteViewer();
+          },
         },
       ],
     );
@@ -140,9 +158,11 @@ const SettingsContent = () => {
             이메일
           </Text>
           <Text allowFontScaling selectable style={styles.value}>
-            {email === undefined
-              ? '이메일 확인 중'
-              : (email ?? '카카오에서 제공되지 않음')}
+            {!remoteEnabled
+              ? '오프라인에서 확인할 수 없음'
+              : email === undefined
+                ? '이메일 확인 중'
+                : (email ?? '카카오에서 제공되지 않음')}
           </Text>
         </View>
         <GlassActionButton onPress={openPrivacyPolicy} variant="secondary">
@@ -151,7 +171,7 @@ const SettingsContent = () => {
         <GlassActionButton
           onPress={() =>
             void logout().catch(() => {
-              Alert.alert('로그아웃 실패', '다시 시도해 주세요.');
+              if (activeRef.current) Alert.alert('로그아웃 실패', '다시 시도해 주세요.');
             })
           }
           variant="secondary"

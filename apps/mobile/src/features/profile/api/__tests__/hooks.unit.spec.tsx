@@ -185,4 +185,35 @@ describe('useProfile', () => {
     expect(updateViewer).not.toHaveBeenCalled();
     expect(deleteAccount).not.toHaveBeenCalled();
   });
+
+  it('blocks retained profile mutations after the hook owner unmounts', async () => {
+    const { result, unmount } = renderHook(() => useProfile());
+    const update = result.current.updateDisplayName;
+    const remove = result.current.deleteAccount;
+
+    unmount();
+
+    await expect(update('닉네임')).resolves.toBe('연결을 확인하고 다시 시도해 주세요.');
+    await expect(remove()).resolves.toBe('연결을 확인하고 다시 시도해 주세요.');
+    expect(updateViewer).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('does not publish an in-flight delete success after the hook owner unmounts', async () => {
+    let resolveDelete!: (value: unknown) => void;
+    deleteAccount.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    const { result, unmount } = renderHook(() => useProfile());
+    const request = result.current.deleteAccount();
+
+    unmount();
+    resolveDelete({
+      data: { deleteViewerAccount: { success: true, userErrors: [] } },
+    });
+
+    await expect(request).resolves.toBe('연결을 확인하고 다시 시도해 주세요.');
+  });
 });
