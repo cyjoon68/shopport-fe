@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client/react';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import { print } from 'graphql';
 import {
   type ComponentType,
@@ -10,11 +11,17 @@ import {
 import { Alert, Linking, Text as mockNativeText } from 'react-native';
 
 import type { SessionStatus } from '@/features/auth';
-import type { ChatTab, DisplayMessage } from '@/features/chat';
+import {
+  type ChatTab,
+  type DisplayMessage,
+  removeUploadedAsset,
+  selectAndUploadAsset,
+} from '@/features/chat';
 import {
   ConversationsDocument,
   CreateConversationDocument,
 } from '@/graphql/generated/graphql';
+import { saveDraft } from '@/shared/storage';
 
 import { ChatScreen } from './chat-screen';
 
@@ -54,6 +61,34 @@ let mockSessionStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
 let mockEffectiveOnline: boolean | undefined;
 const mockMutate = jest.fn();
+const mockedRemoveUploadedAsset = jest.mocked(removeUploadedAsset);
+const mockedSaveDraft = jest.mocked(saveDraft);
+const mockedSelectAndUploadAsset = jest.mocked(selectAndUploadAsset);
+const mockedImpactAsync = jest.mocked(Haptics.impactAsync);
+
+const deferred = <T,>() => {
+  let reject!: (error: Error) => void;
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    reject = rejectPromise;
+    resolve = resolvePromise;
+  });
+  return { promise, reject, resolve };
+};
+
+const conversationMutationResult = {
+  data: {
+    createConversation: {
+      conversation: {
+        id: 'conversation-1',
+        title: '새 대화',
+        createdAt: '2026-08-16T00:00:00.000Z',
+        updatedAt: '2026-08-16T00:00:00.000Z',
+      },
+      userErrors: [],
+    },
+  },
+};
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
@@ -193,6 +228,10 @@ jest.mock('@/features/chat/attachments', () => ({
   selectAndUploadAsset: jest.fn(),
 }));
 
+jest.mock('@/features/chat/api/fetchers', () => ({
+  removeUploadedAsset: jest.fn(),
+}));
+
 jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light' },
   impactAsync: jest.fn(() => Promise.resolve()),
@@ -204,6 +243,13 @@ describe('chat screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedUseMutation.mockReset();
+    mockedRemoveUploadedAsset.mockReset();
+    mockedRemoveUploadedAsset.mockResolvedValue(undefined);
+    mockedSaveDraft.mockReset();
+    mockedSaveDraft.mockResolvedValue(undefined);
+    mockedSelectAndUploadAsset.mockReset();
+    mockedImpactAsync.mockReset();
+    mockedImpactAsync.mockResolvedValue(undefined);
     mockSearchParams = {};
     mockTabChange = undefined;
     mockUnread = undefined;
@@ -566,6 +612,131 @@ describe('chat screen', () => {
       '대화를 만들 수 없습니다.',
     );
     alertSpy.mockRestore();
+  });
+
+  it('cleans an uploaded asset when draft handoff rejects without masking the error', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-1',
+      uri: 'file://asset-1.png',
+    });
+    mockedSaveDraft.mockRejectedValue(new Error('초안을 저장하지 못했습니다.'));
+    mockedRemoveUploadedAsset.mockRejectedValue(new Error('cleanup unavailable'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(mockedRemoveUploadedAsset).toHaveBeenCalledWith('asset-1'),
+    );
+    expect(alertSpy).toHaveBeenCalledWith(
+      '이미지 첨부 실패',
+      '초안을 저장하지 못했습니다.',
+    );
+    expect(screen.queryByTestId('conversation-screen')).toBeNull();
+  });
+
+  it('cleans an upload that resolves after ChatContent unmounts without stale work', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const upload = deferred<{ id: string; uri: string } | null>();
+    mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+    expect(mockedSelectAndUploadAsset).toHaveBeenCalledWith('conversation-1');
+    screen.unmount();
+
+    await act(async () => {
+      upload.resolve({ id: 'asset-stale', uri: 'file://asset-stale.png' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockedRemoveUploadedAsset).toHaveBeenCalledWith('asset-stale');
+    expect(mockedSaveDraft).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not start abandoned-asset cleanup after the effective policy goes offline', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-offline',
+      uri: 'file://asset-offline.png',
+    });
+    const handoff = deferred<void>();
+    mockedSaveDraft.mockReturnValue(handoff.promise);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mockedSaveDraft).toHaveBeenCalledTimes(1));
+    mockSessionStatus = 'offline-authenticated';
+    mockOnline = true;
+    screen.rerender(<ChatScreen />);
+
+    await act(async () => {
+      handoff.reject(new Error('초안을 저장하지 못했습니다.'));
+      await Promise.resolve();
+    });
+
+    expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      '이미지 첨부 실패',
+      '초안을 저장하지 못했습니다.',
+    );
+  });
+
+  it('transfers asset ownership after draft handoff before later UI work', async () => {
+    const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+    mockedUseMutation.mockReturnValue([
+      createConversation,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    mockedSelectAndUploadAsset.mockResolvedValue({
+      id: 'asset-handed-off',
+      uri: 'file://asset-handed-off.png',
+    });
+    mockedImpactAsync.mockRejectedValue(new Error('haptic unavailable'));
+    const screen = render(<ChatScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('conversation-screen')).toBeOnTheScreen(),
+    );
+    expect(mockedSaveDraft).toHaveBeenCalledWith('conversation-1', {
+      assetId: 'asset-handed-off',
+      assetUri: 'file://asset-handed-off.png',
+      text: '',
+    });
+    expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
   });
 
   it('keeps the conversation on the chat screen after creation', async () => {

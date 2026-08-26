@@ -15,7 +15,7 @@ const pageSize = 20;
 export const useFoundProductRecommendations = (enabled: boolean) => {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
-  const activeCursorRef = useRef<string | null>(null);
+  const activeCursorsRef = useRef(new Set<string>());
   const { data, fetchMore } = useQuery(FoundProductsDocument, {
     variables: { first: pageSize },
     fetchPolicy: 'cache-and-network',
@@ -35,12 +35,12 @@ export const useFoundProductRecommendations = (enabled: boolean) => {
     if (!enabledRef.current) return;
     const pageInfo = data?.conversations.pageInfo;
     const cursor = pageInfo?.endCursor;
-    if (!pageInfo?.hasNextPage || !cursor || activeCursorRef.current === cursor) return;
-    activeCursorRef.current = cursor;
+    if (!pageInfo?.hasNextPage || !cursor || activeCursorsRef.current.has(cursor)) return;
+    activeCursorsRef.current.add(cursor);
     try {
       await fetchMore({ variables: { after: cursor, first: pageSize } });
     } finally {
-      if (activeCursorRef.current === cursor) activeCursorRef.current = null;
+      activeCursorsRef.current.delete(cursor);
     }
   };
   return { loadMore, recommendations };

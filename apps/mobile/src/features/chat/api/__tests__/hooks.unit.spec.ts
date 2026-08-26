@@ -181,4 +181,117 @@ describe('useUploadedImages', () => {
     await expect(result.current.loadMore()).resolves.toBeUndefined();
     expect(fetchMore).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps cursor B active when A settles first and retained A retries', async () => {
+    let resolveA!: () => void;
+    let resolveB!: () => void;
+    const requestA = new Promise<void>((resolve) => {
+      resolveA = resolve;
+    });
+    const requestB = new Promise<void>((resolve) => {
+      resolveB = resolve;
+    });
+    const fetchMore = jest
+      .fn()
+      .mockReturnValueOnce(requestA)
+      .mockReturnValueOnce(requestB)
+      .mockResolvedValueOnce(undefined);
+    let cursor = 'cursor-a';
+    mockedUseQuery.mockImplementation(
+      () =>
+        ({
+          data: {
+            conversations: {
+              edges: [],
+              pageInfo: { endCursor: cursor, hasNextPage: true },
+            },
+          },
+          fetchMore,
+        }) as never,
+    );
+    const { result, rerender } = renderHook(
+      (_props: { revision: number }) => useUploadedImages(true),
+      { initialProps: { revision: 0 } },
+    );
+    const retainedA = result.current.loadMore;
+
+    const firstA = retainedA();
+    cursor = 'cursor-b';
+    rerender({ revision: 1 });
+    const firstB = result.current.loadMore();
+    await retainedA();
+    expect(fetchMore).toHaveBeenCalledTimes(2);
+
+    resolveA();
+    await firstA;
+    await retainedA();
+    expect(fetchMore).toHaveBeenNthCalledWith(1, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(2, {
+      variables: { after: 'cursor-b', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(3, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    resolveB();
+    await firstB;
+  });
+
+  it('keeps A active when B settles first, then releases A after rejection', async () => {
+    let rejectA!: (error: Error) => void;
+    let resolveB!: () => void;
+    const requestA = new Promise<void>((_resolve, reject) => {
+      rejectA = reject;
+    });
+    const requestB = new Promise<void>((resolve) => {
+      resolveB = resolve;
+    });
+    const fetchMore = jest
+      .fn()
+      .mockReturnValueOnce(requestA)
+      .mockReturnValueOnce(requestB)
+      .mockResolvedValueOnce(undefined);
+    let cursor = 'cursor-a';
+    mockedUseQuery.mockImplementation(
+      () =>
+        ({
+          data: {
+            conversations: {
+              edges: [],
+              pageInfo: { endCursor: cursor, hasNextPage: true },
+            },
+          },
+          fetchMore,
+        }) as never,
+    );
+    const { result, rerender } = renderHook(
+      (_props: { revision: number }) => useUploadedImages(true),
+      { initialProps: { revision: 0 } },
+    );
+    const retainedA = result.current.loadMore;
+    const firstA = retainedA();
+    const rejectedA = expect(firstA).rejects.toThrow('cursor A failed');
+
+    cursor = 'cursor-b';
+    rerender({ revision: 1 });
+    const firstB = result.current.loadMore();
+    resolveB();
+    await firstB;
+    await retainedA();
+    expect(fetchMore).toHaveBeenCalledTimes(2);
+
+    rejectA(new Error('cursor A failed'));
+    await rejectedA;
+    await retainedA();
+    expect(fetchMore).toHaveBeenNthCalledWith(1, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(2, {
+      variables: { after: 'cursor-b', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(3, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+  });
 });

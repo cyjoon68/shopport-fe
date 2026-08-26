@@ -14,6 +14,7 @@ import {
   type ChatTab,
   type DisplayMessage,
   hasSameChatScreenProjection,
+  removeUploadedAsset,
   type RetailerId,
   retailerIds,
   selectAndUploadAsset,
@@ -67,6 +68,16 @@ const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
   const trackedConversationId = useRef<string | null>(null);
   const seenMessageIds = useRef<Set<string> | null>(null);
   const seenProductIds = useRef<Set<string> | null>(null);
+  const mountedRef = useRef(false);
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setConversationId(routeConversationId);
@@ -156,39 +167,62 @@ const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
 
   const resetProviders = (): void => setProviderIds([]);
 
+  const cleanupOwnedAsset = async (id: string): Promise<void> => {
+    if (!onlineRef.current) return;
+    try {
+      await removeUploadedAsset(id);
+    } catch {
+      return;
+    }
+  };
+
   const create = async (draft = '', withImage = false): Promise<void> => {
     if (!online) {
       Alert.alert('오프라인', '새 대화는 온라인에서 시작할 수 있습니다.');
       return;
     }
     setLoading(true);
+    let ownedAssetId: string | null = null;
     try {
       const result = await createConversation();
+      if (!mountedRef.current) return;
       if (!result.conversation) {
         Alert.alert('대화를 만들지 못했습니다', result.error);
         return;
       }
       const { conversation } = result;
+      if (withImage && !onlineRef.current) return;
       const asset = withImage ? await selectAndUploadAsset(conversation.id) : null;
-      if (draft || asset)
+      ownedAssetId = asset?.id ?? null;
+      if (!mountedRef.current) {
+        if (ownedAssetId) await cleanupOwnedAsset(ownedAssetId);
+        return;
+      }
+      if (draft || asset) {
         await saveDraft(conversation.id, {
           text: draft,
           assetId: asset?.id ?? null,
           assetUri: asset?.uri ?? null,
         });
+        ownedAssetId = null;
+      }
+      if (!mountedRef.current) return;
       if (Platform.OS === 'ios')
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
           () => undefined,
         );
+      if (!mountedRef.current) return;
       setSendInitialDraft(Boolean(draft || asset));
       setConversationId(conversation.id);
     } catch (error) {
+      if (ownedAssetId) await cleanupOwnedAsset(ownedAssetId);
+      if (!mountedRef.current) return;
       Alert.alert(
         withImage ? '이미지 첨부 실패' : '대화를 만들지 못했습니다',
         error instanceof Error ? error.message : '다시 시도해 주세요.',
       );
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 

@@ -148,6 +148,11 @@ describe('asset deletion payload validation', () => {
       '이미지는 15MB 이하여야 합니다.',
     ],
     [
+      'a negative file size',
+      { ...selectedAsset, fileSize: -1 },
+      '이미지는 15MB 이하여야 합니다.',
+    ],
+    [
       'an oversized file',
       { ...selectedAsset, fileSize: 15 * 1024 * 1024 + 1 },
       '이미지는 15MB 이하여야 합니다.',
@@ -377,6 +382,55 @@ describe('asset deletion payload validation', () => {
     rejectUpload(new Error('late native rejection'));
     await Promise.resolve();
     await Promise.resolve();
+  });
+
+  it('deletes again when a timed-out native upload succeeds after primary cleanup', async () => {
+    jest.useFakeTimers();
+    mockSuccessfulSelection();
+    let resolveUpload!: (result: UploadResult) => void;
+    mockUpload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        }),
+    );
+    mockUploadCreation('asset-late-success');
+    let resolvePrimaryCleanup!: (result: unknown) => void;
+    mockedMutate
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolvePrimaryCleanup = resolve;
+          }) as never,
+      )
+      .mockResolvedValueOnce({
+        data: { deleteAsset: { success: true, userErrors: [] } },
+      });
+
+    const selection = selectAndUploadAsset('conversation-1');
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(mockedMutate).toHaveBeenCalledTimes(2);
+
+    resolvePrimaryCleanup({
+      data: { deleteAsset: { success: true, userErrors: [] } },
+    });
+    await expect(selection).rejects.toThrow('이미지를 업로드하지 못했습니다.');
+    expect(mockedMutate).toHaveBeenCalledTimes(2);
+
+    resolveUpload({ body: '', headers: {}, status: 200 });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedMutate).toHaveBeenCalledTimes(3);
+    expect(mockedMutate).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        variables: { input: { id: 'asset-late-success' } },
+      }),
+    );
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   it('clears the upload timer and leaves its controller inactive after success', async () => {

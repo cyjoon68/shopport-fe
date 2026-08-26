@@ -13,10 +13,12 @@ const mockedUseMutation = jest.mocked(useMutation);
 
 const deferred = () => {
   let resolve!: () => void;
-  const promise = new Promise<void>((resolvePromise) => {
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 describe('useFoundProductRecommendations', () => {
@@ -87,6 +89,107 @@ describe('useFoundProductRecommendations', () => {
     await expect(result.current.loadMore()).rejects.toThrow('pagination failed');
     await expect(result.current.loadMore()).resolves.toBeUndefined();
     expect(fetchMore).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps cursor B active when A settles first and retained A retries', async () => {
+    const requestA = deferred();
+    const requestB = deferred();
+    const fetchMore = jest
+      .fn()
+      .mockReturnValueOnce(requestA.promise)
+      .mockReturnValueOnce(requestB.promise)
+      .mockResolvedValueOnce(undefined);
+    let cursor = 'cursor-a';
+    mockedUseQuery.mockImplementation(
+      () =>
+        ({
+          data: {
+            conversations: {
+              edges: [],
+              pageInfo: { endCursor: cursor, hasNextPage: true },
+            },
+          },
+          fetchMore,
+        }) as never,
+    );
+    const { result, rerender } = renderHook(
+      (_props: { revision: number }) => useFoundProductRecommendations(true),
+      { initialProps: { revision: 0 } },
+    );
+    const retainedA = result.current.loadMore;
+
+    const firstA = retainedA();
+    cursor = 'cursor-b';
+    rerender({ revision: 1 });
+    const firstB = result.current.loadMore();
+    await retainedA();
+
+    expect(fetchMore).toHaveBeenCalledTimes(2);
+    requestA.resolve();
+    await firstA;
+    await retainedA();
+    expect(fetchMore).toHaveBeenNthCalledWith(1, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(2, {
+      variables: { after: 'cursor-b', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(3, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    requestB.resolve();
+    await firstB;
+  });
+
+  it('keeps A active when B settles first, then releases A after rejection', async () => {
+    const requestA = deferred();
+    const requestB = deferred();
+    const fetchMore = jest
+      .fn()
+      .mockReturnValueOnce(requestA.promise)
+      .mockReturnValueOnce(requestB.promise)
+      .mockResolvedValueOnce(undefined);
+    let cursor = 'cursor-a';
+    mockedUseQuery.mockImplementation(
+      () =>
+        ({
+          data: {
+            conversations: {
+              edges: [],
+              pageInfo: { endCursor: cursor, hasNextPage: true },
+            },
+          },
+          fetchMore,
+        }) as never,
+    );
+    const { result, rerender } = renderHook(
+      (_props: { revision: number }) => useFoundProductRecommendations(true),
+      { initialProps: { revision: 0 } },
+    );
+    const retainedA = result.current.loadMore;
+    const firstA = retainedA();
+    const rejectedA = expect(firstA).rejects.toThrow('cursor A failed');
+
+    cursor = 'cursor-b';
+    rerender({ revision: 1 });
+    const firstB = result.current.loadMore();
+    requestB.resolve();
+    await firstB;
+    await retainedA();
+    expect(fetchMore).toHaveBeenCalledTimes(2);
+
+    requestA.reject(new Error('cursor A failed'));
+    await rejectedA;
+    await retainedA();
+    expect(fetchMore).toHaveBeenNthCalledWith(1, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(2, {
+      variables: { after: 'cursor-b', first: 20 },
+    });
+    expect(fetchMore).toHaveBeenNthCalledWith(3, {
+      variables: { after: 'cursor-a', first: 20 },
+    });
   });
 });
 
