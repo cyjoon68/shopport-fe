@@ -51,23 +51,24 @@ export const selectAndUploadAsset = async (
     String(selected.fileSize),
   );
   const controller = new AbortController();
-  const nativeUploadPromise = new File(selected.uri).upload(upload.uploadUrl, {
-    httpMethod: 'PUT',
-    headers: Object.fromEntries(upload.headers.map(({ name, value }) => [name, value])),
-    mimeType: contentType,
-    signal: controller.signal,
-  });
+  let nativeUploadPromise: ReturnType<File['upload']> | undefined;
   let timedOut = false;
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    timeout = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-      reject(new Error('upload timeout'));
-    }, uploadTimeoutMilliseconds);
-  });
   let uploaded = false;
   try {
+    nativeUploadPromise = new File(selected.uri).upload(upload.uploadUrl, {
+      httpMethod: 'PUT',
+      headers: Object.fromEntries(upload.headers.map(({ name, value }) => [name, value])),
+      mimeType: contentType,
+      signal: controller.signal,
+    });
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new Error('upload timeout'));
+      }, uploadTimeoutMilliseconds);
+    });
     const uploadResult = await Promise.race([nativeUploadPromise, timeoutPromise]);
     uploaded = uploadResult.status >= 200 && uploadResult.status < 300;
   } catch {
@@ -76,17 +77,12 @@ export const selectAndUploadAsset = async (
     if (timeout) clearTimeout(timeout);
   }
   if (!uploaded) {
-    let primaryCleanupPromise = Promise.resolve();
-    if (timedOut)
+    if (timedOut && nativeUploadPromise)
       void nativeUploadPromise.then(
-        async () => {
-          await primaryCleanupPromise;
-          await bestEffortRemoveUploadedAsset(upload.asset.id);
-        },
+        () => undefined,
         () => undefined,
       );
-    primaryCleanupPromise = bestEffortRemoveUploadedAsset(upload.asset.id);
-    await primaryCleanupPromise;
+    await bestEffortRemoveUploadedAsset(upload.asset.id);
     throw new Error('이미지를 업로드하지 못했습니다.');
   }
   return { id: upload.asset.id, uri: selected.uri };

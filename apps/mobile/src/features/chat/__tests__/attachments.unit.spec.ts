@@ -253,6 +253,50 @@ describe('asset deletion payload validation', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('cleans the allocation when File construction throws synchronously', async () => {
+    mockSuccessfulSelection();
+    mockUploadCreation('asset-constructor-throw');
+    mockedMutate.mockResolvedValueOnce({
+      data: { deleteAsset: { success: true, userErrors: [] } },
+    });
+    mockedFile.mockImplementationOnce(() => {
+      throw new Error('native constructor failed');
+    });
+
+    await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(
+      '이미지를 업로드하지 못했습니다.',
+    );
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(mockedMutate).toHaveBeenCalledTimes(2);
+    expect(mockedMutate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        variables: { input: { id: 'asset-constructor-throw' } },
+      }),
+    );
+  });
+
+  it('cleans the allocation when native upload setup throws synchronously', async () => {
+    mockSuccessfulSelection();
+    mockUploadCreation('asset-upload-throw');
+    mockedMutate.mockResolvedValueOnce({
+      data: { deleteAsset: { success: true, userErrors: [] } },
+    });
+    mockUpload.mockImplementationOnce(() => {
+      throw new Error('native upload setup failed');
+    });
+
+    await expect(selectAndUploadAsset('conversation-1')).rejects.toThrow(
+      '이미지를 업로드하지 못했습니다.',
+    );
+    expect(mockedFile).toHaveBeenCalledWith(selectedAsset.uri);
+    expect(mockedMutate).toHaveBeenCalledTimes(2);
+    expect(mockedMutate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ variables: { input: { id: 'asset-upload-throw' } } }),
+    );
+  });
+
   it('throws the first GraphQL user error when deletion reports failure', async () => {
     mockedMutate.mockResolvedValue({
       data: {
@@ -384,7 +428,7 @@ describe('asset deletion payload validation', () => {
     await Promise.resolve();
   });
 
-  it('deletes again when a timed-out native upload succeeds after primary cleanup', async () => {
+  it('consumes late upload success without attempting a second frontend delete', async () => {
     jest.useFakeTimers();
     mockSuccessfulSelection();
     let resolveUpload!: (result: UploadResult) => void;
@@ -396,16 +440,12 @@ describe('asset deletion payload validation', () => {
     );
     mockUploadCreation('asset-late-success');
     let resolvePrimaryCleanup!: (result: unknown) => void;
-    mockedMutate
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolvePrimaryCleanup = resolve;
-          }) as never,
-      )
-      .mockResolvedValueOnce({
-        data: { deleteAsset: { success: true, userErrors: [] } },
-      });
+    mockedMutate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePrimaryCleanup = resolve;
+        }) as never,
+    );
 
     const selection = selectAndUploadAsset('conversation-1');
     await jest.advanceTimersByTimeAsync(0);
@@ -423,13 +463,7 @@ describe('asset deletion payload validation', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockedMutate).toHaveBeenCalledTimes(3);
-    expect(mockedMutate).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({
-        variables: { input: { id: 'asset-late-success' } },
-      }),
-    );
+    expect(mockedMutate).toHaveBeenCalledTimes(2);
     expect(jest.getTimerCount()).toBe(0);
   });
 

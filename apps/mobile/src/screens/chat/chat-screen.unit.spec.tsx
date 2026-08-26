@@ -673,6 +673,44 @@ describe('chat screen', () => {
     expect(alertSpy).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { nextStatus: 'guest', surface: 'guest' },
+    { nextStatus: 'booting', surface: 'booting' },
+  ] as const)(
+    'does no remote or local continuation after authenticated-to-$surface transition',
+    async ({ nextStatus }) => {
+      const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
+      mockedUseMutation.mockReturnValue([
+        createConversation,
+        { called: false, client: {}, loading: false, reset: jest.fn() },
+      ] as ReturnType<typeof useMutation>);
+      const upload = deferred<{ id: string; uri: string } | null>();
+      mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const screen = render(<ChatScreen />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('이미지 첨부'));
+        await Promise.resolve();
+      });
+      expect(mockedSelectAndUploadAsset).toHaveBeenCalledWith('conversation-1');
+
+      mockSessionStatus = nextStatus;
+      screen.rerender(<ChatScreen />);
+      await act(async () => {
+        upload.resolve({ id: `asset-${nextStatus}`, uri: 'file://asset.png' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
+      expect(mockedSaveDraft).not.toHaveBeenCalled();
+      expect(mockedImpactAsync).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('conversation-screen')).toBeNull();
+      expect(alertSpy).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not start abandoned-asset cleanup after the effective policy goes offline', async () => {
     const createConversation = jest.fn().mockResolvedValue(conversationMutationResult);
     mockedUseMutation.mockReturnValue([

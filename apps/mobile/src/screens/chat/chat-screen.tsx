@@ -2,7 +2,7 @@ import { Screen } from '@shopport/ui';
 import * as Haptics from 'expo-haptics';
 import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
-import { useEffect, useRef, useState } from 'react';
+import { type MutableRefObject, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -30,19 +30,27 @@ import type { ChatScreenRouteParams, ChatScreenUnreadState } from './types';
 export const ChatScreen = () => {
   const { status } = useSession();
   const networkOnline = useOnline();
+  const remoteWorkRef = useRef(false);
+  const online = status === 'authenticated' && networkOnline;
+  remoteWorkRef.current = online;
 
   if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
 
-  const online = status === 'authenticated' && networkOnline;
   return (
     <NetworkBoundary online={online}>
-      <ChatContent online={online} />
+      <ChatContent online={online} remoteWorkRef={remoteWorkRef} />
     </NetworkBoundary>
   );
 };
 
-const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
+const ChatContent = ({
+  online,
+  remoteWorkRef,
+}: Readonly<{
+  online: boolean;
+  remoteWorkRef: MutableRefObject<boolean>;
+}>) => {
   const { deletedConversationId, id: routeId } =
     useLocalSearchParams<ChatScreenRouteParams>();
   const routeConversationId =
@@ -69,8 +77,6 @@ const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
   const seenMessageIds = useRef<Set<string> | null>(null);
   const seenProductIds = useRef<Set<string> | null>(null);
   const mountedRef = useRef(false);
-  const onlineRef = useRef(online);
-  onlineRef.current = online;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -168,7 +174,7 @@ const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
   const resetProviders = (): void => setProviderIds([]);
 
   const cleanupOwnedAsset = async (id: string): Promise<void> => {
-    if (!onlineRef.current) return;
+    if (!remoteWorkRef.current) return;
     try {
       await removeUploadedAsset(id);
     } catch {
@@ -191,7 +197,7 @@ const ChatContent = ({ online }: Readonly<{ online: boolean }>) => {
         return;
       }
       const { conversation } = result;
-      if (withImage && !onlineRef.current) return;
+      if (withImage && !remoteWorkRef.current) return;
       const asset = withImage ? await selectAndUploadAsset(conversation.id) : null;
       ownedAssetId = asset?.id ?? null;
       if (!mountedRef.current) {
