@@ -1,4 +1,3 @@
-import { discardPendingChatWrites } from './chat-storage';
 import { database } from './connection';
 
 let generation = 0;
@@ -13,13 +12,14 @@ const drainWrites = async (writes: ReadonlyArray<Promise<void>>): Promise<void> 
 };
 
 export const openPrivateStorage = async (): Promise<void> => {
-  let pendingClear = clearBarrier;
-  await pendingClear;
-  while (pendingClear !== clearBarrier) {
-    pendingClear = clearBarrier;
-    await pendingClear;
+  while (true) {
+    const pendingClear = clearBarrier;
+    const [result] = await Promise.allSettled([pendingClear]);
+    if (pendingClear !== clearBarrier) continue;
+    if (result.status === 'rejected') throw result.reason;
+    writable = true;
+    return;
   }
-  writable = true;
 };
 
 export const closePrivateStorage = (): Promise<void> => {
@@ -52,7 +52,6 @@ export const clearPrivateStorage = (): Promise<void> => {
   const close = closePrivateStorage();
   const clear = async (): Promise<PromiseSettledResult<void>> => {
     const [closeResult] = await Promise.allSettled([close]);
-    await discardPendingChatWrites();
     const db = await database();
     await db.withExclusiveTransactionAsync((transaction) =>
       transaction.execAsync(`

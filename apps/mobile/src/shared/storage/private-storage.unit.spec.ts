@@ -185,4 +185,52 @@ describe('private storage', () => {
     await expect(openPrivateStorage()).resolves.toBeUndefined();
     expect(capturePrivateWriteGeneration()).not.toBeNull();
   });
+
+  it('follows a newer successful clear after the captured clear rejects', async () => {
+    const firstClearStarted = deferred();
+    const firstClearCommitted = deferred();
+    const secondClearStarted = deferred();
+    const secondClearCommitted = deferred();
+    const firstFailure = new Error('first clear failed');
+    const events: Array<string> = [];
+    mockWithExclusiveTransactionAsync
+      .mockReset()
+      .mockImplementationOnce(async (task) => {
+        firstClearStarted.resolve();
+        await task(mockTransaction);
+        await firstClearCommitted.promise;
+      })
+      .mockImplementationOnce(async (task) => {
+        secondClearStarted.resolve();
+        await task(mockTransaction);
+        await secondClearCommitted.promise;
+        events.push('second clear');
+      });
+
+    const firstClear = clearPrivateStorage();
+    const firstClearResult = firstClear.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    await firstClearStarted.promise;
+    const openResult = openPrivateStorage().then(
+      () => 'open',
+      (error: unknown) => error,
+    );
+    const secondClear = clearPrivateStorage();
+
+    firstClearCommitted.reject(firstFailure);
+    await secondClearStarted.promise;
+
+    expect(await firstClearResult).toBe(firstFailure);
+    expect(capturePrivateWriteGeneration()).toBeNull();
+    expect(events).toEqual([]);
+
+    secondClearCommitted.resolve();
+    await expect(secondClear).resolves.toBeUndefined();
+
+    expect(await openResult).toBe('open');
+    expect(events).toEqual(['second clear']);
+    expect(capturePrivateWriteGeneration()).not.toBeNull();
+  });
 });

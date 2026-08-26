@@ -286,19 +286,6 @@ export const flushChatPersistence = async (id: string): Promise<void> => {
     await flushChatPersistence(id);
 };
 
-export const discardPendingChatWrites = async (): Promise<void> => {
-  const pending = [...pendingChatWrites.values()];
-  pending.forEach((entry) => {
-    entry.removed = true;
-    if (entry.timer) clearTimeout(entry.timer);
-    entry.timer = undefined;
-  });
-  await Promise.all(
-    pending.flatMap(({ write }) => (write ? [write.catch(() => undefined)] : [])),
-  );
-  pendingChatWrites.clear();
-};
-
 export const readPinnedConversationIds = async (): Promise<Array<string>> => {
   const db = await database();
   const rows = await db.getAllAsync<{ conversationId: string }>(
