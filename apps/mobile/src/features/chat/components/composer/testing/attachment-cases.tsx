@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 
 import type { pollAssetUntilSettled } from '../../../api/fetchers';
 import { ChatComposer } from '../chat-composer';
@@ -197,5 +197,50 @@ describe('chat composer attachment isolation', () => {
       await flushPromises();
     });
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rejected attachment terminal when the app becomes active', async () => {
+    const appStateSpy = jest.spyOn(AppState, 'addEventListener');
+    mockedPollAssetUntilSettled.mockResolvedValue('REJECTED');
+    mockedReadDraft.mockResolvedValue({
+      text: 'A',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    mockedSelectAndUploadAsset.mockResolvedValue({ id: 'asset-b', uri: 'file://b' });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    const listener = appStateSpy.mock.calls.find(([event]) => event === 'change')?.[1];
+    await act(async () => {
+      listener?.('active');
+      await flushPromises();
+    });
+
+    expect(mockedPollAssetUntilSettled).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('이미지 제거')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('이미지 제거'));
+    await act(flushPromises);
+    expect(screen.queryByText('이미지 제거')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('이미지 첨부'));
+    await act(flushPromises);
+    expect(mockedPollAssetUntilSettled).toHaveBeenCalledWith('asset-b');
+    alertSpy.mockRestore();
+    appStateSpy.mockClear();
   });
 });

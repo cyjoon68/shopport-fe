@@ -234,6 +234,81 @@ describe('chat composer draft isolation', () => {
     alertSpy.mockRestore();
   });
 
+  it('sends a later identical draft after the cleaned draft has advanced', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '같은 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(inputValue(screen)).toBe('');
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '같은 초안');
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores a whitespace-edited draft after its submitted cleanup settles', async () => {
+    const cleanup = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '같은 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedDeleteDraft.mockReturnValue(cleanup.promise);
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), ' 같은 초안 ');
+    act(() => jest.advanceTimersByTime(250));
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: ' 같은 초안 ',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedSaveDraft.mockClear();
+
+    await act(async () => {
+      cleanup.resolve();
+      await flushPromises();
+    });
+
+    expect(inputValue(screen)).toBe(' 같은 초안 ');
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: ' 같은 초안 ',
+      assetId: null,
+      assetUri: null,
+    });
+  });
+
   it('cleans up a submitted initial draft after its composer unmounts', async () => {
     const response = deferred<void>();
     mockedReadDraft.mockResolvedValue({ text: '전송 중', assetId: null, assetUri: null });

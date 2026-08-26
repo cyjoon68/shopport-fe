@@ -83,7 +83,8 @@ export const resetComposerMocks = (): void => {
   mockedDeleteDraft.mockReset();
   mockedDeleteDraft.mockResolvedValue(undefined);
   mockedSaveDraft.mockClear();
-  mockedRemoveUploadedAsset.mockClear();
+  mockedRemoveUploadedAsset.mockReset();
+  mockedRemoveUploadedAsset.mockResolvedValue(undefined);
   mockedSelectAndUploadAsset.mockReset();
   mockedPollAssetUntilSettled.mockReset();
   mockedPollAssetUntilSettled.mockResolvedValue('READY');

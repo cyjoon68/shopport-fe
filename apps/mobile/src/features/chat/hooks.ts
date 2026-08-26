@@ -255,7 +255,8 @@ export const useComposerState = (
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (status) => {
       const current = assetRef.current;
-      if (status === 'active' && online && current) void verifyAsset(current);
+      if (status === 'active' && online && current && current.state !== 'rejected')
+        void verifyAsset(current);
     });
     return () => subscription.remove();
   }, [online]);
@@ -295,10 +296,30 @@ export const useComposerActions = ({
 }: ComposerActionsArgs) => {
   const sendInFlightRef = useRef(false);
   const submittedDraftRef = useRef<{
-    assetId: string | null;
     conversationId: string;
-    text: string;
+    revision: number;
   } | null>(null);
+  const draftRevisionRef = useRef({
+    assetId: state.asset?.id ?? null,
+    conversationId,
+    revision: 0,
+    text: state.text,
+  });
+  const previousDraft = draftRevisionRef.current;
+  if (
+    previousDraft.conversationId !== conversationId ||
+    previousDraft.text !== state.text ||
+    previousDraft.assetId !== (state.asset?.id ?? null)
+  ) {
+    draftRevisionRef.current = {
+      assetId: state.asset?.id ?? null,
+      conversationId,
+      revision: previousDraft.revision + 1,
+      text: state.text,
+    };
+    submittedDraftRef.current = null;
+  }
+  const draftRevision = draftRevisionRef.current.revision;
   const latestRef = useRef({
     allowFreeText,
     asset: state.asset,
@@ -306,6 +327,7 @@ export const useComposerActions = ({
     draftReadyFor: state.draftReadyFor,
     loading,
     online,
+    revision: draftRevision,
     text: state.text,
     uploading: state.uploading,
   });
@@ -316,6 +338,7 @@ export const useComposerActions = ({
     draftReadyFor: state.draftReadyFor,
     loading,
     online,
+    revision: draftRevision,
     text: state.text,
     uploading: state.uploading,
   };
@@ -334,26 +357,36 @@ export const useComposerActions = ({
     !snapshot.loading &&
     !snapshot.uploading &&
     (!snapshot.asset || snapshot.asset.state === 'ready');
-  const matchesDraft = (
-    snapshot: typeof latestRef.current,
-    text: string,
-    assetId: string | null,
-  ): boolean =>
+  const matchesDraft = (snapshot: typeof latestRef.current, revision: number): boolean =>
     snapshot.conversationId === conversationId &&
     snapshot.draftReadyFor === conversationId &&
-    snapshot.text.trim() === text &&
-    (snapshot.asset?.id ?? null) === assetId;
+    snapshot.revision === revision;
+  const saveLatestDraft = async (): Promise<void> => {
+    const current = latestRef.current;
+    if (current.conversationId !== conversationId) return;
+    await saveDraft(conversationId, {
+      text: current.text,
+      assetId: current.asset?.id ?? null,
+      assetUri: current.asset?.uri ?? null,
+    });
+  };
   const cleanupSubmittedDraft = async (
     expected: ReturnType<typeof currentSnapshot>,
-    text: string,
-    assetId: string | null,
+    revision: number,
   ): Promise<boolean> => {
     const current = latestRef.current;
-    if (
-      current.conversationId === conversationId &&
-      !matchesDraft(current, text, assetId)
-    )
+    if (current.conversationId === conversationId && !matchesDraft(current, revision)) {
+      try {
+        await saveLatestDraft();
+      } catch {
+        if (isCurrent(expected))
+          Alert.alert(
+            '초안 정리 실패',
+            '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
+          );
+      }
       return false;
+    }
     try {
       await state.deleteDraft(conversationId);
     } catch {
@@ -364,7 +397,20 @@ export const useComposerActions = ({
         );
       return false;
     }
-    if (isCurrent(expected) && matchesDraft(latestRef.current, text, assetId)) {
+    const latest = latestRef.current;
+    if (latest.conversationId === conversationId && !matchesDraft(latest, revision)) {
+      try {
+        await saveLatestDraft();
+      } catch {
+        if (isCurrent(expected))
+          Alert.alert(
+            '초안 정리 실패',
+            '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
+          );
+      }
+      return false;
+    }
+    if (isCurrent(expected) && matchesDraft(latest, revision)) {
       state.assetRef.current = null;
       state.setText('');
       state.setAsset(null);
@@ -461,19 +507,18 @@ export const useComposerActions = ({
     const retryingSubmittedDraft =
       submitted &&
       submitted.conversationId === conversationId &&
-      submitted.text === trimmed &&
-      submitted.assetId === assetId;
+      submitted.revision === current.revision;
     if (!retryingSubmittedDraft && !isEligible(current)) return false;
     sendInFlightRef.current = true;
     try {
       if (retryingSubmittedDraft)
-        return cleanupSubmittedDraft(expected, trimmed, assetId);
+        return cleanupSubmittedDraft(expected, current.revision);
       if (current.asset) {
         const status = await readAssetStatus(current.asset.id);
         if (
           !isCurrent(expected) ||
           !isEligible(latestRef.current) ||
-          !matchesDraft(latestRef.current, trimmed, assetId)
+          !matchesDraft(latestRef.current, current.revision)
         )
           return false;
         if (status !== 'READY') {
@@ -486,7 +531,7 @@ export const useComposerActions = ({
       if (
         !isCurrent(expected) ||
         !isEligible(latestRef.current) ||
-        !matchesDraft(latestRef.current, trimmed, assetId)
+        !matchesDraft(latestRef.current, current.revision)
       )
         return false;
       if (Platform.OS === 'ios')
@@ -494,12 +539,12 @@ export const useComposerActions = ({
       if (
         !isCurrent(expected) ||
         !isEligible(latestRef.current) ||
-        !matchesDraft(latestRef.current, trimmed, assetId)
+        !matchesDraft(latestRef.current, current.revision)
       )
         return false;
       await onSend(trimmed, assetId);
-      submittedDraftRef.current = { assetId, conversationId, text: trimmed };
-      return cleanupSubmittedDraft(expected, trimmed, assetId);
+      submittedDraftRef.current = { conversationId, revision: current.revision };
+      return cleanupSubmittedDraft(expected, current.revision);
     } catch (error) {
       if (isCurrent(expected))
         Alert.alert(
