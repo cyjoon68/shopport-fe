@@ -383,6 +383,4 @@ describe('chat composer initial draft isolation', () => {
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(mockedDeleteDraft).toHaveBeenCalledTimes(2);
   });
-
 });
-

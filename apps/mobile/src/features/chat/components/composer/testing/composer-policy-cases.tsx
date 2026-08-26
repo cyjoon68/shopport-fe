@@ -401,4 +401,3 @@ describe('chat composer policy isolation', () => {
     );
   });
 });
-
