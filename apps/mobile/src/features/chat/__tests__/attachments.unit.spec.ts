@@ -137,6 +137,12 @@ describe('asset deletion payload validation', () => {
 
   it.each([
     ['a missing URI', { ...selectedAsset, uri: '' }, '이미지 파일을 찾을 수 없습니다.'],
+    ['a null URI', { ...selectedAsset, uri: null }, '이미지 파일을 찾을 수 없습니다.'],
+    [
+      'a non-string URI',
+      { ...selectedAsset, uri: 42 },
+      '이미지 파일을 찾을 수 없습니다.',
+    ],
     [
       'a missing size',
       { ...selectedAsset, fileSize: undefined },

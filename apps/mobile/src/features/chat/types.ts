@@ -53,6 +53,7 @@ export type ChatRunOptions = Readonly<{
   online: boolean;
   onFinish: () => void;
   providerIds: MutableRefObject<ReadonlyArray<RetailerId> | undefined>;
+  remoteWorkRef: MutableRefObject<boolean>;
 }>;
 
 export type UploadedImage = Readonly<{
@@ -69,6 +70,7 @@ export type ChatComposerProps = Readonly<{
   quickActionsEnabled?: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
   onStop: () => Promise<void>;
+  remoteWorkRef?: MutableRefObject<boolean> | undefined;
   sendInitialDraft?: boolean;
 }>;
 
@@ -236,6 +238,7 @@ export type ComposerActionsArgs = Readonly<{
   loading: boolean;
   onSend: (text: string, assetId: string | null) => Promise<void>;
   online: boolean;
+  remoteWorkRef: MutableRefObject<boolean>;
   state: ComposerState;
 }>;
 

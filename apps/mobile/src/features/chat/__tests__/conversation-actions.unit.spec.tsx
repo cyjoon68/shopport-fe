@@ -4,6 +4,7 @@ import type { AlertButton } from 'react-native';
 import { Alert } from 'react-native';
 
 import {
+  type ConversationSummaryFragment,
   DeleteConversationDocument,
   RenameConversationDocument,
 } from '@/graphql/generated/graphql';
@@ -45,6 +46,14 @@ const successfulDelete = {
   data: { deleteConversation: { success: true, userErrors: [] } },
 };
 
+const renamedConversation: ConversationSummaryFragment = {
+  __typename: 'Conversation',
+  createdAt: '2026-08-26T00:00:00Z',
+  id: 'conversation-1',
+  title: '새 이름',
+  updatedAt: '2026-08-27T00:00:00Z',
+};
+
 const props = (online = true) => ({
   conversation: { id: 'conversation-1', title: '기존 이름' },
   onDeleted,
@@ -69,7 +78,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   renameConversation.mockResolvedValue({
-    data: { renameConversation: { conversation: null, userErrors: [] } },
+    data: { renameConversation: { conversation: renamedConversation, userErrors: [] } },
   });
   deleteConversation.mockResolvedValue({
     data: { deleteConversation: { success: true, userErrors: [] } },
@@ -124,6 +133,38 @@ describe('useConversationActions', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
+  it('keeps the rename dialog open when the server returns no conversation', async () => {
+    renameConversation.mockResolvedValueOnce({
+      data: { renameConversation: { conversation: null, userErrors: [] } },
+    });
+    const { result } = renderHook(() => useConversationActions(props()));
+
+    await expect(result.current.rename('새 이름')).resolves.toBe(false);
+
+    expect(Alert.alert).toHaveBeenCalledWith('이름 변경 실패', '다시 시도해 주세요.');
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps the rename dialog open for a contradictory conversation and user error', async () => {
+    renameConversation.mockResolvedValueOnce({
+      data: {
+        renameConversation: {
+          conversation: renamedConversation,
+          userErrors: [
+            { code: 'INVALID', message: '  ', path: ['title'] },
+            { code: 'CONFLICT', message: '이미 사용 중인 이름', path: ['title'] },
+          ],
+        },
+      },
+    });
+    const { result } = renderHook(() => useConversationActions(props()));
+
+    await expect(result.current.rename('새 이름')).resolves.toBe(false);
+
+    expect(Alert.alert).toHaveBeenCalledWith('이름 변경 실패', '이미 사용 중인 이름');
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
   it('keeps the rename dialog open when the network mutation rejects', async () => {
     renameConversation.mockRejectedValueOnce(new Error('network failed'));
     const { result } = renderHook(() => useConversationActions(props()));
@@ -146,7 +187,9 @@ describe('useConversationActions', () => {
 
     unmount();
     resolveRename({
-      data: { renameConversation: { conversation: null, userErrors: [] } },
+      data: {
+        renameConversation: { conversation: renamedConversation, userErrors: [] },
+      },
     });
     await request;
 

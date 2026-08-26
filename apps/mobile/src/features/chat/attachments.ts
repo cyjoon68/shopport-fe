@@ -23,7 +23,8 @@ export const selectAndUploadAsset = async (
   if (result.canceled) return null;
   const selected = result.assets?.[0];
   if (!selected) return null;
-  if (!selected.uri.trim()) throw new Error('이미지 파일을 찾을 수 없습니다.');
+  if (typeof selected.uri !== 'string' || !selected.uri.trim())
+    throw new Error('이미지 파일을 찾을 수 없습니다.');
   if (
     typeof selected.fileSize !== 'number' ||
     !Number.isFinite(selected.fileSize) ||

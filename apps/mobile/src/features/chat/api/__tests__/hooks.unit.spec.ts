@@ -70,6 +70,7 @@ describe('useChatRun', () => {
       online,
       onFinish: jest.fn(),
       providerIds,
+      remoteWorkRef: { current: online },
     };
   };
 
@@ -97,8 +98,12 @@ describe('useChatRun', () => {
 
   it('stops an active client and blocks finish refetch after going offline', () => {
     const initial = options(true);
+    const remoteWorkRef = initial.remoteWorkRef;
     const { rerender } = renderHook(
-      ({ online }: { online: boolean }) => useChatRun({ ...initial, online }),
+      ({ online }: { online: boolean }) => {
+        remoteWorkRef.current = online;
+        return useChatRun({ ...initial, online });
+      },
       { initialProps: { online: true } },
     );
     const finish = chatOptions?.onFinish;

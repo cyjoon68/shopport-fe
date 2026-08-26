@@ -1,5 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { type MutableRefObject, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -31,6 +31,7 @@ export const ConversationScreen = ({
   onProviderReset,
   onProviderToggle,
   providerIds = [],
+  remoteWorkRef: parentRemoteWorkRef,
 }: ConversationScreenProps = {}) => {
   const { id: routeId, send: routeSend } =
     useLocalSearchParams<ConversationScreenRouteParams>();
@@ -38,6 +39,10 @@ export const ConversationScreen = ({
   const initialSend = initialSendProp ?? routeSend === '1';
   const { status } = useSession();
   const networkOnline = useOnline();
+  const localRemoteWorkRef = useRef(false);
+  const remoteWorkRef = parentRemoteWorkRef ?? localRemoteWorkRef;
+  const online = status === 'authenticated' && networkOnline;
+  remoteWorkRef.current = online;
 
   if (status === 'booting') return null;
   if (status === 'guest') return <Redirect href="/auth" />;
@@ -51,8 +56,9 @@ export const ConversationScreen = ({
       onProductSelect={onProductSelect}
       onProviderReset={onProviderReset}
       onProviderToggle={onProviderToggle}
-      online={status === 'authenticated' && networkOnline}
+      online={online}
       providerIds={providerIds}
+      remoteWorkRef={remoteWorkRef}
     />
   );
 };
@@ -66,8 +72,14 @@ const ConversationContent = ({
   onProviderToggle,
   online,
   providerIds,
+  remoteWorkRef,
 }: Omit<ConversationScreenProps, 'conversationId' | 'initialSend'> &
-  Readonly<{ conversationId: string; initialSend: boolean; online: boolean }>) => {
+  Readonly<{
+    conversationId: string;
+    initialSend: boolean;
+    online: boolean;
+    remoteWorkRef: MutableRefObject<boolean>;
+  }>) => {
   const assetId = useRef<string | null>(null);
   const providerIdsRef = useRef<ReadonlyArray<RetailerId> | undefined>(undefined);
   const responseFinishedRef = useRef(false);
@@ -87,6 +99,7 @@ const ConversationContent = ({
       responseFinishedRef.current = true;
     },
     providerIds: providerIdsRef,
+    remoteWorkRef,
   });
 
   const historicalMessages = data?.conversation?.messages;
@@ -231,6 +244,7 @@ const ConversationContent = ({
           quickActionsEnabled={
             !historyLoading && !activeAskUser && displayMessages.length === 0
           }
+          remoteWorkRef={remoteWorkRef}
           sendInitialDraft={initialSend}
         />
       </NetworkBoundary>

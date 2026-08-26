@@ -53,6 +53,7 @@ let mockConversationOnProductSelect:
       isSaved: boolean;
     }) => void)
   | undefined;
+let mockConversationRemoteWorkRef: { current: boolean } | undefined;
 let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
@@ -126,6 +127,7 @@ jest.mock('./conversation-screen', () => ({
   ConversationScreen: ({
     onMessagesChange,
     onProductSelect,
+    remoteWorkRef,
   }: {
     onMessagesChange?: (messages: ReadonlyArray<DisplayMessage>) => void;
     onProductSelect?: (product: {
@@ -145,9 +147,11 @@ jest.mock('./conversation-screen', () => ({
       observedAt: string;
       isSaved: boolean;
     }) => void;
+    remoteWorkRef?: { current: boolean };
   }) => {
     mockConversationOnMessagesChange = onMessagesChange;
     mockConversationOnProductSelect = onProductSelect;
+    mockConversationRemoteWorkRef = remoteWorkRef;
     return mockCreateElement(
       mockNativeText,
       { testID: 'conversation-screen' },
@@ -255,6 +259,7 @@ describe('chat screen', () => {
     mockUnread = undefined;
     mockConversationOnMessagesChange = undefined;
     mockConversationOnProductSelect = undefined;
+    mockConversationRemoteWorkRef = undefined;
     mockFoundProductsRecommendations = undefined;
     mockFoundProductsPresentation = undefined;
     mockFoundProductsScope = undefined;
@@ -305,6 +310,18 @@ describe('chat screen', () => {
     mockOnline = true;
     screen.rerender(<ChatScreen />);
     expect(screen.getByLabelText('메시지 보내기')).toBeDisabled();
+  });
+
+  it('updates the existing conversation remote policy before an early session return', () => {
+    mockSearchParams = { id: 'conversation-1' };
+    const screen = render(<ChatScreen />);
+    const retainedRemoteWorkRef = mockConversationRemoteWorkRef;
+
+    expect(retainedRemoteWorkRef?.current).toBe(true);
+    mockSessionStatus = 'guest';
+    screen.rerender(<ChatScreen />);
+
+    expect(retainedRemoteWorkRef?.current).toBe(false);
   });
 
   it('permits remote conversation work only for an online authenticated session', () => {

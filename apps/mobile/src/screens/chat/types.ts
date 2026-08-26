@@ -1,3 +1,5 @@
+import type { MutableRefObject } from 'react';
+
 import type { DisplayMessage, RetailerId } from '@/features/chat';
 import type { CachedProduct } from '@/shared/storage/types';
 
@@ -24,4 +26,5 @@ export type ConversationScreenProps = Readonly<{
   onProviderReset?: (() => void) | undefined;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
   providerIds?: ReadonlyArray<RetailerId> | undefined;
+  remoteWorkRef?: MutableRefObject<boolean> | undefined;
 }>;

@@ -15,9 +15,13 @@ export const ChatComposer = ({
   onStop,
   providerIds,
   quickActionsEnabled = true,
+  remoteWorkRef: parentRemoteWorkRef,
   sendInitialDraft = false,
 }: ChatComposerProps) => {
   const online = useOnline();
+  const localRemoteWorkRef = useRef(online);
+  localRemoteWorkRef.current = online;
+  const remoteWorkRef = parentRemoteWorkRef ?? localRemoteWorkRef;
   const state = useComposerState(conversationId, online);
   const { attach, initialDraftRetiredRef, remove, send } = useComposerActions({
     allowFreeText,
@@ -25,6 +29,7 @@ export const ChatComposer = ({
     loading,
     onSend,
     online,
+    remoteWorkRef,
     state,
   });
   const initialDraftSendingRef = useRef(false);

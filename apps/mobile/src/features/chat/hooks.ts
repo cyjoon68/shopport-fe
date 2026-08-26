@@ -80,9 +80,12 @@ export const useConversationActions = ({
         variables: { input: { id: conversation.id, title: nextTitle } },
       });
       if (!activeRef.current) return false;
-      const message = result.data?.renameConversation.userErrors[0]?.message;
-      if (message) {
-        Alert.alert('이름 변경 실패', message);
+      const payload = result.data?.renameConversation;
+      const message = payload?.userErrors
+        .find(({ message: candidate }) => candidate.trim())
+        ?.message.trim();
+      if (!payload?.conversation || payload.userErrors.length > 0) {
+        Alert.alert('이름 변경 실패', message ?? '다시 시도해 주세요.');
         return false;
       }
       if (onlineRef.current) {
@@ -428,7 +431,11 @@ export const useComposerState = (
   };
 };
 
-const bestEffortRemoveUploadedAsset = async (id: string): Promise<void> => {
+const bestEffortRemoveUploadedAsset = async (
+  id: string,
+  remoteWorkRef: ComposerActionsArgs['remoteWorkRef'],
+): Promise<void> => {
+  if (!remoteWorkRef.current) return;
   try {
     await removeUploadedAsset(id);
   } catch {
@@ -442,6 +449,7 @@ export const useComposerActions = ({
   loading,
   onSend,
   online,
+  remoteWorkRef,
   state,
 }: ComposerActionsArgs) => {
   const sendInFlightRef = useRef(false);
@@ -640,29 +648,30 @@ export const useComposerActions = ({
       if (!uploaded) return;
       uploadedId = uploaded.id;
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
       const previous = state.assetRef.current;
       const previousId = previous?.id ?? null;
       if (previous) {
+        if (!remoteWorkRef.current) return;
         await removeUploadedAsset(previous.id);
         if (!isCurrent(expected) || state.assetRef.current?.id !== previousId) {
-          await bestEffortRemoveUploadedAsset(uploaded.id);
+          await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
           uploadedId = null;
           return;
         }
       }
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
       const next: Attachment = { ...uploaded, state: 'processing' };
       if (Platform.OS === 'ios') await Haptics.selectionAsync();
       if (!isCurrent(expected)) {
-        await bestEffortRemoveUploadedAsset(uploaded.id);
+        await bestEffortRemoveUploadedAsset(uploaded.id, remoteWorkRef);
         uploadedId = null;
         return;
       }
@@ -670,7 +679,7 @@ export const useComposerActions = ({
       state.setAsset(next);
       uploadedId = null;
     } catch (error) {
-      if (uploadedId) await bestEffortRemoveUploadedAsset(uploadedId);
+      if (uploadedId) await bestEffortRemoveUploadedAsset(uploadedId, remoteWorkRef);
       if (isCurrent(expected))
         Alert.alert(
           '이미지 첨부 실패',
@@ -690,6 +699,7 @@ export const useComposerActions = ({
       return;
     }
     try {
+      if (!remoteWorkRef.current) return;
       await removeUploadedAsset(current.id);
     } catch (error) {
       if (isCurrent(expected) && state.assetRef.current?.id === current.id) {

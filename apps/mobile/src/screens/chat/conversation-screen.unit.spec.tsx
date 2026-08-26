@@ -201,6 +201,27 @@ describe('conversation screen', () => {
     expect(mockRefetchQueries).not.toHaveBeenCalled();
   });
 
+  it.each<SessionStatus>(['guest', 'booting'])(
+    'blocks retained remote work when an authenticated conversation becomes %s',
+    (status) => {
+      const screen = render(<ConversationScreen conversationId="conversation-1" />);
+      const retainedFinish = mockFinish;
+      const retainedComposerProps = mockComposerProps as
+        | (ComponentProps<typeof ChatComposer> & {
+            remoteWorkRef?: { current: boolean };
+          })
+        | undefined;
+
+      mockSessionStatus = status;
+      screen.rerender(<ConversationScreen conversationId="conversation-1" />);
+      retainedFinish?.();
+
+      expect(retainedComposerProps?.remoteWorkRef?.current).toBe(false);
+      expect(mockRefetchQueries).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('conversation-screen')).toBeNull();
+    },
+  );
+
   it('hides quick actions once the conversation has content', () => {
     mockHistory = [{ id: 'message-1' }];
 

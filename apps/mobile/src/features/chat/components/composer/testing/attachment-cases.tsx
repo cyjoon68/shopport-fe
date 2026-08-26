@@ -57,6 +57,38 @@ describe('chat composer attachment isolation', () => {
     alertSpy.mockRestore();
   });
 
+  it.each(['guest', 'booting'])(
+    'does not clean up a deferred upload after the session becomes %s',
+    async () => {
+      const upload = deferred<{ id: string; uri: string } | null>();
+      const remoteWorkRef = { current: true };
+      mockedSelectAndUploadAsset.mockReturnValue(upload.promise);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const screen = render(
+        <ChatComposer
+          conversationId="A"
+          loading={false}
+          onSend={jest.fn(() => Promise.resolve())}
+          onStop={jest.fn(() => Promise.resolve())}
+          remoteWorkRef={remoteWorkRef}
+        />,
+      );
+      await act(flushPromises);
+      fireEvent.press(screen.getByLabelText('이미지 첨부'));
+
+      remoteWorkRef.current = false;
+      screen.unmount();
+      await act(async () => {
+        upload.resolve({ id: 'disabled-upload', uri: 'file://disabled' });
+        await flushPromises();
+      });
+
+      expect(mockedRemoveUploadedAsset).not.toHaveBeenCalled();
+      expect(alertSpy).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    },
+  );
+
   it('keeps B attachment when A removal or replacement is still awaiting', async () => {
     const removal = deferred<void>();
     mockedRemoveUploadedAsset.mockImplementation((id) =>

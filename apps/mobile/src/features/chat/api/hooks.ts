@@ -56,10 +56,9 @@ export const useChatRun = ({
   online,
   onFinish,
   providerIds,
+  remoteWorkRef,
 }: ChatRunOptions) => {
   const client = useApolloClient();
-  const onlineRef = useRef(online);
-  onlineRef.current = online;
   const previousOnlineRef = useRef(online);
   const [connection] = useState<ConnectConnectionAdapter>(() => {
     const transport = xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
@@ -77,11 +76,11 @@ export const useChatRun = ({
     });
     return {
       async *connect(messages, data, abortSignal, runContext) {
-        if (!onlineRef.current) return;
+        if (!remoteWorkRef.current) return;
         yield* transport.connect(messages, data, abortSignal, runContext);
       },
       async *joinRun(runId, abortSignal) {
-        if (!onlineRef.current) return;
+        if (!remoteWorkRef.current) return;
         yield* transport.joinRun(runId, abortSignal);
       },
     };
@@ -89,7 +88,7 @@ export const useChatRun = ({
   const [persistence] = useState<ChatClientPersistence>(() => ({
     getItem: async (id) => {
       const state = await sqliteChatPersistence.getItem(id);
-      if (onlineRef.current || !state || Array.isArray(state)) return state;
+      if (remoteWorkRef.current || !state || Array.isArray(state)) return state;
       return { messages: state.messages };
     },
     setItem: sqliteChatPersistence.setItem,
@@ -100,7 +99,7 @@ export const useChatRun = ({
     onFinish: () => {
       onFinish();
       void flushChatPersistence(conversationId).catch(() => undefined);
-      if (onlineRef.current)
+      if (remoteWorkRef.current)
         void client.refetchQueries({ include: [ConversationsDocument] });
     },
     persistence,

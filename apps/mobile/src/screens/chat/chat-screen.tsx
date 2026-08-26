@@ -266,6 +266,7 @@ const ChatContent = ({
                 onProviderReset={resetProviders}
                 onProviderToggle={toggleProvider}
                 providerIds={providerIds}
+                remoteWorkRef={remoteWorkRef}
               />
             ) : (
               <ChatNewConversation
