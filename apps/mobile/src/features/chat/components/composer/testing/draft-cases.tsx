@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { startTransition, StrictMode, Suspense, useState } from 'react';
+import { Alert, Button } from 'react-native';
 
 import { ChatComposer } from '../chat-composer';
 import type { DraftValue } from './test-support';
@@ -87,6 +88,31 @@ describe('chat composer draft isolation', () => {
     await act(flushPromises);
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(onSend).toHaveBeenCalledWith('조용한 무선 마우스 추천해줘', null);
+  });
+
+  it('sends an unchanged initial draft once through StrictMode renders', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '반복 렌더 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => Promise.resolve());
+    render(
+      <StrictMode>
+        <ChatComposer
+          conversationId="A"
+          loading={false}
+          onSend={onSend}
+          onStop={jest.fn(() => Promise.resolve())}
+          sendInitialDraft
+        />
+      </StrictMode>,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
   });
 
   it('sends an image-only initial draft once its asset is ready', async () => {
@@ -307,6 +333,197 @@ describe('chat composer draft isolation', () => {
       assetId: null,
       assetUri: null,
     });
+  });
+
+  it('keeps the committed cleanup identity when a different draft render is abandoned', async () => {
+    const never = new Promise<never>(() => undefined);
+    const suspension = Object.assign(new Error('suspended draft render'), {
+      then: never.then.bind(never),
+    });
+    mockedReadDraft.mockResolvedValue({
+      text: '커밋된 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedDeleteDraft.mockRejectedValueOnce(new Error('정리 실패'));
+    const onSend = jest.fn(() => Promise.resolve());
+    const Suspend = () => {
+      throw suspension;
+    };
+    const SuspendedComposer = () => {
+      const [conversationId, setConversationId] = useState('A');
+      return (
+        <>
+          <Button
+            accessibilityLabel="보이지 않는 초안으로 전환"
+            onPress={() => startTransition(() => setConversationId('B'))}
+            title="전환"
+          />
+          <Suspense fallback={null}>
+            <ChatComposer
+              conversationId={conversationId}
+              loading={false}
+              onSend={onSend}
+              onStop={jest.fn(() => Promise.resolve())}
+              sendInitialDraft
+            />
+            {conversationId === 'B' ? <Suspend /> : null}
+          </Suspense>
+        </>
+      );
+    };
+    const screen = render(<SuspendedComposer />);
+
+    await act(flushPromises);
+    await act(flushPromises);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText('보이지 않는 초안으로 전환'));
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not auto-send a restored newer draft after deletion completes', async () => {
+    const cleanup = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '처음 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedDeleteDraft.mockReturnValue(cleanup.promise);
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '복원할 B 초안');
+    await act(async () => {
+      cleanup.resolve();
+      await flushPromises();
+    });
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+    await act(flushPromises);
+
+    expect(inputValue(screen)).toBe('복원할 B 초안');
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists C after B restoration is overtaken before unmount', async () => {
+    const cleanup = deferred<void>();
+    const restoreB = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '처음 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedDeleteDraft.mockReturnValue(cleanup.promise);
+    mockedSaveDraft.mockReturnValueOnce(restoreB.promise).mockResolvedValue(undefined);
+    const onSend = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), 'B 초안');
+    await act(async () => {
+      cleanup.resolve();
+      await flushPromises();
+    });
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: 'B 초안',
+      assetId: null,
+      assetUri: null,
+    });
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), 'C 초안');
+    screen.unmount();
+    await act(async () => {
+      restoreB.resolve();
+      await flushPromises();
+    });
+
+    expect(mockedSaveDraft).toHaveBeenLastCalledWith('A', {
+      text: 'C 초안',
+      assetId: null,
+      assetUri: null,
+    });
+  });
+
+  it('recovers a rejected draft restoration on a later committed edit without resending', async () => {
+    const cleanup = deferred<void>();
+    mockedReadDraft.mockResolvedValue({
+      text: '처음 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    mockedDeleteDraft.mockReturnValue(cleanup.promise);
+    mockedSaveDraft
+      .mockRejectedValueOnce(new Error('저장 실패'))
+      .mockResolvedValue(undefined);
+    const onSend = jest.fn(() => Promise.resolve());
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        sendInitialDraft
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '복원 실패 C');
+    await act(async () => {
+      cleanup.resolve();
+      await flushPromises();
+    });
+    expect(inputValue(screen)).toBe('복원 실패 C');
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledWith(
+      '초안 저장 실패',
+      '메시지는 전송되었지만 최신 초안을 저장하지 못했습니다.',
+    );
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '복구 D');
+    await act(flushPromises);
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(mockedSaveDraft).toHaveBeenLastCalledWith('A', {
+      text: '복구 D',
+      assetId: null,
+      assetUri: null,
+    });
+    alertSpy.mockRestore();
   });
 
   it('cleans up a submitted initial draft after its composer unmounts', async () => {

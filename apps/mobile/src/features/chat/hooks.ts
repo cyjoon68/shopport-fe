@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Animated, AppState, Keyboard, Platform } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 
@@ -299,27 +299,22 @@ export const useComposerActions = ({
     conversationId: string;
     revision: number;
   } | null>(null);
+  const pendingRestoreRef = useRef<{
+    conversationId: string;
+    revision: number;
+  } | null>(null);
+  const restoreInFlightRef = useRef(false);
   const draftRevisionRef = useRef({
     assetId: state.asset?.id ?? null,
     conversationId,
     revision: 0,
     text: state.text,
   });
-  const previousDraft = draftRevisionRef.current;
-  if (
-    previousDraft.conversationId !== conversationId ||
-    previousDraft.text !== state.text ||
-    previousDraft.assetId !== (state.asset?.id ?? null)
-  ) {
-    draftRevisionRef.current = {
-      assetId: state.asset?.id ?? null,
-      conversationId,
-      revision: previousDraft.revision + 1,
-      text: state.text,
-    };
-    submittedDraftRef.current = null;
-  }
-  const draftRevision = draftRevisionRef.current.revision;
+  const draftCandidate = {
+    assetId: state.asset?.id ?? null,
+    conversationId,
+    text: state.text,
+  };
   const latestRef = useRef({
     allowFreeText,
     asset: state.asset,
@@ -327,21 +322,38 @@ export const useComposerActions = ({
     draftReadyFor: state.draftReadyFor,
     loading,
     online,
-    revision: draftRevision,
+    revision: draftRevisionRef.current.revision,
     text: state.text,
     uploading: state.uploading,
   });
-  latestRef.current = {
+  const latestCandidate = {
     allowFreeText,
     asset: state.asset,
     conversationId,
     draftReadyFor: state.draftReadyFor,
     loading,
     online,
-    revision: draftRevision,
     text: state.text,
     uploading: state.uploading,
   };
+  useLayoutEffect(() => {
+    const previousDraft = draftRevisionRef.current;
+    const changed =
+      previousDraft.conversationId !== draftCandidate.conversationId ||
+      previousDraft.text !== draftCandidate.text ||
+      previousDraft.assetId !== draftCandidate.assetId;
+    const nextDraft = changed
+      ? {
+          ...draftCandidate,
+          revision: previousDraft.revision + 1,
+        }
+      : previousDraft;
+    if (changed) {
+      draftRevisionRef.current = nextDraft;
+      submittedDraftRef.current = null;
+    }
+    latestRef.current = { ...latestCandidate, revision: nextDraft.revision };
+  });
   const currentSnapshot = () => ({
     generation: state.lifecycleRef.current.generation,
     version: state.lifecycleRef.current.version,
@@ -361,15 +373,75 @@ export const useComposerActions = ({
     snapshot.conversationId === conversationId &&
     snapshot.draftReadyFor === conversationId &&
     snapshot.revision === revision;
-  const saveLatestDraft = async (): Promise<void> => {
-    const current = latestRef.current;
-    if (current.conversationId !== conversationId) return;
-    await saveDraft(conversationId, {
-      text: current.text,
-      assetId: current.asset?.id ?? null,
-      assetUri: current.asset?.uri ?? null,
-    });
+  const saveLatestDraft = async (): Promise<boolean> => {
+    if (restoreInFlightRef.current) return false;
+    restoreInFlightRef.current = true;
+    try {
+      while (true) {
+        const current = latestRef.current;
+        if (current.conversationId !== conversationId) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+        try {
+          await saveDraft(conversationId, {
+            text: current.text,
+            assetId: current.asset?.id ?? null,
+            assetUri: current.asset?.uri ?? null,
+          });
+        } catch {
+          if (latestRef.current.conversationId === conversationId) {
+            pendingRestoreRef.current = {
+              conversationId,
+              revision: current.revision,
+            };
+            if (isCurrent(currentSnapshot()))
+              Alert.alert(
+                '초안 저장 실패',
+                '메시지는 전송되었지만 최신 초안을 저장하지 못했습니다.',
+              );
+          }
+          return false;
+        }
+        const latest = latestRef.current;
+        if (latest.conversationId !== conversationId) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+        if (latest.revision === current.revision) {
+          if (pendingRestoreRef.current?.conversationId === conversationId)
+            pendingRestoreRef.current = null;
+          return true;
+        }
+      }
+    } finally {
+      restoreInFlightRef.current = false;
+      const pending = pendingRestoreRef.current;
+      const latest = latestRef.current;
+      if (
+        pending &&
+        pending.conversationId === conversationId &&
+        latest.conversationId === conversationId &&
+        latest.revision !== pending.revision
+      )
+        void saveLatestDraft();
+    }
   };
+
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    const latest = latestRef.current;
+    if (
+      pending &&
+      pending.conversationId === conversationId &&
+      latest.conversationId === conversationId &&
+      latest.revision !== pending.revision
+    )
+      void saveLatestDraft();
+  }, [conversationId, state.asset?.id, state.text]);
+
   const cleanupSubmittedDraft = async (
     expected: ReturnType<typeof currentSnapshot>,
     revision: number,
@@ -399,16 +471,8 @@ export const useComposerActions = ({
     }
     const latest = latestRef.current;
     if (latest.conversationId === conversationId && !matchesDraft(latest, revision)) {
-      try {
-        await saveLatestDraft();
-      } catch {
-        if (isCurrent(expected))
-          Alert.alert(
-            '초안 정리 실패',
-            '메시지는 전송되었지만 초안을 정리하지 못했습니다.',
-          );
-      }
-      return false;
+      await saveLatestDraft();
+      return true;
     }
     if (isCurrent(expected) && matchesDraft(latest, revision)) {
       state.assetRef.current = null;
