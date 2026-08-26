@@ -6,6 +6,7 @@ const mockDatabase = {
   getAllAsync: mockGetAllAsync,
   getFirstAsync: mockGetFirstAsync,
   runAsync: mockRunAsync,
+  withExclusiveTransactionAsync: jest.fn(),
   withTransactionAsync: jest.fn(),
 };
 
@@ -20,6 +21,7 @@ import {
   setConversationPinned,
   sqliteChatPersistence,
 } from './chat-storage';
+import { closePrivateStorage, openPrivateStorage } from './private-storage';
 
 const validMessage = {
   id: 'message-1',
@@ -249,10 +251,16 @@ const malformedPersistedChats: ReadonlyArray<readonly [string, unknown]> = [
 ];
 
 describe('chat storage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await closePrivateStorage();
+    await openPrivateStorage();
     mockGetFirstAsync.mockReset();
     mockGetAllAsync.mockReset();
     mockRunAsync.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('ignores corrupted chat cache rows', async () => {
@@ -349,7 +357,52 @@ describe('chat storage', () => {
       }),
       expect.any(Number),
     );
-    jest.useRealTimers();
+  });
+
+  it('does not expose or merge a pending chat snapshot from an old generation', async () => {
+    jest.useFakeTimers();
+    const oldState = {
+      messages: [
+        {
+          id: 'message-1',
+          role: 'assistant' as const,
+          parts: [{ type: 'text' as const, content: '이전 세션' }],
+        },
+      ],
+    };
+    const newState = {
+      messages: [
+        {
+          id: 'message-2',
+          role: 'assistant' as const,
+          parts: [{ type: 'text' as const, content: '새 세션' }],
+        },
+      ],
+    };
+    void sqliteChatPersistence.setItem('chat-generation', oldState);
+
+    await closePrivateStorage();
+    await openPrivateStorage();
+    mockGetFirstAsync.mockResolvedValueOnce(null);
+
+    await expect(sqliteChatPersistence.getItem('chat-generation')).resolves.toBeNull();
+
+    void sqliteChatPersistence.setItem('chat-generation', newState);
+    jest.advanceTimersByTime(250);
+    await flushChatPersistence('chat-generation');
+
+    expect(mockRunAsync).toHaveBeenCalledWith(
+      'INSERT OR REPLACE INTO chat_cache (id, payload, updated_at) VALUES (?, ?, ?)',
+      'chat-generation',
+      JSON.stringify(newState),
+      expect.any(Number),
+    );
+    expect(mockRunAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT OR REPLACE INTO chat_cache'),
+      'chat-generation',
+      JSON.stringify(oldState),
+      expect.any(Number),
+    );
   });
 
   it('persists pinned conversation IDs locally', async () => {

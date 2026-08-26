@@ -7,6 +7,7 @@ import type {
 } from '@tanstack/ai-client';
 
 import { database } from './connection';
+import { capturePrivateWriteGeneration, runPrivateWrite } from './private-storage';
 import type { Draft, PendingChatWrite } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -215,7 +216,9 @@ const writePendingChat = (id: string, pending: PendingChatWrite): Promise<void> 
   const state = pending.state;
   const previous = pending.write?.catch(() => undefined) ?? Promise.resolve();
   const write = previous.then(() =>
-    pending.removed ? undefined : writeChatState(id, state),
+    pending.removed
+      ? undefined
+      : runPrivateWrite(pending.generation, () => writeChatState(id, state)),
   );
   pending.write = write;
   pending.writingState = state;
@@ -242,14 +245,24 @@ const scheduleChatWrite = (id: string, pending: PendingChatWrite): void => {
   }, chatPersistenceDelayMilliseconds);
 };
 
-const queueChatWrite = (id: string, state: ChatPersistedState): void => {
+const queueChatWrite = (
+  id: string,
+  state: ChatPersistedState,
+  generation: number | null,
+): void => {
   const pending = pendingChatWrites.get(id);
-  if (pending && !pending.removed) {
+  if (pending && !pending.removed && pending.generation === generation) {
     pending.state = state;
     scheduleChatWrite(id, pending);
     return;
   }
+  if (pending) {
+    pending.removed = true;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.timer = undefined;
+  }
   const next = {
+    generation,
     removed: false,
     state,
     timer: undefined,
@@ -298,19 +311,22 @@ export const setConversationPinned = async (
   conversationId: string,
   pinned: boolean,
 ): Promise<void> => {
-  const db = await database();
-  if (pinned) {
+  const capturedGeneration = capturePrivateWriteGeneration();
+  await runPrivateWrite(capturedGeneration, async () => {
+    const db = await database();
+    if (pinned) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO conversation_pin (conversation_id, pinned_at) VALUES (?, ?)',
+        conversationId,
+        Date.now(),
+      );
+      return;
+    }
     await db.runAsync(
-      'INSERT OR REPLACE INTO conversation_pin (conversation_id, pinned_at) VALUES (?, ?)',
+      'DELETE FROM conversation_pin WHERE conversation_id = ?',
       conversationId,
-      Date.now(),
     );
-    return;
-  }
-  await db.runAsync(
-    'DELETE FROM conversation_pin WHERE conversation_id = ?',
-    conversationId,
-  );
+  });
 };
 
 export const readCachedChatMessages = async (): Promise<
@@ -327,15 +343,18 @@ export const readCachedChatMessages = async (): Promise<
 };
 
 export const saveDraft = async (conversationId: string, draft: Draft): Promise<void> => {
-  const db = await database();
-  await db.runAsync(
-    'INSERT OR REPLACE INTO draft (conversation_id, text, asset_id, asset_uri, updated_at) VALUES (?, ?, ?, ?, ?)',
-    conversationId,
-    draft.text,
-    draft.assetId,
-    draft.assetUri,
-    Date.now(),
-  );
+  const capturedGeneration = capturePrivateWriteGeneration();
+  await runPrivateWrite(capturedGeneration, async () => {
+    const db = await database();
+    await db.runAsync(
+      'INSERT OR REPLACE INTO draft (conversation_id, text, asset_id, asset_uri, updated_at) VALUES (?, ?, ?, ?, ?)',
+      conversationId,
+      draft.text,
+      draft.assetId,
+      draft.assetUri,
+      Date.now(),
+    );
+  });
 };
 
 export const readDraft = async (conversationId: string): Promise<Draft> => {
@@ -352,14 +371,23 @@ export const readDraft = async (conversationId: string): Promise<Draft> => {
 };
 
 export const deleteDraft = async (conversationId: string): Promise<void> => {
-  const db = await database();
-  await db.runAsync('DELETE FROM draft WHERE conversation_id = ?', conversationId);
+  const capturedGeneration = capturePrivateWriteGeneration();
+  await runPrivateWrite(capturedGeneration, async () => {
+    const db = await database();
+    await db.runAsync('DELETE FROM draft WHERE conversation_id = ?', conversationId);
+  });
 };
 
 export const sqliteChatPersistence: ChatClientPersistence = {
   getItem: async (id) => {
     const pending = pendingChatWrites.get(id);
-    if (pending && !pending.removed) return pending.state;
+    if (
+      pending &&
+      !pending.removed &&
+      pending.generation !== null &&
+      pending.generation === capturePrivateWriteGeneration()
+    )
+      return pending.state;
     const db = await database();
     const row = await db.getFirstAsync<{ payload: string }>(
       'SELECT payload FROM chat_cache WHERE id = ?',
@@ -369,8 +397,12 @@ export const sqliteChatPersistence: ChatClientPersistence = {
     const parsed = parseJson(row.payload);
     return isPersistedChat(parsed) ? parsed : null;
   },
-  setItem: queueChatWrite,
+  setItem: (id, state) => {
+    const capturedGeneration = capturePrivateWriteGeneration();
+    queueChatWrite(id, state, capturedGeneration);
+  },
   removeItem: async (id) => {
+    const capturedGeneration = capturePrivateWriteGeneration();
     const pending = pendingChatWrites.get(id);
     if (pending) {
       pending.removed = true;
@@ -379,7 +411,9 @@ export const sqliteChatPersistence: ChatClientPersistence = {
       await pending.write?.catch(() => undefined);
       if (pendingChatWrites.get(id) === pending) pendingChatWrites.delete(id);
     }
-    const db = await database();
-    await db.runAsync('DELETE FROM chat_cache WHERE id = ?', id);
+    await runPrivateWrite(capturedGeneration, async () => {
+      const db = await database();
+      await db.runAsync('DELETE FROM chat_cache WHERE id = ?', id);
+    });
   },
 };

@@ -1,4 +1,5 @@
 import { database } from './connection';
+import { capturePrivateWriteGeneration, runPrivateWrite } from './private-storage';
 import type { CachedProduct } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -37,23 +38,26 @@ const parseJson = (value: string): unknown => {
 export const cacheProducts = async (
   products: ReadonlyArray<CachedProduct>,
 ): Promise<void> => {
-  const db = await database();
-  const now = Date.now();
-  await db.withTransactionAsync(async () => {
-    for (const product of products.slice(0, 100)) {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO product_cache (id, payload, updated_at) VALUES (?, ?, ?)',
-        product.id,
-        JSON.stringify(product),
-        now,
-      );
-    }
-    await db.runAsync(`
-      DELETE FROM product_cache
-      WHERE id NOT IN (
-        SELECT id FROM product_cache ORDER BY updated_at DESC LIMIT 100
-      )
-    `);
+  const capturedGeneration = capturePrivateWriteGeneration();
+  await runPrivateWrite(capturedGeneration, async () => {
+    const db = await database();
+    const now = Date.now();
+    await db.withTransactionAsync(async () => {
+      for (const product of products.slice(0, 100)) {
+        await db.runAsync(
+          'INSERT OR REPLACE INTO product_cache (id, payload, updated_at) VALUES (?, ?, ?)',
+          product.id,
+          JSON.stringify(product),
+          now,
+        );
+      }
+      await db.runAsync(`
+        DELETE FROM product_cache
+        WHERE id NOT IN (
+          SELECT id FROM product_cache ORDER BY updated_at DESC LIMIT 100
+        )
+      `);
+    });
   });
 };
 

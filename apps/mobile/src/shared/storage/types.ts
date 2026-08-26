@@ -25,6 +25,7 @@ export type Draft = Readonly<{
 }>;
 
 export type PendingChatWrite = {
+  generation: number | null;
   removed: boolean;
   state: ChatPersistedState;
   timer: ReturnType<typeof setTimeout> | undefined;
