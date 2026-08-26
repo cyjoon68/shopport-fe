@@ -227,10 +227,19 @@ describe('settings screen', () => {
       | undefined;
     mockStatus = 'offline-authenticated';
     screen.rerender(<SettingsScreen />);
+    mockProfile.deleteAccount.mockResolvedValueOnce(
+      '연결을 확인하고 다시 시도해 주세요.',
+    );
     actions?.find(({ text }) => text === '회원 탈퇴')?.onPress?.();
 
     await act(async () => Promise.resolve());
     expect(mockProfile.deleteAccount).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledWith(
+      '삭제 실패',
+      '연결을 확인하고 다시 시도해 주세요.',
+    );
+    expect(mockLogout).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it('checks current remote permission again before saving a nickname', async () => {
