@@ -222,11 +222,15 @@ describe('chat composer attachment isolation', () => {
 
     await act(flushPromises);
     await act(flushPromises);
-    const listener = appStateSpy.mock.calls.find(([event]) => event === 'change')?.[1];
+    await act(flushPromises);
+    expect(screen.getByText('이미지 처리 실패')).toBeTruthy();
+    const listener = appStateSpy.mock.calls.at(-1)?.[1];
+    expect(listener).toBeDefined();
     await act(async () => {
       listener?.('active');
       await flushPromises();
     });
+    await act(flushPromises);
 
     expect(mockedPollAssetUntilSettled).toHaveBeenCalledTimes(1);
     expect(onSend).not.toHaveBeenCalled();
