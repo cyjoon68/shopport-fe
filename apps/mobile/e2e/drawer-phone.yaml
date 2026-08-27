@@ -1,7 +1,0 @@
-appId: com.cyjoon68.shopport
----
-- launchApp
-- assertVisible: '기록 화면 열기'
-- assertVisible: '설정 화면 열기'
-- tapOn: '설정 화면 열기'
-- assertVisible: '찜한 상품'
