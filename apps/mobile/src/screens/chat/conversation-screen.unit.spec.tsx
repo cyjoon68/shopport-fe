@@ -9,17 +9,20 @@ import {
 import { Text as mockText } from 'react-native';
 
 import type { SessionStatus } from '@/features/auth';
-import type { ChatComposer } from '@/features/chat';
+import { cancelRunThenStop, type ChatComposer, type MessageList } from '@/features/chat';
 import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
 
 import { ConversationScreen } from './conversation-screen';
 
 let mockComposerProps: ComponentProps<typeof ChatComposer> | undefined;
+let mockMessageListProps: ComponentProps<typeof MessageList> | undefined;
 let mockConnectionOptions: (() => { body: Record<string, unknown> }) | undefined;
 let mockFinish: (() => void) | undefined;
 let mockHistory: ReadonlyArray<unknown> = [];
 let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
+let mockIsLoading = false;
+let mockRunId: string | null = null;
 const mockSendMessage = jest.fn<Promise<void>, [unknown]>();
 const mockStopChat = jest.fn();
 const mockRefetchQueries = jest.fn();
@@ -83,7 +86,10 @@ jest.mock('@/features/chat', () => ({
   },
   chatErrorPresentation: () => ({ message: '오류', route: null }),
   createStableChatMessageId: () => 'message-1',
-  MessageList: () => null,
+  MessageList: (props: ComponentProps<typeof MessageList>) => {
+    mockMessageListProps = props;
+    return null;
+  },
   activeAskUserRequest: () => mockActiveAskUser,
   fromHistoricalMessage: (message: unknown) => message,
   fromLiveMessage: (message: unknown) => message,
@@ -98,22 +104,27 @@ const mockedUseApolloClient = useApolloClient as jest.MockedFunction<
   typeof useApolloClient
 >;
 const mockedUseChat = useChat as jest.MockedFunction<typeof useChat>;
+const mockedCancelRunThenStop = jest.mocked(cancelRunThenStop);
 
 describe('conversation screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockComposerProps = undefined;
+    mockMessageListProps = undefined;
     mockConnectionOptions = undefined;
     mockFinish = undefined;
     mockHistory = [];
     mockHistoryLoading = false;
     mockChatMessages = [];
+    mockIsLoading = false;
+    mockRunId = null;
     mockSessionStatus = 'authenticated';
     mockOnline = true;
     mockBoundaryOnline = undefined;
     mockActiveAskUser = null;
     mockSendMessage.mockReset();
     mockStopChat.mockReset();
+    mockedCancelRunThenStop.mockReset().mockResolvedValue(undefined);
     mockRefetchQueries.mockReset().mockResolvedValue([]);
     mockedUseApolloClient.mockReturnValue({
       refetchQueries: mockRefetchQueries,
@@ -129,9 +140,9 @@ describe('conversation screen', () => {
       mockFinish = () => options.onFinish?.({} as never);
       return {
         error: undefined,
-        isLoading: false,
+        isLoading: mockIsLoading,
         messages: mockChatMessages,
-        runId: null,
+        runId: mockRunId,
         sendMessage: mockSendMessage,
         stop: mockStopChat,
       } as unknown as ReturnType<typeof useChat>;
@@ -278,6 +289,103 @@ describe('conversation screen', () => {
     });
 
     expect(onProviderReset).not.toHaveBeenCalled();
+  });
+
+  it('stops a generating reply before replacing the composer draft', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    let finishCancellation!: () => void;
+    mockedCancelRunThenStop.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishCancellation = resolve;
+      }),
+    );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let edit: Promise<void> | undefined;
+
+    act(() => {
+      edit = mockMessageListProps?.onEditMessage?.('이전 질문');
+    });
+
+    expect(
+      (
+        mockComposerProps as
+          | (ComponentProps<typeof ChatComposer> & {
+              draftReplacement?: Readonly<{ text: string }>;
+            })
+          | undefined
+      )?.draftReplacement,
+    ).toBeNull();
+
+    await act(async () => {
+      finishCancellation();
+      await edit;
+    });
+
+    expect(mockedCancelRunThenStop).toHaveBeenCalledWith(
+      'conversation-1',
+      'run-1',
+      mockStopChat,
+    );
+    expect(
+      (
+        mockComposerProps as ComponentProps<typeof ChatComposer> & {
+          draftReplacement?: Readonly<{ text: string }>;
+        }
+      ).draftReplacement,
+    ).toEqual({ text: '이전 질문' });
+  });
+
+  it('keeps the latest edit when cancellations finish out of order', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    let finishFirstCancellation!: () => void;
+    let finishSecondCancellation!: () => void;
+    mockedCancelRunThenStop
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          finishFirstCancellation = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          finishSecondCancellation = resolve;
+        }),
+      );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let firstEdit: Promise<void> | undefined;
+    let secondEdit: Promise<void> | undefined;
+
+    act(() => {
+      firstEdit = mockMessageListProps?.onEditMessage?.('첫 번째 질문');
+      secondEdit = mockMessageListProps?.onEditMessage?.('두 번째 질문');
+    });
+
+    await act(async () => {
+      finishSecondCancellation();
+      await secondEdit;
+    });
+
+    expect(
+      (
+        mockComposerProps as ComponentProps<typeof ChatComposer> & {
+          draftReplacement?: Readonly<{ text: string }>;
+        }
+      ).draftReplacement,
+    ).toEqual({ text: '두 번째 질문' });
+
+    await act(async () => {
+      finishFirstCancellation();
+      await firstEdit;
+    });
+
+    expect(
+      (
+        mockComposerProps as ComponentProps<typeof ChatComposer> & {
+          draftReplacement?: Readonly<{ text: string }>;
+        }
+      ).draftReplacement,
+    ).toEqual({ text: '두 번째 질문' });
   });
 
   it('refreshes recent conversations after the response finishes', () => {

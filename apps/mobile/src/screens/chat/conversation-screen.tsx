@@ -111,6 +111,10 @@ const ConversationContent = ({
   );
   const activeAskUser = activeAskUserRequest(displayMessages);
   const [askSheetOpen, setAskSheetOpen] = useState(false);
+  const [draftReplacement, setDraftReplacement] = useState<Readonly<{
+    text: string;
+  }> | null>(null);
+  const editRequestIdRef = useRef(0);
   const askSheetIdRef = useRef<string | null>(null);
   const skipAskUserRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
@@ -201,6 +205,13 @@ const ConversationContent = ({
     }
   };
 
+  const editMessage = async (text: string): Promise<void> => {
+    const requestId = ++editRequestIdRef.current;
+    if (isLoading) await stop();
+    if (requestId !== editRequestIdRef.current) return;
+    setDraftReplacement({ text });
+  };
+
   return (
     <View style={styles.root} testID="conversation-screen">
       {historyLoading && !data ? (
@@ -214,6 +225,7 @@ const ConversationContent = ({
           onAskUserPress={() => {
             if (!skipAskUserRef.current) setAskSheetOpen(true);
           }}
+          onEditMessage={editMessage}
           onProductSelect={onProductSelect}
         />
       )}
@@ -236,6 +248,7 @@ const ConversationContent = ({
           allowFreeText={activeAskUser?.request.allowFreeText ?? true}
           key={id}
           conversationId={id}
+          draftReplacement={draftReplacement}
           loading={isLoading}
           onProviderToggle={onProviderToggle}
           onSend={send}

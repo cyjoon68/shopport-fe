@@ -1,14 +1,41 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import * as Clipboard from 'expo-clipboard';
 import {
   createElement as mockCreateElement,
   forwardRef as mockForwardRef,
   type ReactElement,
   type ReactNode,
+  type Ref,
   useImperativeHandle as mockUseImperativeHandle,
 } from 'react';
-import { View as mockNativeView } from 'react-native';
+import { Platform, View as mockNativeView } from 'react-native';
 
 import type { DisplayMessage } from '../../../types';
+
+type MockMenuProps = Readonly<{
+  actions: ReadonlyArray<Readonly<{ id?: string; image?: unknown; title: string }>>;
+  children?: ReactNode;
+  onPressAction?: (event: Readonly<{ nativeEvent: Readonly<{ event: string }> }>) => void;
+  ref?: Ref<Readonly<{ show: () => void }>>;
+  shouldOpenOnLongPress?: boolean;
+  title?: string;
+}>;
+
+let mockMenuProps: MockMenuProps | undefined;
+const mockShowMenu = jest.fn();
+const originalOS = Platform.OS;
+
+jest.mock('@expo/ui/community/menu', () => ({
+  MenuView: (props: MockMenuProps) => {
+    mockMenuProps = props;
+    mockUseImperativeHandle(props.ref, () => ({ show: mockShowMenu }));
+    return mockCreateElement(mockNativeView, null, props.children);
+  },
+}));
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(() => Promise.resolve()),
+}));
 
 type FlashListProps = Readonly<{
   data: ReadonlyArray<DisplayMessage>;
@@ -72,7 +99,11 @@ describe('chat message list', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFlashListProps = null;
+    mockMenuProps = undefined;
   });
+  afterEach(() =>
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS }),
+  );
 
   it('does not expose internal tool status to the user', () => {
     const screen = render(<MessageList messages={[message]} />);
@@ -81,6 +112,177 @@ describe('chat message list', () => {
     expect(screen.getByLabelText('추천 상품')).toBeOnTheScreen();
     expect(screen.getByText('자세히 보기')).toBeOnTheScreen();
     expect(screen.queryByText('searchProducts 완료')).toBeNull();
+  });
+
+  it('shows an assistant timestamp through the minute without the current year', () => {
+    const currentYear = new Date().getFullYear();
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(currentYear, 7, 19, 20, 48),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('8월 19일 오후 8시 48분')).toBeOnTheScreen();
+  });
+
+  it('keeps the assistant copy button as a 44-point touch target', () => {
+    const screen = render(<MessageList messages={[message]} />);
+
+    expect(screen.getByLabelText('답변 복사')).toHaveStyle({
+      height: 44,
+      width: 44,
+    });
+  });
+
+  it('includes the year in an assistant timestamp from another year', () => {
+    const previousYear = new Date().getFullYear() - 1;
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(previousYear, 0, 2, 9, 5),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(`${previousYear}년 1월 2일 오전 9시 5분`)).toBeOnTheScreen();
+  });
+
+  it('copies the assistant bubble text from a regular button', () => {
+    const screen = render(<MessageList messages={[message]} />);
+
+    fireEvent.press(screen.getByLabelText('답변 복사'));
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('상품을 찾았어요.');
+  });
+
+  it('uses a dated native long-press menu for user actions', () => {
+    const currentYear = new Date().getFullYear();
+    render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(currentYear, 7, 19, 20, 48),
+            id: 'user-actions',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(mockMenuProps).toMatchObject({
+      actions: [
+        { id: 'copy', image: 'doc.on.doc', title: '복사' },
+        { id: 'edit', image: 'pencil', title: '편집' },
+      ],
+      shouldOpenOnLongPress: true,
+      title: '8월 19일 오후 8시 48분',
+    });
+  });
+
+  it('keeps the native user-menu trigger accessible', () => {
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-accessibility-actions',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '립밤 찾아줘' })).toHaveProp(
+      'accessibilityHint',
+      '길게 눌러 메시지 작업 열기',
+    );
+  });
+
+  it('opens the native user menu from the Android accessibility activate action', () => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-android-accessibility-action',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent(
+      screen.getByRole('button', { name: '립밤 찾아줘' }),
+      'accessibilityAction',
+      {
+        nativeEvent: { actionName: 'activate' },
+      },
+    );
+
+    expect(mockShowMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('copies the user bubble text from its native menu', () => {
+    render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-copy',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    mockMenuProps?.onPressAction?.({ nativeEvent: { event: 'copy' } });
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('립밤 찾아줘');
+  });
+
+  it('forwards the user bubble text from its native edit action', () => {
+    const onEditMessage = jest.fn(() => Promise.resolve());
+    render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-edit',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+        onEditMessage={onEditMessage}
+      />,
+    );
+
+    mockMenuProps?.onPressAction?.({ nativeEvent: { event: 'edit' } });
+
+    expect(onEditMessage).toHaveBeenCalledWith('립밤 찾아줘');
   });
 
   it('follows streamed responses near the bottom without moving existing messages', () => {

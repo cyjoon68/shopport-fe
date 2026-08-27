@@ -78,6 +78,25 @@ const historical = {
 } as HistoricalMessage;
 
 describe('historical message parts', () => {
+  it('preserves the historical message timestamp', () => {
+    expect(fromHistoricalMessage(historical).createdAt).toEqual(
+      new Date('2026-08-13T00:00:00.000Z'),
+    );
+  });
+
+  it('preserves the live message timestamp', () => {
+    const createdAt = new Date('2026-08-19T11:48:00.000Z');
+
+    expect(
+      fromLiveMessage({
+        createdAt,
+        id: '0198a122-0c00-7000-8000-000000000004',
+        parts: [{ type: 'text', content: '실시간 답변' }],
+        role: 'assistant',
+      }).createdAt,
+    ).toBe(createdAt);
+  });
+
   it('renders text, image, product reference and tool status models', () => {
     const message = fromHistoricalMessage(historical);
     expect(message.text).toBe('추천 결과');
@@ -179,6 +198,21 @@ describe('historical message parts', () => {
     );
     expect(merged[0]?.askUsers).toHaveLength(1);
     expect(merged[0]?.askUsers[0]?.id).toBe('live-question');
+  });
+
+  it('keeps the historical timestamp when a matching live message has none', () => {
+    const merged = mergeMessages(
+      [historical],
+      [
+        {
+          id: historical.id,
+          role: 'assistant',
+          parts: [{ type: 'text', content: '실시간 추천 결과' }],
+        },
+      ],
+    );
+
+    expect(merged[0]?.createdAt).toEqual(new Date(historical.createdAt));
   });
 
   it('preserves unchanged historical message references while live content streams', () => {
