@@ -1,7 +1,0 @@
-appId: com.cyjoon68.shopport
----
-- launchApp:
-    clearState: true
-- assertVisible: 'Shopport'
-- assertVisible: '나만의 쇼핑 에이전트'
-- assertVisible: '카카오로 시작하기'

@@ -1,0 +1,27 @@
+appId: com.cyjoon68.shopport
+---
+- launchApp
+- tapOn:
+    text: 'Continue'
+    optional: true
+- tapOn:
+    id: 'xmark'
+    optional: true
+- assertVisible: '메뉴 열기'
+- tapOn: '메뉴 열기'
+- assertVisible: '새로운 대화 열기'
+- tapOn: '새로운 대화 열기'
+- tapOn:
+    id: 'new-chat-segment-상품'
+- assertVisible: '찾은 상품이 없습니다'
+- tapOn: '메뉴 열기'
+- assertVisible: '설정 열기'
+- assertVisible: '새로운 대화 열기'
+- swipe:
+    start: '85%, 50%'
+    end: '10%, 50%'
+    duration: 500
+- assertNotVisible: '설정 열기'
+- assertVisible: '메뉴 열기'
+- assertVisible: '찾은 상품이 없습니다'
+- assertNotVisible: '쇼핑 질문'

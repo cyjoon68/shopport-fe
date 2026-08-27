@@ -1,0 +1,33 @@
+appId: com.cyjoon68.shopport
+---
+- launchApp
+- tapOn:
+    text: 'Continue'
+    optional: true
+- tapOn:
+    id: 'xmark'
+    optional: true
+- assertVisible: '메뉴 열기'
+- tapOn: '메뉴 열기'
+- assertVisible: '새로운 대화 열기'
+- tapOn: '새로운 대화 열기'
+- assertVisible:
+    id: 'chat-quick-actions'
+- tapOn: '최저가 찾기 프롬프트 열기'
+- assertVisible: '프롬프트 선택: 토너 패드 최저가 찾아줘'
+- tapOn: '프롬프트 선택: 토너 패드 최저가 찾아줘'
+- assertNotVisible:
+    id: 'chat-quick-actions'
+- assertNotVisible:
+    id: 'conversation-screen'
+- assertVisible: '토너 패드 최저가 찾아줘'
+- tapOn:
+    id: 'new-chat-segment-상품'
+- assertVisible: '찾은 상품이 없습니다'
+- tapOn:
+    id: 'new-chat-segment-채팅'
+- assertVisible: '토너 패드 최저가 찾아줘'
+- assertNotVisible:
+    id: 'chat-quick-actions'
+- assertNotVisible:
+    id: 'conversation-screen'
