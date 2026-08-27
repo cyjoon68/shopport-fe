@@ -281,7 +281,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: theme.spacing.xs,
-    marginTop: -theme.spacing.md,
+    marginTop: -theme.spacing.sm,
   },
   copyButton: {
     alignItems: 'center',
