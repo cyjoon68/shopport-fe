@@ -97,6 +97,7 @@ export const fromLiveMessage = (message: UIMessage): DisplayMessage => {
       const request = askUserArgsFromToolPart(part);
       return request && part.type === 'tool-call' ? [{ id: part.id, request }] : [];
     }),
+    createdAt: message.createdAt ?? null,
     id: messageIdentity('live', message.id),
     role: message.role === 'user' ? 'user' : 'assistant',
     status: tools.some(({ status }) => status === 'FAILED')
@@ -149,6 +150,7 @@ export const fromHistoricalMessage = (message: HistoricalMessage): DisplayMessag
           ]
         : [],
     ),
+    createdAt: new Date(message.createdAt),
     id: messageIdentity('server', message.id),
     role: message.role === 'USER' ? 'user' : 'assistant',
     status: message.status,
@@ -180,6 +182,7 @@ const mergeDisplayMessage = (
 ): DisplayMessage => ({
   ...historical,
   ...live,
+  createdAt: live.createdAt ?? historical.createdAt ?? null,
   text: live.text || historical.text,
   images: uniqueById([...historical.images, ...live.images]),
   products: uniqueById([...historical.products, ...live.products]),

@@ -9,6 +9,7 @@ import { ChatComposerView } from './chat-composer-view';
 export const ChatComposer = ({
   allowFreeText = true,
   conversationId,
+  draftReplacement,
   loading,
   onProviderToggle,
   onSend,
@@ -23,6 +24,10 @@ export const ChatComposer = ({
   localRemoteWorkRef.current = online;
   const remoteWorkRef = parentRemoteWorkRef ?? localRemoteWorkRef;
   const state = useComposerState(conversationId, online);
+  useEffect(() => {
+    if (!draftReplacement || state.draftReadyFor !== conversationId) return;
+    state.setText(draftReplacement.text);
+  }, [conversationId, draftReplacement, state.draftReadyFor, state.setText]);
   const { attach, initialDraftRetiredRef, remove, send } = useComposerActions({
     allowFreeText,
     conversationId,

@@ -64,6 +64,7 @@ export type UploadedImage = Readonly<{
 export type ChatComposerProps = Readonly<{
   allowFreeText?: boolean;
   conversationId: string;
+  draftReplacement?: Readonly<{ text: string }> | null;
   loading: boolean;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
   providerIds?: ReadonlyArray<RetailerId> | undefined;
@@ -176,6 +177,7 @@ export type DisplayTool = Readonly<{
 
 export type DisplayMessage = Readonly<{
   askUsers: ReadonlyArray<Readonly<{ id: string; request: AskUserRequest }>>;
+  createdAt?: Date | null;
   id: string;
   images: ReadonlyArray<DisplayImage>;
   products: ReadonlyArray<CachedProduct>;
@@ -198,6 +200,7 @@ export type MessageListProps = Readonly<{
   isGenerating?: boolean;
   messages: ReadonlyArray<DisplayMessage>;
   onAskUserPress?: (() => void) | undefined;
+  onEditMessage?: ((text: string) => Promise<void>) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
 
@@ -206,6 +209,7 @@ export type MessageListItemProps = Readonly<{
   animate: boolean;
   message: DisplayMessage;
   onAskUserPress?: (() => void) | undefined;
+  onEditMessage?: ((text: string) => Promise<void>) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
 }>;
 

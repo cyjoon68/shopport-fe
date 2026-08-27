@@ -20,6 +20,7 @@ export const MessageList = ({
   isGenerating = false,
   messages,
   onAskUserPress,
+  onEditMessage,
   onProductSelect,
 }: MessageListProps) => {
   const reducedMotion = useReducedMotion();
@@ -45,6 +46,7 @@ export const MessageList = ({
       animate={!reducedMotion && isGenerating && item.id === latestMessageId}
       message={item}
       onAskUserPress={onAskUserPress}
+      onEditMessage={onEditMessage}
       onProductSelect={onProductSelect}
     />
   );

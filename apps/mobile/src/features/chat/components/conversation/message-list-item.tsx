@@ -1,19 +1,29 @@
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import type { MessageListItemProps } from '../../types';
 import { ChatProductRow } from './chat-product-row';
+
+const formatMessageDate = (date: Date): string => {
+  const hour = date.getHours();
+  const year = date.getFullYear();
+  const yearLabel = year === new Date().getFullYear() ? '' : `${year}년 `;
+  return `${yearLabel}${date.getMonth() + 1}월 ${date.getDate()}일 ${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${date.getMinutes()}분`;
+};
 
 export const MessageListItem = ({
   activeAskUserId,
   animate,
   message,
   onAskUserPress,
+  onEditMessage,
   onProductSelect,
 }: MessageListItemProps) => {
   styles.useVariants({ role: message.role });
+  const [actionsOpen, setActionsOpen] = useState(false);
   const shouldAnimate = useRef(animate).current;
   const animation = useRef(new Animated.Value(shouldAnimate ? 0 : 1)).current;
   const animatedRowStyle = {
@@ -39,6 +49,12 @@ export const MessageListItem = ({
     (text, { request }) => text.replace(request.question, '').trim(),
     message.text,
   );
+  const copyText = [
+    transcriptText,
+    ...message.askUsers.map(({ request }) => request.question),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   if (
     !transcriptText &&
     !message.askUsers.length &&
@@ -51,7 +67,18 @@ export const MessageListItem = ({
       accessibilityLabel={message.role === 'user' ? '내 메시지' : 'Shopport 답변'}
       style={shouldAnimate ? [styles.row, animatedRowStyle] : styles.row}
     >
-      {transcriptText ? (
+      {transcriptText && message.role === 'user' ? (
+        <Pressable
+          accessibilityHint="길게 눌러 메시지 작업 열기"
+          accessibilityRole="button"
+          onLongPress={() => setActionsOpen(true)}
+          style={styles.bubble}
+        >
+          <Text allowFontScaling maxFontSizeMultiplier={2.5} style={styles.text}>
+            {transcriptText}
+          </Text>
+        </Pressable>
+      ) : transcriptText ? (
         <View style={styles.bubble}>
           <Text
             allowFontScaling
@@ -90,6 +117,28 @@ export const MessageListItem = ({
           <View key={id}>{question}</View>
         );
       })}
+      {message.role === 'assistant' && copyText ? (
+        <View style={styles.metadata}>
+          {message.createdAt ? (
+            <Text allowFontScaling style={styles.date}>
+              {formatMessageDate(message.createdAt)}
+            </Text>
+          ) : null}
+          <Pressable
+            accessibilityLabel="답변 복사"
+            accessibilityRole="button"
+            onPress={() => void Clipboard.setStringAsync(copyText)}
+            style={styles.copyButton}
+          >
+            <Image
+              contentFit="contain"
+              source="sf:doc.on.doc"
+              style={styles.copyIcon}
+              tintColor={styles.date.color}
+            />
+          </Pressable>
+        </View>
+      ) : null}
       {message.images.map((image) =>
         image.status === 'READY' && image.url ? (
           <Image
@@ -122,6 +171,66 @@ export const MessageListItem = ({
           ))}
         </ScrollView>
       ) : null}
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setActionsOpen(false)}
+        transparent
+        visible={actionsOpen}
+      >
+        <View style={styles.actionsBackdrop}>
+          <Pressable
+            accessibilityLabel="메시지 메뉴 닫기"
+            accessibilityRole="button"
+            onPress={() => setActionsOpen(false)}
+            style={styles.actionsDismiss}
+          />
+          <View accessibilityViewIsModal style={styles.actionsMenu}>
+            {message.createdAt ? (
+              <Text allowFontScaling style={styles.actionsDate}>
+                {formatMessageDate(message.createdAt)}
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityLabel="메시지 복사"
+              accessibilityRole="button"
+              onPress={() => {
+                setActionsOpen(false);
+                void Clipboard.setStringAsync(copyText);
+              }}
+              style={styles.action}
+            >
+              <Image
+                contentFit="contain"
+                source="sf:doc.on.doc"
+                style={styles.actionIcon}
+                tintColor={styles.actionLabel.color}
+              />
+              <Text allowFontScaling style={styles.actionLabel}>
+                복사
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel="메시지 편집"
+              accessibilityRole="button"
+              onPress={() => {
+                setActionsOpen(false);
+                void onEditMessage?.(copyText);
+              }}
+              style={styles.action}
+            >
+              <Image
+                contentFit="contain"
+                source="sf:pencil"
+                style={styles.actionIcon}
+                tintColor={styles.actionLabel.color}
+              />
+              <Text allowFontScaling style={styles.actionLabel}>
+                편집
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 };
@@ -176,6 +285,56 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
+  date: { color: theme.colors.textMuted, fontSize: 12 },
+  metadata: { alignItems: 'center', flexDirection: 'row', gap: theme.spacing.xs },
+  copyButton: {
+    alignItems: 'center',
+    height: theme.interaction.minTouchTarget,
+    justifyContent: 'center',
+    width: theme.interaction.minTouchTarget,
+  },
+  copyIcon: { height: 18, width: 18 },
+  actionsBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.32)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  actionsDismiss: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  actionsMenu: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderCurve: 'continuous',
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    maxWidth: 360,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  actionsDate: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
+  },
+  action: {
+    alignItems: 'center',
+    borderColor: theme.colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    minHeight: 56,
+    paddingHorizontal: theme.spacing.xl,
+  },
+  actionIcon: { height: 22, width: 22 },
+  actionLabel: { color: theme.colors.text, fontSize: 17 },
   products: { marginHorizontal: -theme.spacing.lg, width: 'auto' },
   productsContent: {
     flexDirection: 'row',

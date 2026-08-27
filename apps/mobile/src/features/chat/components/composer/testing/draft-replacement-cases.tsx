@@ -18,6 +18,34 @@ describe('chat composer draft replacement isolation', () => {
   beforeEach(resetComposerMocks);
   afterEach(restoreComposerTimers);
 
+  it('replaces the composer value without sending', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '작성 중인 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    const onSend = jest.fn(() => Promise.resolve());
+    const onStop = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <ChatComposer conversationId="A" loading={false} onSend={onSend} onStop={onStop} />,
+    );
+    await act(flushPromises);
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        draftReplacement={{ text: '이전 질문' }}
+        loading={false}
+        onSend={onSend}
+        onStop={onStop}
+      />,
+    );
+    await act(flushPromises);
+
+    expect(inputValue(screen)).toBe('이전 질문');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
   it('does not auto-send a newer draft preserved before deletion', async () => {
     const response = deferred<void>();
     mockedReadDraft.mockResolvedValue({

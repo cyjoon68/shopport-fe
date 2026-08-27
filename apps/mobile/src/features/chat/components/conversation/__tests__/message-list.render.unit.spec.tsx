@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import * as Clipboard from 'expo-clipboard';
 import {
   createElement as mockCreateElement,
   forwardRef as mockForwardRef,
@@ -9,6 +10,10 @@ import {
 import { View as mockNativeView } from 'react-native';
 
 import type { DisplayMessage } from '../../../types';
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(() => Promise.resolve()),
+}));
 
 type FlashListProps = Readonly<{
   data: ReadonlyArray<DisplayMessage>;
@@ -81,6 +86,119 @@ describe('chat message list', () => {
     expect(screen.getByLabelText('추천 상품')).toBeOnTheScreen();
     expect(screen.getByText('자세히 보기')).toBeOnTheScreen();
     expect(screen.queryByText('searchProducts 완료')).toBeNull();
+  });
+
+  it('shows an assistant timestamp through the minute without the current year', () => {
+    const currentYear = new Date().getFullYear();
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(currentYear, 7, 19, 20, 48),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('8월 19일 오후 8시 48분')).toBeOnTheScreen();
+  });
+
+  it('includes the year in an assistant timestamp from another year', () => {
+    const previousYear = new Date().getFullYear() - 1;
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(previousYear, 0, 2, 9, 5),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(`${previousYear}년 1월 2일 오전 9시 5분`)).toBeOnTheScreen();
+  });
+
+  it('copies the assistant bubble text from a regular button', () => {
+    const screen = render(<MessageList messages={[message]} />);
+
+    fireEvent.press(screen.getByLabelText('답변 복사'));
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('상품을 찾았어요.');
+  });
+
+  it('opens dated copy and edit actions by long-pressing a user bubble', () => {
+    const currentYear = new Date().getFullYear();
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            createdAt: new Date(currentYear, 7, 19, 20, 48),
+            id: 'user-actions',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByLabelText('메시지 편집')).toBeNull();
+
+    fireEvent(screen.getByText('립밤 찾아줘'), 'longPress');
+
+    expect(screen.getByText('8월 19일 오후 8시 48분')).toBeOnTheScreen();
+    expect(screen.getByLabelText('메시지 복사')).toBeOnTheScreen();
+    expect(screen.getByLabelText('메시지 편집')).toBeOnTheScreen();
+  });
+
+  it('copies the user bubble text from its long-press menu', () => {
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-copy',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent(screen.getByText('립밤 찾아줘'), 'longPress');
+    fireEvent.press(screen.getByLabelText('메시지 복사'));
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('립밤 찾아줘');
+  });
+
+  it('forwards the user bubble text from its edit action', () => {
+    const onEditMessage = jest.fn(() => Promise.resolve());
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-edit',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+        onEditMessage={onEditMessage}
+      />,
+    );
+
+    fireEvent(screen.getByText('립밤 찾아줘'), 'longPress');
+    fireEvent.press(screen.getByLabelText('메시지 편집'));
+
+    expect(onEditMessage).toHaveBeenCalledWith('립밤 찾아줘');
   });
 
   it('follows streamed responses near the bottom without moving existing messages', () => {
