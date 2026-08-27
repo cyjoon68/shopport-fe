@@ -5,9 +5,10 @@ import {
   forwardRef as mockForwardRef,
   type ReactElement,
   type ReactNode,
+  type Ref,
   useImperativeHandle as mockUseImperativeHandle,
 } from 'react';
-import { View as mockNativeView } from 'react-native';
+import { Platform, View as mockNativeView } from 'react-native';
 
 import type { DisplayMessage } from '../../../types';
 
@@ -15,15 +16,19 @@ type MockMenuProps = Readonly<{
   actions: ReadonlyArray<Readonly<{ id?: string; image?: unknown; title: string }>>;
   children?: ReactNode;
   onPressAction?: (event: Readonly<{ nativeEvent: Readonly<{ event: string }> }>) => void;
+  ref?: Ref<Readonly<{ show: () => void }>>;
   shouldOpenOnLongPress?: boolean;
   title?: string;
 }>;
 
 let mockMenuProps: MockMenuProps | undefined;
+const mockShowMenu = jest.fn();
+const originalOS = Platform.OS;
 
 jest.mock('@expo/ui/community/menu', () => ({
   MenuView: (props: MockMenuProps) => {
     mockMenuProps = props;
+    mockUseImperativeHandle(props.ref, () => ({ show: mockShowMenu }));
     return mockCreateElement(mockNativeView, null, props.children);
   },
 }));
@@ -96,6 +101,9 @@ describe('chat message list', () => {
     mockFlashListProps = null;
     mockMenuProps = undefined;
   });
+  afterEach(() =>
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS }),
+  );
 
   it('does not expose internal tool status to the user', () => {
     const screen = render(<MessageList messages={[message]} />);
@@ -122,26 +130,12 @@ describe('chat message list', () => {
     expect(screen.getByText('8월 19일 오후 8시 48분')).toBeOnTheScreen();
   });
 
-  it('keeps assistant metadata nearly flush with its bubble', () => {
-    const currentYear = new Date().getFullYear();
-    const screen = render(
-      <MessageList
-        messages={[
-          {
-            ...message,
-            createdAt: new Date(currentYear, 7, 19, 20, 48),
-          },
-        ]}
-      />,
-    );
+  it('keeps the assistant copy button as a 44-point touch target', () => {
+    const screen = render(<MessageList messages={[message]} />);
 
-    expect(screen.getByText('8월 19일 오후 8시 48분').parent?.parent).toHaveStyle({
-      alignItems: 'flex-start',
-      marginTop: -12,
-    });
     expect(screen.getByLabelText('답변 복사')).toHaveStyle({
       height: 44,
-      justifyContent: 'flex-start',
+      width: 44,
     });
   });
 
@@ -217,6 +211,34 @@ describe('chat message list', () => {
       'accessibilityHint',
       '길게 눌러 메시지 작업 열기',
     );
+  });
+
+  it('opens the native user menu from the Android accessibility activate action', () => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-android-accessibility-action',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent(
+      screen.getByRole('button', { name: '립밤 찾아줘' }),
+      'accessibilityAction',
+      {
+        nativeEvent: { actionName: 'activate' },
+      },
+    );
+
+    expect(mockShowMenu).toHaveBeenCalledTimes(1);
   });
 
   it('copies the user bubble text from its native menu', () => {

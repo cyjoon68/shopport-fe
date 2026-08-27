@@ -1,12 +1,21 @@
 import {
   type MenuAction,
+  type MenuComponentRef,
   MenuView,
   type NativeActionEvent,
 } from '@expo/ui/community/menu';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
-import { Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  type AccessibilityActionEvent,
+  Animated,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import type { MessageListItemProps } from '../../types';
@@ -19,6 +28,10 @@ const formatMessageDate = (date: Date): string => {
   return `${yearLabel}${date.getMonth() + 1}월 ${date.getDate()}일 ${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${date.getMinutes()}분`;
 };
 
+const messageAccessibilityActions = [
+  { label: '메시지 작업 열기', name: 'activate' },
+] as const;
+
 export const MessageListItem = ({
   activeAskUserId,
   animate,
@@ -28,6 +41,7 @@ export const MessageListItem = ({
   onProductSelect,
 }: MessageListItemProps) => {
   styles.useVariants({ role: message.role });
+  const userMenuRef = useRef<MenuComponentRef>(null);
   const shouldAnimate = useRef(animate).current;
   const animation = useRef(new Animated.Value(shouldAnimate ? 0 : 1)).current;
   const animatedRowStyle = {
@@ -71,6 +85,11 @@ export const MessageListItem = ({
     if (nativeEvent.event === 'copy') void Clipboard.setStringAsync(copyText);
     if (nativeEvent.event === 'edit') void onEditMessage?.(copyText);
   };
+  const handleUserMenuAccessibilityAction = ({
+    nativeEvent,
+  }: AccessibilityActionEvent): void => {
+    if (nativeEvent.actionName === 'activate') userMenuRef.current?.show();
+  };
   if (
     !transcriptText &&
     !message.askUsers.length &&
@@ -87,12 +106,19 @@ export const MessageListItem = ({
         <MenuView
           actions={userMenuActions}
           onPressAction={handleUserMenuAction}
+          ref={userMenuRef}
           shouldOpenOnLongPress
           style={styles.userMenu}
           title={date ?? ''}
         >
           <View
             accessible
+            {...(Platform.OS === 'android'
+              ? {
+                  accessibilityActions: messageAccessibilityActions,
+                  onAccessibilityAction: handleUserMenuAccessibilityAction,
+                }
+              : {})}
             accessibilityHint="길게 눌러 메시지 작업 열기"
             accessibilityLabel={transcriptText}
             accessibilityRole="button"
