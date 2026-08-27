@@ -155,6 +155,30 @@ describe('chat message list', () => {
     expect(screen.getByLabelText('메시지 편집')).toBeOnTheScreen();
   });
 
+  it('opens user actions through the screen-reader activate action', () => {
+    const screen = render(
+      <MessageList
+        messages={[
+          {
+            ...message,
+            id: 'user-accessibility-actions',
+            products: [],
+            role: 'user',
+            text: '립밤 찾아줘',
+            tools: [],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent(screen.getByText('립밤 찾아줘'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    });
+
+    expect(screen.getByLabelText('메시지 복사')).toBeOnTheScreen();
+    expect(screen.getByLabelText('메시지 편집')).toBeOnTheScreen();
+  });
+
   it('copies the user bubble text from its long-press menu', () => {
     const screen = render(
       <MessageList

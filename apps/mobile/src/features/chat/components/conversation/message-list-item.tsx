@@ -14,6 +14,10 @@ const formatMessageDate = (date: Date): string => {
   return `${yearLabel}${date.getMonth() + 1}월 ${date.getDate()}일 ${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${date.getMinutes()}분`;
 };
 
+const messageAccessibilityActions = [
+  { label: '메시지 작업 열기', name: 'activate' },
+] as const;
+
 export const MessageListItem = ({
   activeAskUserId,
   animate,
@@ -69,8 +73,12 @@ export const MessageListItem = ({
     >
       {transcriptText && message.role === 'user' ? (
         <Pressable
+          accessibilityActions={messageAccessibilityActions}
           accessibilityHint="길게 눌러 메시지 작업 열기"
           accessibilityRole="button"
+          onAccessibilityAction={({ nativeEvent }) => {
+            if (nativeEvent.actionName === 'activate') setActionsOpen(true);
+          }}
           onLongPress={() => setActionsOpen(true)}
           style={styles.bubble}
         >
@@ -312,11 +320,11 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
     borderCurve: 'continuous',
-    borderRadius: theme.radii.lg,
+    borderRadius: 28,
     borderWidth: 1,
-    maxWidth: 360,
+    maxWidth: 340,
     overflow: 'hidden',
-    width: '100%',
+    width: '88%',
   },
   actionsDate: {
     color: theme.colors.textMuted,

@@ -336,6 +336,58 @@ describe('conversation screen', () => {
     ).toEqual({ text: '이전 질문' });
   });
 
+  it('keeps the latest edit when cancellations finish out of order', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    let finishFirstCancellation!: () => void;
+    let finishSecondCancellation!: () => void;
+    mockedCancelRunThenStop
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          finishFirstCancellation = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          finishSecondCancellation = resolve;
+        }),
+      );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let firstEdit: Promise<void> | undefined;
+    let secondEdit: Promise<void> | undefined;
+
+    act(() => {
+      firstEdit = mockMessageListProps?.onEditMessage?.('첫 번째 질문');
+      secondEdit = mockMessageListProps?.onEditMessage?.('두 번째 질문');
+    });
+
+    await act(async () => {
+      finishSecondCancellation();
+      await secondEdit;
+    });
+
+    expect(
+      (
+        mockComposerProps as ComponentProps<typeof ChatComposer> & {
+          draftReplacement?: Readonly<{ text: string }>;
+        }
+      ).draftReplacement,
+    ).toEqual({ text: '두 번째 질문' });
+
+    await act(async () => {
+      finishFirstCancellation();
+      await firstEdit;
+    });
+
+    expect(
+      (
+        mockComposerProps as ComponentProps<typeof ChatComposer> & {
+          draftReplacement?: Readonly<{ text: string }>;
+        }
+      ).draftReplacement,
+    ).toEqual({ text: '두 번째 질문' });
+  });
+
   it('refreshes recent conversations after the response finishes', () => {
     render(<ConversationScreen conversationId="conversation-1" />);
 

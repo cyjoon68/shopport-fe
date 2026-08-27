@@ -114,6 +114,7 @@ const ConversationContent = ({
   const [draftReplacement, setDraftReplacement] = useState<Readonly<{
     text: string;
   }> | null>(null);
+  const editRequestIdRef = useRef(0);
   const askSheetIdRef = useRef<string | null>(null);
   const skipAskUserRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
@@ -205,7 +206,9 @@ const ConversationContent = ({
   };
 
   const editMessage = async (text: string): Promise<void> => {
+    const requestId = ++editRequestIdRef.current;
     if (isLoading) await stop();
+    if (requestId !== editRequestIdRef.current) return;
     setDraftReplacement({ text });
   };
 
