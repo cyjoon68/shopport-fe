@@ -20,8 +20,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     'development-kakao-native-key';
   const easProjectId = environmentValue('EAS_PROJECT_ID');
   const apiUrl = environmentValue('EXPO_PUBLIC_API_URL');
+  const e2eMode = environmentValue('EXPO_PUBLIC_E2E_MODE') === '1';
   const privacyPolicyUrl = environmentValue('EXPO_PUBLIC_PRIVACY_POLICY_URL');
   if (environmentValue('EAS_BUILD_PROFILE') === 'production') {
+    if (e2eMode) {
+      throw new Error('EXPO_PUBLIC_E2E_MODE is forbidden for production');
+    }
     if (kakaoNativeAppKey.startsWith('development-')) {
       throw new Error('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for production');
     }
@@ -73,6 +77,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             minSdkVersion: 29,
             targetSdkVersion: 36,
             extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
+            usesCleartextTraffic: e2eMode,
           },
         },
       ],

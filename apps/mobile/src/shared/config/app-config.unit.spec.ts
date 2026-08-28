@@ -6,6 +6,7 @@ const context = { config: {} } as ConfigContext;
 const keys = [
   'EAS_BUILD_PROFILE',
   'EXPO_PUBLIC_API_URL',
+  'EXPO_PUBLIC_E2E_MODE',
   'EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY',
   'EXPO_PUBLIC_PRIVACY_POLICY_URL',
 ] as const;
@@ -20,6 +21,7 @@ describe('production app configuration', () => {
     }
     process.env.EAS_BUILD_PROFILE = 'production';
     process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY = 'secure-kakao-key';
+    delete process.env.EXPO_PUBLIC_E2E_MODE;
     delete process.env.EXPO_PUBLIC_API_URL;
     delete process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
   });
@@ -45,5 +47,27 @@ describe('production app configuration', () => {
       typedRoutes: true,
     });
     expect(configure(context).plugins).toContain('expo-sqlite');
+  });
+
+  it('rejects the E2E identity mode from production builds', () => {
+    process.env.EXPO_PUBLIC_API_URL = 'https://api.shopport.example';
+    process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL = 'https://shopport.example/privacy';
+    process.env.EXPO_PUBLIC_E2E_MODE = '1';
+
+    expect(() => configure(context)).toThrow('EXPO_PUBLIC_E2E_MODE');
+  });
+
+  it('allows cleartext traffic only for E2E builds', () => {
+    process.env.EAS_BUILD_PROFILE = 'development';
+    process.env.EXPO_PUBLIC_E2E_MODE = '1';
+
+    expect(JSON.stringify(configure(context).plugins)).toContain(
+      '"usesCleartextTraffic":true',
+    );
+
+    delete process.env.EXPO_PUBLIC_E2E_MODE;
+    expect(JSON.stringify(configure(context).plugins)).toContain(
+      '"usesCleartextTraffic":false',
+    );
   });
 });

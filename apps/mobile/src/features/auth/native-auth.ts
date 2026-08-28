@@ -14,6 +14,12 @@ const initializeKakao = async (): Promise<void> => {
 };
 
 export const kakaoIdentity = async (): Promise<IdentityCredential> => {
+  if (environment.e2eMode) {
+    return {
+      identityToken: 'maestro-identity-token',
+      nonce: 'maestro-identity-nonce',
+    };
+  }
   await initializeKakao();
   const nonce = Crypto.randomUUID();
   const credential = await kakaoLogin({ nonce });
