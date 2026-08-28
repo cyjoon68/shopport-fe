@@ -7,7 +7,12 @@ appId: com.cyjoon68.shopport
 - tapOn:
     id: 'xmark'
     optional: true
-- assertVisible: '메뉴 열기'
+- tapOn:
+    text: '카카오로 시작하기'
+    optional: true
+- extendedWaitUntil:
+    visible: '메뉴 열기'
+    timeout: 30000
 - tapOn: '메뉴 열기'
 - assertVisible: '새로운 대화 열기'
 - tapOn: '새로운 대화 열기'
