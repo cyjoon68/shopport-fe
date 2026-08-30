@@ -16,6 +16,7 @@ const product = {
     shipping: { amountMinor: '2000', currency: 'KRW' },
     total: { amountMinor: '21900', currency: 'KRW' },
     isInStock: true,
+    availability: 'UNKNOWN',
     deliveryExpectedAt: null,
     observedAt: '2026-08-13T00:00:00.000Z',
     outboundUrl: 'https://example.com/products/tumbler',
@@ -36,6 +37,7 @@ describe('product tool result', () => {
         id: product.id,
         totalMinor: '21900',
         providerName: '승인 쇼핑몰',
+        availability: 'UNKNOWN',
       }),
     ]);
   });
@@ -45,6 +47,19 @@ describe('product tool result', () => {
     expect(
       productsFromToolResult(JSON.stringify({ kind: 'text', products: [product] })),
     ).toEqual([]);
+  });
+
+  it('marks a legacy product result without availability as unknown', () => {
+    const legacyOffer = Object.fromEntries(
+      Object.entries(product.offer).filter(([field]) => field !== 'availability'),
+    );
+
+    expect(
+      productsFromToolResult({
+        kind: 'product_cards',
+        products: [{ ...product, offer: legacyOffer }],
+      }),
+    ).toEqual([expect.objectContaining({ availability: 'UNKNOWN' })]);
   });
 
   it.each([

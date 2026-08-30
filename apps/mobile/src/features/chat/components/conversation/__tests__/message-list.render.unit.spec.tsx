@@ -114,6 +114,69 @@ describe('chat message list', () => {
     expect(screen.queryByText('searchProducts 완료')).toBeNull();
   });
 
+  it('shows cancelled search recovery actions in the conversation', () => {
+    const onEdit = jest.fn();
+    const onRetry = jest.fn();
+    const screen = render(
+      <MessageList
+        messages={[message]}
+        recovery={{
+          onEdit,
+          onRetry,
+          question: '립밤을 찾아줘',
+          message: '검색을 중지했어요',
+          reason: 'cancelled',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('검색을 중지했어요')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('질문 수정'));
+    fireEvent.press(screen.getByLabelText('다시 검색'));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables recovery actions while the retry is in flight', () => {
+    const screen = render(
+      <MessageList
+        messages={[message]}
+        recovery={{
+          onEdit: jest.fn(),
+          onRetry: jest.fn(),
+          question: '립밤을 찾아줘',
+          message: '검색을 중지했어요',
+          reason: 'cancelled',
+          retrying: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('다시 검색').props).toMatchObject({
+      accessibilityState: { disabled: true },
+    });
+  });
+
+  it('shows a failed search recovery without cancellation copy', () => {
+    const screen = render(
+      <MessageList
+        messages={[message]}
+        recovery={
+          {
+            message: '검색에 실패했어요',
+            onEdit: jest.fn(),
+            onRetry: jest.fn(),
+            question: '립밤을 찾아줘',
+            reason: 'failed',
+          } as never
+        }
+      />,
+    );
+
+    expect(screen.getByText('검색에 실패했어요')).toBeOnTheScreen();
+    expect(screen.queryByText('검색을 중지했어요')).toBeNull();
+  });
+
   it('shows an assistant timestamp through the minute without the current year', () => {
     const currentYear = new Date().getFullYear();
     const screen = render(

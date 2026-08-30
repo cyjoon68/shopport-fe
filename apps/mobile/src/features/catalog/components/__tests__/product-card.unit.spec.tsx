@@ -26,6 +26,7 @@ const product = {
   currency: 'KRW',
   isAffiliate: false,
   isInStock: true,
+  availability: 'IN_STOCK',
   outboundUrl: 'https://example.com/product',
   deliveryExpectedAt: null,
   observedAt: '2026-08-13T00:00:00.000Z',
@@ -84,6 +85,7 @@ describe('product card links', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -94,6 +96,37 @@ describe('product card links', () => {
     fireEvent.press(screen.getByLabelText('텀블러 구매 링크'));
 
     expect(openURL).toHaveBeenCalledWith('https://example.com/product');
+  });
+
+  it('shows unknown availability without claiming that the product can be purchased', () => {
+    const screen = render(
+      <ProductCard product={{ ...product, availability: 'UNKNOWN' }} />,
+    );
+
+    expect(screen.getByText('재고 확인 필요')).toBeOnTheScreen();
+    expect(screen.getByText('재고 확인 시간 알 수 없음')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/텀블러, ₩10,000, 재고 확인 필요/)).toBeOnTheScreen();
+    expect(screen.getByLabelText(/재고 확인 시간 알 수 없음/)).toBeOnTheScreen();
+  });
+
+  it('shows out-of-stock availability even when the legacy flag is true', () => {
+    const screen = render(
+      <ProductCard product={{ ...product, availability: 'OUT_OF_STOCK' }} />,
+    );
+
+    expect(screen.getByText('품절')).toBeOnTheScreen();
+  });
+
+  it('marks stock information observed more than a week ago as stale', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    const screen = render(
+      <ProductCard product={{ ...product, observedAt: '2026-08-22T12:00:00.000Z' }} />,
+    );
+
+    expect(screen.getByText('재고 정보 오래됨 · 8일 전 확인')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText('텀블러, ₩10,000, 구매 가능, 재고 정보 오래됨 · 8일 전 확인'),
+    ).toBeOnTheScreen();
   });
 
   it('blocks non-https links', () => {

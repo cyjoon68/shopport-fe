@@ -91,6 +91,7 @@ export const ChatComposer = ({
       asset={visibleAsset}
       attach={attach}
       draftReady={draftReady}
+      focusInput={draftReplacement?.focus}
       loading={loading}
       online={online}
       onStop={onStop}

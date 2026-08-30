@@ -32,6 +32,7 @@ export type {
   AskUserRequest,
   Attachment,
   ChatComposerProps,
+  ChatRunContext,
   ChatTab,
   ConversationActionProps,
   DisplayMessage,

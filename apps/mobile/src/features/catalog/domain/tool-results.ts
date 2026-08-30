@@ -40,6 +40,7 @@ const parseProduct = (value: unknown): CachedProduct | null => {
   const rawOutboundUrl = stringField(value.offer, 'outboundUrl');
   const outboundUrl = rawOutboundUrl ? httpsUrl(rawOutboundUrl) : null;
   const observedAt = stringField(value.offer, 'observedAt');
+  const availability = value.offer.availability;
   const deliveryExpectedAt = value.offer.deliveryExpectedAt;
   if (
     !id ||
@@ -56,6 +57,10 @@ const parseProduct = (value: unknown): CachedProduct | null => {
     typeof value.isAffiliate !== 'boolean' ||
     typeof value.isSaved !== 'boolean' ||
     typeof value.offer.isInStock !== 'boolean' ||
+    (availability !== undefined &&
+      availability !== 'IN_STOCK' &&
+      availability !== 'OUT_OF_STOCK' &&
+      availability !== 'UNKNOWN') ||
     (deliveryExpectedAt !== null && typeof deliveryExpectedAt !== 'string')
   ) {
     return null;
@@ -72,6 +77,7 @@ const parseProduct = (value: unknown): CachedProduct | null => {
     currency,
     isAffiliate: value.isAffiliate,
     isInStock: value.offer.isInStock,
+    availability: availability ?? 'UNKNOWN',
     outboundUrl,
     deliveryExpectedAt,
     observedAt,

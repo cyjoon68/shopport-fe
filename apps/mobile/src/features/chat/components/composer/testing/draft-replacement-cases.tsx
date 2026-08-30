@@ -1,5 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, TextInput } from 'react-native';
 
 import { ChatComposer } from '../chat-composer';
 import {
@@ -44,6 +44,33 @@ describe('chat composer draft replacement isolation', () => {
 
     expect(inputValue(screen)).toBe('이전 질문');
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('focuses the composer when a recovery action restores a question', async () => {
+    const focus = jest.spyOn(TextInput.prototype, 'focus');
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={jest.fn(() => Promise.resolve())}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+    await act(flushPromises);
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        draftReplacement={{ focus: 1, text: '이전 질문' }}
+        loading={false}
+        onSend={jest.fn(() => Promise.resolve())}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+    await act(flushPromises);
+
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
   });
 
   it('does not auto-send a newer draft preserved before deletion', async () => {

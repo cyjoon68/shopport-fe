@@ -24,6 +24,10 @@ const isCachedProduct = (value: unknown): value is CachedProduct =>
   cachedProductStringFields.every((field) => typeof value[field] === 'string') &&
   typeof value.isAffiliate === 'boolean' &&
   typeof value.isInStock === 'boolean' &&
+  (value.availability === undefined ||
+    value.availability === 'IN_STOCK' ||
+    value.availability === 'OUT_OF_STOCK' ||
+    value.availability === 'UNKNOWN') &&
   typeof value.isSaved === 'boolean' &&
   (value.deliveryExpectedAt === null || typeof value.deliveryExpectedAt === 'string');
 
@@ -68,6 +72,8 @@ export const readCachedProducts = async (): Promise<Array<CachedProduct>> => {
   );
   return rows.flatMap(({ payload }) => {
     const parsed = parseJson(payload);
-    return isCachedProduct(parsed) ? [parsed] : [];
+    return isCachedProduct(parsed)
+      ? [{ ...parsed, availability: parsed.availability ?? 'UNKNOWN' }]
+      : [];
   });
 };

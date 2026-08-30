@@ -12,6 +12,7 @@ export const ChatComposerView = ({
   asset,
   attach,
   draftReady,
+  focusInput,
   loading,
   online,
   onStop,
@@ -81,6 +82,7 @@ export const ChatComposerView = ({
       attachDisabled={loading || uploading || !draftReady || !allowFreeText}
       inputEditable={!loading && draftReady && allowFreeText}
       loading={loading}
+      focusInput={focusInput}
       onAttach={attach}
       onProviderToggle={onProviderToggle}
       onSend={send}

@@ -9,6 +9,13 @@ import { environment } from '@/shared/config/environment';
 
 import type { AssetProcessingResult, AssetRemoteStatus, PollOptions } from '../types';
 
+export type CancelRunOutcome = 'cancelled' | 'already_cancelled' | 'completed' | 'failed';
+
+const cancelOutcomes = ['cancelled', 'already_cancelled', 'completed', 'failed'] as const;
+
+const isCancelRunOutcome = (value: unknown): value is CancelRunOutcome =>
+  typeof value === 'string' && (cancelOutcomes as ReadonlyArray<string>).includes(value);
+
 export const readAssetStatus = async (id: string): Promise<AssetRemoteStatus> => {
   const result = await apolloClient.query({
     query: AssetDocument,
@@ -72,7 +79,10 @@ export const removeUploadedAsset = async (id: string): Promise<void> => {
   }
 };
 
-const cancelChatRun = async (threadId: string, runId: string): Promise<void> => {
+const cancelChatRun = async (
+  threadId: string,
+  runId: string,
+): Promise<CancelRunOutcome> => {
   const token = getAccessToken();
   const response = await fetch(`${environment.apiUrl}/v1/ai/chat/cancel`, {
     method: 'POST',
@@ -83,15 +93,28 @@ const cancelChatRun = async (threadId: string, runId: string): Promise<void> => 
     body: JSON.stringify({ threadId, runId }),
   });
   if (!response.ok) throw new Error('응답을 중지하지 못했습니다. 다시 시도해 주세요.');
+  const payload: unknown = await response
+    .json()
+    .catch(() =>
+      Promise.reject(new Error('응답을 중지하지 못했습니다. 다시 시도해 주세요.')),
+    );
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('outcome' in payload) ||
+    !isCancelRunOutcome(payload.outcome)
+  )
+    throw new Error('응답을 중지하지 못했습니다. 다시 시도해 주세요.');
+  return payload.outcome;
 };
 
 export const cancelRunThenStop = async (
   threadId: string,
   runId: string,
   stop: () => void,
-): Promise<void> => {
+): Promise<CancelRunOutcome> => {
   try {
-    await cancelChatRun(threadId, runId);
+    return await cancelChatRun(threadId, runId);
   } finally {
     stop();
   }

@@ -21,6 +21,7 @@ export const productFromFragment = (
     currency: product.offer.total.currency,
     isAffiliate: product.isAffiliate,
     isInStock: product.offer.isInStock,
+    availability: product.offer.availability,
     outboundUrl: product.offer.outboundUrl,
     deliveryExpectedAt: product.offer.deliveryExpectedAt ?? null,
     observedAt: product.offer.observedAt,

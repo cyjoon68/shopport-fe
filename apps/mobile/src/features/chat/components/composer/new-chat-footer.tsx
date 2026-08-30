@@ -1,5 +1,6 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
+import { useEffect, useRef } from 'react';
 import { Animated, Platform, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -13,6 +14,7 @@ import { ChatQuickActions } from './chat-quick-actions';
 export const NewChatFooter = ({
   attachDisabled,
   fill = false,
+  focusInput,
   inputEditable,
   loading,
   onAttach,
@@ -28,6 +30,13 @@ export const NewChatFooter = ({
   const { theme } = useUnistyles();
   const reducedTransparency = useReducedTransparency();
   const keyboardPad = useKeyboardLift();
+  const inputRef = useRef<TextInput>(null);
+  const focusInputRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (focusInput !== undefined && focusInput !== focusInputRef.current)
+      inputRef.current?.focus();
+    focusInputRef.current = focusInput;
+  }, [focusInput]);
   const showStop = loading && Boolean(onStop);
   const glassAvailable =
     Platform.OS === 'ios' && !reducedTransparency && isGlassEffectAPIAvailable();
@@ -61,6 +70,7 @@ export const NewChatFooter = ({
         onSubmitEditing={send}
         placeholder="Shopport에게 추천받기"
         placeholderTextColor={styles.placeholder.color}
+        ref={inputRef}
         returnKeyType="send"
         style={styles.input}
         value={text}
