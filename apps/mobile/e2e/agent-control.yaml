@@ -44,9 +44,7 @@ appId: com.cyjoon68.shopport
 - tapOn:
     text: '질문 수정'
     enabled: true
-- tapOn:
-    text: 'DON.T ALLOW'
-    optional: true
+- hideKeyboard
 - assertVisible: '토너 패드 최저가 찾아줘'
 - assertNotVisible:
     id: 'chat-quick-actions'
