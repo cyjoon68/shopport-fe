@@ -995,6 +995,7 @@ describe('conversation screen', () => {
       await mockComposerProps?.onStop();
     });
     expect(mockMessageListProps?.recovery?.question).toBe('두 번째 립밤 찾아줘');
+    expect(mockMessageListProps?.recovery?.retrying).toBeFalsy();
 
     await act(async () => {
       resolveReload();

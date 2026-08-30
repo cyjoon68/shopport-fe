@@ -240,6 +240,7 @@ const ConversationContent = ({
   const stoppedQuestionFocusRef = useRef(0);
   const editRequestIdRef = useRef(0);
   const retryInFlightRef = useRef(false);
+  const retryRequestIdRef = useRef(0);
   const askSheetIdRef = useRef<string | null>(null);
   const skipAskUserRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
@@ -323,6 +324,15 @@ const ConversationContent = ({
     }
   };
 
+  const settleRetryState = (): void => {
+    if (!retryInFlightRef.current) return;
+    retryRequestIdRef.current += 1;
+    retryInFlightRef.current = false;
+    assetId.current = null;
+    providerIdsRef.current = undefined;
+    setRetrying(false);
+  };
+
   const stop = async (showRecovery = true): Promise<void> => {
     const question = displayMessages.findLast(({ role }) => role === 'user')?.text.trim();
     const context =
@@ -349,6 +359,7 @@ const ConversationContent = ({
         : null;
     if (!runId) {
       stopChat();
+      settleRetryState();
       activeRunContextRef.current = null;
       setActiveRunContext((current) => (current?.conversationId === id ? null : current));
       if (showRecovery) setStoppedRecovery(recovery('cancelled'));
@@ -357,6 +368,7 @@ const ConversationContent = ({
     try {
       const outcome = await cancelRunThenStop(id, runId, stopChat);
       if (outcome === 'completed') {
+        settleRetryState();
         activeRunContextRef.current = null;
         setActiveRunContext((current) =>
           current?.conversationId === id && (!current.runId || current.runId === runId)
@@ -375,6 +387,7 @@ const ConversationContent = ({
         return;
       }
       if (outcome === 'failed') {
+        settleRetryState();
         activeRunContextRef.current = null;
         setActiveRunContext((current) =>
           current?.conversationId === id && (!current.runId || current.runId === runId)
@@ -398,6 +411,7 @@ const ConversationContent = ({
         ? null
         : current,
     );
+    settleRetryState();
     activeRunContextRef.current = null;
     void clearPersistedResume(runId).catch(() => undefined);
     if (showRecovery && finishedRunIdRef.current !== runId)
@@ -424,6 +438,7 @@ const ConversationContent = ({
   const retryStoppedQuestion = async (): Promise<void> => {
     if (!stoppedRecovery || retryInFlightRef.current) return;
     retryInFlightRef.current = true;
+    const requestId = ++retryRequestIdRef.current;
     const recovery = stoppedRecovery;
     setRetrying(true);
     activeRunContextRef.current = {
@@ -444,17 +459,21 @@ const ConversationContent = ({
     responseFinishedRef.current = false;
     try {
       await reload();
+      if (requestId !== retryRequestIdRef.current) return;
       if (responseFinishedRef.current) onProviderReset?.();
       setStoppedRecovery((current) => (current === recovery ? null : current));
     } catch (error) {
+      if (requestId !== retryRequestIdRef.current) return;
       setActiveRunContext((current) => (current?.conversationId === id ? null : current));
       setStoppedRecovery((current) => (current === recovery ? recovery : current));
       Alert.alert('다시 검색 실패', chatErrorPresentation(error).message);
     } finally {
-      assetId.current = null;
-      providerIdsRef.current = undefined;
-      retryInFlightRef.current = false;
-      setRetrying(false);
+      if (requestId === retryRequestIdRef.current) {
+        assetId.current = null;
+        providerIdsRef.current = undefined;
+        retryInFlightRef.current = false;
+        setRetrying(false);
+      }
     }
   };
 
