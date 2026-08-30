@@ -1,33 +1,47 @@
 import { useApolloClient, useQuery } from '@apollo/client/react';
-import { useChat } from '@tanstack/ai-react';
+import { useChat, xhrHttpStream } from '@tanstack/ai-react';
 import { act, render } from '@testing-library/react-native';
 import {
   type ComponentProps,
   createElement as mockCreateElement,
   type ReactNode,
 } from 'react';
-import { Text as mockText } from 'react-native';
+import { Alert, Text as mockText } from 'react-native';
 
 import type { SessionStatus } from '@/features/auth';
-import { cancelRunThenStop, type ChatComposer, type MessageList } from '@/features/chat';
+import {
+  type AskUserSheet,
+  cancelRunThenStop,
+  type ChatComposer,
+  type MessageList,
+} from '@/features/chat';
 import { ConversationDocument, ConversationsDocument } from '@/graphql/generated/graphql';
+import { sqliteChatPersistence } from '@/shared/storage';
 
 import { ConversationScreen } from './conversation-screen';
 
 let mockComposerProps: ComponentProps<typeof ChatComposer> | undefined;
+let mockAskUserSheetProps: ComponentProps<typeof AskUserSheet> | undefined;
 let mockMessageListProps: ComponentProps<typeof MessageList> | undefined;
 let mockConnectionOptions: (() => { body: Record<string, unknown> }) | undefined;
+let mockChatConnection: Parameters<typeof useChat>[0]['connection'] | undefined;
 let mockFinish: (() => void) | undefined;
+let mockChunk: ((chunk: { runId?: string; type: string }) => void) | undefined;
 let mockHistory: ReadonlyArray<unknown> = [];
 let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
 let mockIsLoading = false;
 let mockRunId: string | null = null;
 const mockSendMessage = jest.fn<Promise<void>, [unknown]>();
+const mockReload = jest.fn<Promise<void>, []>();
 const mockStopChat = jest.fn();
 const mockRefetchQueries = jest.fn();
+const mockHistoryRefetch = jest.fn();
+const mockTransportConnect = jest.fn();
+const mockTransportJoinRun = jest.fn();
 let mockSessionStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
+let mockRouteParams: Record<string, string> = {};
 let mockBoundaryOnline: boolean | undefined;
 let mockActiveAskUser: { id: string; request: { allowFreeText: boolean } } | null = null;
 
@@ -35,7 +49,7 @@ jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) =>
     mockCreateElement(mockText, { testID: 'redirect' }, href),
   router: { push: jest.fn() },
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockRouteParams,
 }));
 
 jest.mock('@apollo/client/react', () => ({
@@ -50,7 +64,7 @@ jest.mock(
     xhrHttpStream: jest.fn(
       (_url: string, options: () => { body: Record<string, unknown> }) => {
         mockConnectionOptions = options;
-        return {};
+        return { connect: mockTransportConnect, joinRun: mockTransportJoinRun };
       },
     ),
   }),
@@ -72,13 +86,18 @@ jest.mock('@/providers/network-provider', () => ({
 
 jest.mock('@/shared/storage', () => ({
   flushChatPersistence: jest.fn(() => Promise.resolve()),
-  sqliteChatPersistence: {},
+  sqliteChatPersistence: {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+  },
 }));
 
 jest.mock('@/features/chat', () => ({
   ASK_USER_SKIP_MESSAGE: '질문을 건너뛰고 현재 정보로 계속 진행해줘.',
-  AskUserSheet: () =>
-    mockCreateElement(mockText, { testID: 'ask-user-sheet' }, 'ask-user'),
+  AskUserSheet: (props: ComponentProps<typeof AskUserSheet>) => {
+    mockAskUserSheetProps = props;
+    return mockCreateElement(mockText, { testID: 'ask-user-sheet' }, 'ask-user');
+  },
   cancelRunThenStop: jest.fn(),
   ChatComposer: (props: ComponentProps<typeof ChatComposer>) => {
     mockComposerProps = props;
@@ -104,15 +123,21 @@ const mockedUseApolloClient = useApolloClient as jest.MockedFunction<
   typeof useApolloClient
 >;
 const mockedUseChat = useChat as jest.MockedFunction<typeof useChat>;
+const mockedXhrHttpStream = xhrHttpStream as jest.MockedFunction<typeof xhrHttpStream>;
 const mockedCancelRunThenStop = jest.mocked(cancelRunThenStop);
+const mockedPersistence = jest.mocked(sqliteChatPersistence);
+const mockedAlert = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
 
 describe('conversation screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockComposerProps = undefined;
+    mockAskUserSheetProps = undefined;
     mockMessageListProps = undefined;
     mockConnectionOptions = undefined;
+    mockChatConnection = undefined;
     mockFinish = undefined;
+    mockChunk = undefined;
     mockHistory = [];
     mockHistoryLoading = false;
     mockChatMessages = [];
@@ -120,12 +145,20 @@ describe('conversation screen', () => {
     mockRunId = null;
     mockSessionStatus = 'authenticated';
     mockOnline = true;
+    mockRouteParams = {};
     mockBoundaryOnline = undefined;
     mockActiveAskUser = null;
     mockSendMessage.mockReset();
+    mockReload.mockReset().mockResolvedValue(undefined);
     mockStopChat.mockReset();
-    mockedCancelRunThenStop.mockReset().mockResolvedValue(undefined);
+    mockedCancelRunThenStop.mockReset().mockResolvedValue('cancelled');
     mockRefetchQueries.mockReset().mockResolvedValue([]);
+    mockHistoryRefetch.mockReset().mockResolvedValue(undefined);
+    mockedAlert.mockClear();
+    mockTransportConnect.mockReset().mockImplementation(async function* () {});
+    mockTransportJoinRun.mockReset().mockImplementation(async function* () {});
+    mockedPersistence.getItem.mockReset().mockResolvedValue(null);
+    mockedPersistence.setItem.mockReset().mockResolvedValue(undefined);
     mockedUseApolloClient.mockReturnValue({
       refetchQueries: mockRefetchQueries,
     } as unknown as ReturnType<typeof useApolloClient>);
@@ -133,16 +166,20 @@ describe('conversation screen', () => {
       () =>
         ({
           data: { conversation: { messages: mockHistory } },
+          refetch: mockHistoryRefetch,
           loading: mockHistoryLoading,
-        }) as ReturnType<typeof useQuery>,
+        }) as unknown as ReturnType<typeof useQuery>,
     );
     mockedUseChat.mockImplementation((options) => {
+      mockChatConnection = options.connection;
       mockFinish = () => options.onFinish?.({} as never);
+      mockChunk = (chunk) => options.onChunk?.(chunk as never);
       return {
         error: undefined,
         isLoading: mockIsLoading,
         messages: mockChatMessages,
         runId: mockRunId,
+        reload: mockReload,
         sendMessage: mockSendMessage,
         stop: mockStopChat,
       } as unknown as ReturnType<typeof useChat>;
@@ -158,6 +195,35 @@ describe('conversation screen', () => {
     expect(screen.queryByTestId('chat-composer')).toBeNull();
     expect(mockedUseQuery).not.toHaveBeenCalled();
     expect(mockedUseChat).not.toHaveBeenCalled();
+  });
+
+  it('mounts one stream client on the first authenticated render after booting', () => {
+    mockSessionStatus = 'booting';
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    mockSessionStatus = 'authenticated';
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts one stream client on the first authenticated render after guest', () => {
+    mockSessionStatus = 'guest';
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    mockSessionStatus = 'authenticated';
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts one stream client when a route ID first becomes available online', () => {
+    const screen = render(<ConversationScreen />);
+
+    mockRouteParams = { id: 'conversation-1' };
+    act(() => screen.rerender(<ConversationScreen />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(1);
   });
 
   it('redirects guests before private hooks or content mount', () => {
@@ -197,6 +263,16 @@ describe('conversation screen', () => {
     });
     expect(mockBoundaryOnline).toBe(false);
     expect(screen.queryByTestId('ask-user-sheet')).toBeNull();
+  });
+
+  it('rejoins once when an offline-authenticated conversation becomes authenticated', () => {
+    mockSessionStatus = 'offline-authenticated';
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    mockSessionStatus = 'authenticated';
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(2);
   });
 
   it('stops mounted transport and blocks a retained finish refetch after going offline', () => {
@@ -296,8 +372,8 @@ describe('conversation screen', () => {
     mockRunId = 'run-1';
     let finishCancellation!: () => void;
     mockedCancelRunThenStop.mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        finishCancellation = resolve;
+      new Promise<'cancelled'>((resolve) => {
+        finishCancellation = () => resolve('cancelled');
       }),
     );
     render(<ConversationScreen conversationId="conversation-1" />);
@@ -336,6 +412,972 @@ describe('conversation screen', () => {
     ).toEqual({ text: '이전 질문' });
   });
 
+  it('keeps a cancelled question in the conversation and retries its existing message', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    const recovery = mockMessageListProps?.recovery;
+    expect(recovery?.question).toBe('토너 패드 최저가 찾아줘');
+
+    await act(async () => {
+      recovery?.onRetry();
+      await Promise.resolve();
+    });
+
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('removes only a cancelled run resume while retaining its persisted messages', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedPersistence.getItem.mockResolvedValue({
+      messages: [{ id: 'message-1' }],
+      resume: { resumeState: { runId: 'run-1', threadId: 'conversation-1' } },
+    } as never);
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockedPersistence.setItem).toHaveBeenCalledWith('conversation-1', {
+      messages: [{ id: 'message-1' }],
+    });
+  });
+
+  it('shows terminal recovery when persistence cleanup rejects after cancellation', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedPersistence.getItem.mockRejectedValue(new Error('sqlite unavailable'));
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+  });
+
+  it('reconciles history without recovery when completion wins cancellation', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedCancelRunThenStop.mockResolvedValue('completed');
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockFinish).toBeDefined();
+    expect(mockHistoryRefetch).toHaveBeenCalledTimes(1);
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+    expect(mockedPersistence.setItem).not.toHaveBeenCalled();
+  });
+
+  it('does not display cancellation recovery when completed reconciliation fails', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedCancelRunThenStop.mockResolvedValue('completed');
+    mockHistoryRefetch.mockRejectedValue(new Error('network unavailable'));
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+    expect(mockedAlert).toHaveBeenCalledWith(
+      '응답 상태 확인 실패',
+      '완료된 응답을 확인하지 못했어요. 다시 시도해 주세요.',
+    );
+  });
+
+  it('shows failure recovery and clears stale resume when failure wins without a run error', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedCancelRunThenStop.mockResolvedValue('failed');
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockHistoryRefetch).not.toHaveBeenCalled();
+    expect(mockMessageListProps?.recovery?.message).toBe('검색에 실패했어요');
+    expect(mockMessageListProps?.recovery?.reason).toBe('failed');
+    expect(mockedPersistence.getItem).toHaveBeenCalledWith('conversation-1');
+    await act(async () => {
+      mockMessageListProps?.recovery?.onRetry();
+      await Promise.resolve();
+    });
+    expect(mockReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps terminal recovery through an offline reconnect remount', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+
+    mockOnline = false;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    mockOnline = true;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+  });
+
+  it('does not expose a cancelled recovery in a different conversation', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '토너 패드 최저가 찾아줘',
+        tools: [],
+      },
+    ];
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-2" />));
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+  });
+
+  it('joins a deferred persisted run exactly once across an offline reconnect', async () => {
+    let resolveInitialHydration!: (state: unknown) => void;
+    const initialHydration = new Promise<unknown>((resolve) => {
+      resolveInitialHydration = resolve;
+    });
+    const persisted = {
+      messages: [{ id: 'message-1' }],
+      resume: { resumeState: { runId: 'run-1', threadId: 'conversation-1' } },
+    };
+    mockedPersistence.getItem
+      .mockReturnValueOnce(initialHydration as never)
+      .mockResolvedValue(persisted as never);
+    const hydratedConnections = new Set<unknown>();
+    mockedUseChat.mockImplementation((options) => {
+      if (!hydratedConnections.has(options.connection)) {
+        hydratedConnections.add(options.connection);
+        const persistence = options.persistence;
+        if (persistence && typeof persistence === 'object' && 'getItem' in persistence) {
+          const getItem = persistence.getItem as (id: string) => unknown;
+          void Promise.resolve(getItem('conversation-1')).then(async (state) => {
+            if (
+              Array.isArray(state) ||
+              !state ||
+              typeof state !== 'object' ||
+              !('resume' in state) ||
+              !state.resume
+            )
+              return;
+            const resume = state.resume as { resumeState: { runId: string } };
+            const connection = options.connection;
+            if (!connection || !('joinRun' in connection) || !connection.joinRun) return;
+            for await (const _chunk of connection.joinRun(resume.resumeState.runId))
+              void _chunk;
+          });
+        }
+      }
+      mockFinish = () => options.onFinish?.({} as never);
+      mockChunk = (chunk) => options.onChunk?.(chunk as never);
+      return {
+        error: undefined,
+        isLoading: mockIsLoading,
+        messages: mockChatMessages,
+        runId: mockRunId,
+        reload: mockReload,
+        sendMessage: mockSendMessage,
+        stop: mockStopChat,
+      } as unknown as ReturnType<typeof useChat>;
+    });
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    mockOnline = false;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    mockOnline = true;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    resolveInitialHydration(persisted);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockTransportJoinRun).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cancelled', 'completed', 'failed'] as const)(
+    'strips a %s tombstone from reconnect hydration while cleanup is deferred',
+    async (outcome) => {
+      let resolveCleanupRead!: (state: unknown) => void;
+      const cleanupRead = new Promise<unknown>((resolve) => {
+        resolveCleanupRead = resolve;
+      });
+      const persisted = {
+        messages: [{ id: 'message-1' }],
+        resume: { resumeState: { runId: 'run-1', threadId: 'conversation-1' } },
+      };
+      mockIsLoading = true;
+      mockRunId = 'run-1';
+      mockChatMessages = [
+        {
+          askUsers: [],
+          id: 'message-1',
+          images: [],
+          products: [],
+          recommendations: [],
+          role: 'user',
+          status: 'COMPLETED',
+          text: '토너 패드 최저가 찾아줘',
+          tools: [],
+        },
+      ];
+      mockedPersistence.getItem
+        .mockReturnValueOnce(cleanupRead as never)
+        .mockResolvedValue(persisted as never);
+      mockedCancelRunThenStop.mockResolvedValue(outcome);
+      const hydratedConnections = new Set<unknown>();
+      let hydratedState: unknown;
+      mockedUseChat.mockImplementation((options) => {
+        if (!hydratedConnections.has(options.connection)) {
+          hydratedConnections.add(options.connection);
+          if (hydratedConnections.size > 1) {
+            const persistence = options.persistence;
+            if (
+              persistence &&
+              typeof persistence === 'object' &&
+              'getItem' in persistence
+            ) {
+              const getItem = persistence.getItem as (id: string) => unknown;
+              void Promise.resolve(getItem('conversation-1')).then(async (state) => {
+                hydratedState = state;
+                if (
+                  Array.isArray(state) ||
+                  !state ||
+                  typeof state !== 'object' ||
+                  !('resume' in state) ||
+                  !state.resume
+                )
+                  return;
+                const resume = state.resume as { resumeState: { runId: string } };
+                const connection = options.connection;
+                if (!connection || !('joinRun' in connection) || !connection.joinRun)
+                  return;
+                for await (const _chunk of connection.joinRun(resume.resumeState.runId))
+                  void _chunk;
+              });
+            }
+          }
+        }
+        mockChatConnection = options.connection;
+        mockFinish = () => options.onFinish?.({} as never);
+        mockChunk = (chunk) => options.onChunk?.(chunk as never);
+        return {
+          error: undefined,
+          isLoading: mockIsLoading,
+          messages: mockChatMessages,
+          reload: mockReload,
+          runId: mockRunId,
+          sendMessage: mockSendMessage,
+          stop: mockStopChat,
+        } as unknown as ReturnType<typeof useChat>;
+      });
+      const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+      await act(async () => {
+        await mockComposerProps?.onStop();
+      });
+      if (outcome === 'completed') {
+        expect(mockHistoryRefetch).toHaveBeenCalledTimes(1);
+        expect(mockMessageListProps?.recovery).toBeUndefined();
+      } else {
+        expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+      }
+      mockOnline = false;
+      act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+      mockOnline = true;
+      act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      resolveCleanupRead(persisted);
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockTransportJoinRun).not.toHaveBeenCalled();
+      expect(hydratedState).toEqual({ messages: [{ id: 'message-1' }] });
+      if (outcome !== 'completed')
+        expect(mockMessageListProps?.recovery?.question).toBe('토너 패드 최저가 찾아줘');
+    },
+  );
+
+  it('keeps the stream initializer while offline and recreates it once when reconnecting', () => {
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(1);
+
+    mockOnline = false;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(1);
+    mockOnline = true;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates one stream client when switching conversations', () => {
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-2" />));
+
+    expect(mockedXhrHttpStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores the cancelled run context before retrying its existing message', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveSend!: () => void;
+    const sending = new Promise<void>((resolve) => {
+      resolveSend = resolve;
+    });
+    let retryBody: Record<string, unknown> | undefined;
+    mockSendMessage.mockReturnValue(sending);
+    mockReload.mockImplementation(() => {
+      retryBody = mockConnectionOptions?.().body;
+      return Promise.resolve();
+    });
+    mockedCancelRunThenStop.mockImplementation((_thread, _run, stop) => {
+      stop();
+      resolveSend();
+      return Promise.resolve('cancelled');
+    });
+    render(
+      <ConversationScreen conversationId="conversation-1" providerIds={['oliveyoung']} />,
+    );
+    let send: Promise<void> | undefined;
+    act(() => {
+      send = mockComposerProps?.onSend('립밤 찾아줘', 'asset-1');
+    });
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+      await send;
+    });
+    const recovery = mockMessageListProps?.recovery;
+
+    act(() => recovery?.onRetry());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(retryBody).toEqual({ assetId: 'asset-1', providerIds: ['oliveyoung'] });
+    expect(mockConnectionOptions?.().body).toEqual({ assetId: null });
+  });
+
+  it('submits one retry and retains its context when recovery is double-tapped', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveReload!: () => void;
+    const retrying = new Promise<void>((resolve) => {
+      resolveReload = resolve;
+    });
+    let retryBody: Record<string, unknown> | undefined;
+    mockReload.mockImplementation(() => {
+      retryBody = mockConnectionOptions?.().body;
+      return retrying;
+    });
+    const screen = render(
+      <ConversationScreen conversationId="conversation-1" providerIds={['oliveyoung']} />,
+    );
+    await act(async () => {
+      await mockComposerProps?.onSend('립밤 찾아줘', 'asset-1');
+      await mockComposerProps?.onStop();
+    });
+    const recovery = mockMessageListProps?.recovery;
+
+    act(() => {
+      recovery?.onRetry();
+      recovery?.onRetry();
+    });
+
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(retryBody).toEqual({ assetId: 'asset-1', providerIds: ['oliveyoung'] });
+    await act(async () => {
+      resolveReload();
+      await retrying;
+    });
+    expect(mockConnectionOptions?.().body).toEqual({ assetId: null });
+    expect(screen.getByTestId('conversation-screen')).toBeTruthy();
+  });
+
+  it('keeps a newer cancellation recovery when an earlier retry finishes', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '첫 번째 립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveReload!: () => void;
+    const firstRetry = new Promise<void>((resolve) => {
+      resolveReload = resolve;
+    });
+    mockReload.mockReturnValue(firstRetry);
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    act(() => mockMessageListProps?.recovery?.onRetry());
+    mockRunId = 'run-b';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-b',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '두 번째 립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    expect(mockMessageListProps?.recovery?.question).toBe('두 번째 립밤 찾아줘');
+
+    await act(async () => {
+      resolveReload();
+      await firstRetry;
+    });
+
+    expect(mockMessageListProps?.recovery?.question).toBe('두 번째 립밤 찾아줘');
+  });
+
+  it('preserves asset and provider context through reconnect before cancelling and retrying', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let retryBody: Record<string, unknown> | undefined;
+    mockReload.mockImplementation(() => {
+      retryBody = mockConnectionOptions?.().body;
+      return Promise.resolve();
+    });
+    const screen = render(
+      <ConversationScreen conversationId="conversation-1" providerIds={['oliveyoung']} />,
+    );
+
+    await act(async () => {
+      await mockComposerProps?.onSend('립밤 찾아줘', 'asset-1');
+    });
+    mockOnline = false;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    mockOnline = true;
+    act(() =>
+      screen.rerender(
+        <ConversationScreen
+          conversationId="conversation-1"
+          providerIds={['oliveyoung']}
+        />,
+      ),
+    );
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    const recovery = mockMessageListProps?.recovery;
+
+    act(() => recovery?.onRetry());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(retryBody).toEqual({ assetId: 'asset-1', providerIds: ['oliveyoung'] });
+  });
+
+  it('restores a persisted run context after cold hydration before cancelling and retrying', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    mockedPersistence.getItem.mockResolvedValue({
+      messages: [{ id: 'message-1' }],
+      resume: { resumeState: { runId: 'run-1', threadId: 'conversation-1' } },
+      shopportRunContext: {
+        assetId: 'asset-1',
+        conversationId: 'conversation-1',
+        providerIds: ['oliveyoung'],
+        runId: 'run-1',
+      },
+    } as never);
+    let hydrated = false;
+    mockedUseChat.mockImplementation((options) => {
+      if (!hydrated) {
+        hydrated = true;
+        const persistence = options.persistence;
+        if (persistence && typeof persistence === 'object' && 'getItem' in persistence)
+          void Promise.resolve(persistence.getItem('conversation-1'));
+      }
+      mockChatConnection = options.connection;
+      mockFinish = () => options.onFinish?.({} as never);
+      mockChunk = (chunk) => options.onChunk?.(chunk as never);
+      return {
+        error: undefined,
+        isLoading: mockIsLoading,
+        messages: mockChatMessages,
+        reload: mockReload,
+        runId: mockRunId,
+        sendMessage: mockSendMessage,
+        stop: mockStopChat,
+      } as unknown as ReturnType<typeof useChat>;
+    });
+    let retryBody: Record<string, unknown> | undefined;
+    mockReload.mockImplementation(() => {
+      retryBody = mockConnectionOptions?.().body;
+      return Promise.resolve();
+    });
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    act(() => mockMessageListProps?.recovery?.onRetry());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(retryBody).toEqual({ assetId: 'asset-1', providerIds: ['oliveyoung'] });
+    expect(screen.getByTestId('conversation-screen')).toBeTruthy();
+  });
+
+  it('clears persisted run transport context before skipping a completed ask-user prompt', async () => {
+    mockActiveAskUser = {
+      id: 'ask-1',
+      request: { allowFreeText: false },
+    };
+    mockedPersistence.getItem.mockResolvedValue({
+      messages: [{ id: 'message-1' }],
+      resume: { resumeState: { runId: 'run-1', threadId: 'conversation-1' } },
+      shopportRunContext: {
+        assetId: 'asset-1',
+        conversationId: 'conversation-1',
+        providerIds: ['oliveyoung'],
+        runId: 'run-1',
+      },
+    } as never);
+    let hydrated = false;
+    mockedUseChat.mockImplementation((options) => {
+      if (!hydrated) {
+        hydrated = true;
+        const persistence = options.persistence;
+        if (persistence && typeof persistence === 'object' && 'getItem' in persistence)
+          void Promise.resolve(persistence.getItem('conversation-1'));
+      }
+      mockChatConnection = options.connection;
+      mockFinish = () => options.onFinish?.({} as never);
+      mockChunk = (chunk) => options.onChunk?.(chunk as never);
+      return {
+        error: undefined,
+        isLoading: mockIsLoading,
+        messages: mockChatMessages,
+        reload: mockReload,
+        runId: 'run-1',
+        sendMessage: mockSendMessage,
+        stop: mockStopChat,
+      } as unknown as ReturnType<typeof useChat>;
+    });
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => mockFinish?.());
+    await act(async () => {
+      await mockAskUserSheetProps?.onDismiss();
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      { content: '질문을 건너뛰고 현재 정보로 계속 진행해줘.', id: 'message-1' },
+      { whenBusy: 'queue' },
+    );
+    expect(mockConnectionOptions?.().body).toEqual({ assetId: null });
+  });
+
+  it('does not show stale recovery when the response finishes during cancellation', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveCancellation!: () => void;
+    mockedCancelRunThenStop.mockReturnValue(
+      new Promise<'cancelled'>((resolve) => {
+        resolveCancellation = () => resolve('cancelled');
+      }),
+    );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let cancel!: Promise<void>;
+
+    act(() => {
+      cancel = mockComposerProps?.onStop() as Promise<void>;
+    });
+    act(() => mockFinish?.());
+    await act(async () => {
+      resolveCancellation();
+      await cancel;
+    });
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+  });
+
+  it('keeps the active run ID through a null render before cancellation finishes', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveCancellation!: () => void;
+    mockedCancelRunThenStop.mockReturnValue(
+      new Promise<'cancelled'>((resolve) => {
+        resolveCancellation = () => resolve('cancelled');
+      }),
+    );
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+    let cancel!: Promise<void>;
+
+    act(() => {
+      cancel = mockComposerProps?.onStop() as Promise<void>;
+    });
+    mockRunId = null;
+    screen.rerender(<ConversationScreen conversationId="conversation-1" />);
+    act(() => mockFinish?.());
+    await act(async () => {
+      resolveCancellation();
+      await cancel;
+    });
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+  });
+
+  it('removes recovery when the response finishes after cancellation', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    expect(mockMessageListProps?.recovery?.question).toBe('립밤 찾아줘');
+
+    act(() => mockFinish?.());
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+  });
+
+  it('ignores a cancelled run finish after a retry starts a newer run', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    const recovery = mockMessageListProps?.recovery;
+    mockRunId = 'run-b';
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    act(() => recovery?.onRetry());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      mockChunk?.({ runId: 'run-a', type: 'RUN_FINISHED' });
+      mockFinish?.();
+    });
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+
+    expect(mockMessageListProps?.recovery?.question).toBe('립밤 찾아줘');
+  });
+
+  it('ignores a cancelled run finish once a retry transport starts before its run ID rerenders', async () => {
+    const onProviderReset = jest.fn();
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    let resolveReload!: () => void;
+    mockReload.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveReload = resolve;
+      }),
+    );
+    render(
+      <ConversationScreen
+        conversationId="conversation-1"
+        onProviderReset={onProviderReset}
+      />,
+    );
+
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    const recovery = mockMessageListProps?.recovery;
+    act(() => recovery?.onRetry());
+    const connection = mockChatConnection;
+    if (!connection || !('connect' in connection))
+      throw new Error('chat connection unavailable');
+    await act(async () => {
+      for await (const _chunk of connection.connect([], undefined, undefined, {
+        runId: 'run-b',
+      } as never))
+        void _chunk;
+    });
+    act(() => {
+      mockChunk?.({ runId: 'run-a', type: 'RUN_FINISHED' });
+      mockFinish?.();
+    });
+    await act(async () => {
+      resolveReload();
+      await Promise.resolve();
+    });
+
+    expect(onProviderReset).not.toHaveBeenCalled();
+  });
+
   it('keeps the latest edit when cancellations finish out of order', async () => {
     mockIsLoading = true;
     mockRunId = 'run-1';
@@ -343,13 +1385,13 @@ describe('conversation screen', () => {
     let finishSecondCancellation!: () => void;
     mockedCancelRunThenStop
       .mockReturnValueOnce(
-        new Promise<void>((resolve) => {
-          finishFirstCancellation = resolve;
+        new Promise<'cancelled'>((resolve) => {
+          finishFirstCancellation = () => resolve('cancelled');
         }),
       )
       .mockReturnValueOnce(
-        new Promise<void>((resolve) => {
-          finishSecondCancellation = resolve;
+        new Promise<'cancelled'>((resolve) => {
+          finishSecondCancellation = () => resolve('cancelled');
         }),
       );
     render(<ConversationScreen conversationId="conversation-1" />);

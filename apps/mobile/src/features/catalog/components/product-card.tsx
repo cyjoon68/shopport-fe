@@ -11,6 +11,7 @@ import { glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { useUpdateSavedProduct } from '../api/hooks';
 import { formatMoney } from '../domain/format-money';
+import { formatStockFreshness } from '../domain/format-stock-freshness';
 import type { ProductCardProps } from '../types';
 
 export const ProductCard = ({
@@ -24,6 +25,23 @@ export const ProductCard = ({
   const { theme } = useUnistyles();
   const online = useOnline();
   const reducedMotion = useReducedMotion();
+  const stockStatus =
+    product.availability === 'IN_STOCK'
+      ? '구매 가능'
+      : product.availability === 'OUT_OF_STOCK'
+        ? '품절'
+        : '재고 확인 필요';
+  const stockStyle =
+    product.availability === 'IN_STOCK'
+      ? styles.stock
+      : product.availability === 'OUT_OF_STOCK'
+        ? styles.soldOut
+        : styles.unknownStock;
+  const stockFreshness = formatStockFreshness(
+    product.availability,
+    product.observedAt,
+    new Date(),
+  );
   styles.useVariants({ compact, highlighted, horizontal });
 
   useEffect(() => setSaved(product.isSaved), [product.isSaved]);
@@ -87,8 +105,11 @@ export const ProductCard = ({
       <Text allowFontScaling style={styles.price}>
         {formatMoney(product.totalMinor, product.currency)}
       </Text>
-      <Text allowFontScaling style={product.isInStock ? styles.stock : styles.soldOut}>
-        {product.isInStock ? '구매 가능' : '품절'}
+      <Text allowFontScaling style={stockStyle}>
+        {stockStatus}
+      </Text>
+      <Text allowFontScaling style={styles.stockFreshness}>
+        {stockFreshness}
       </Text>
     </>
   );
@@ -113,7 +134,7 @@ export const ProductCard = ({
 
   return (
     <View
-      accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}`}
+      accessibilityLabel={`${product.title}, ${formatMoney(product.totalMinor, product.currency)}, ${stockStatus}, ${stockFreshness}`}
       style={styles.card}
     >
       <View style={horizontal ? styles.horizontalTop : undefined}>
@@ -225,6 +246,15 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.danger,
     fontSize: theme.typography.productCard.status.regular,
     fontWeight: '600',
+  },
+  unknownStock: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.productCard.status.regular,
+    fontWeight: '600',
+  },
+  stockFreshness: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.productCard.provider.regular,
   },
   actions: {
     flexDirection: 'row',

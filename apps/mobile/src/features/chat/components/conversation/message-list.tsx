@@ -6,6 +6,7 @@ import { useReducedMotion } from '@/shared/accessibility/hooks';
 
 import { activeAskUserRequest } from '../../domain/models';
 import type { MessageListProps } from '../../types';
+import { ChatStopRecovery } from './chat-stop-recovery';
 import { MessageListItem } from './message-list-item';
 
 const maintainVisibleContentPosition = {
@@ -22,6 +23,7 @@ export const MessageList = ({
   onAskUserPress,
   onEditMessage,
   onProductSelect,
+  recovery,
 }: MessageListProps) => {
   const reducedMotion = useReducedMotion();
   const activeAskUserId = activeAskUserRequest(messages)?.id ?? null;
@@ -52,18 +54,21 @@ export const MessageList = ({
   );
 
   return (
-    <FlashList
-      contentContainerStyle={styles.list}
-      data={messages}
-      getItemType={messageType}
-      keyExtractor={messageKey}
-      keyboardDismissMode="interactive"
-      keyboardShouldPersistTaps="handled"
-      maintainVisibleContentPosition={maintainVisibleContentPosition}
-      ref={listRef}
-      style={styles.flex}
-      renderItem={renderMessage}
-    />
+    <>
+      <FlashList
+        contentContainerStyle={styles.list}
+        data={messages}
+        getItemType={messageType}
+        keyExtractor={messageKey}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={maintainVisibleContentPosition}
+        ref={listRef}
+        style={styles.flex}
+        renderItem={renderMessage}
+      />
+      {recovery ? <ChatStopRecovery {...recovery} /> : null}
+    </>
   );
 };
 

@@ -24,11 +24,19 @@ appId: com.cyjoon68.shopport
     timeout: 30000
 - tapOn: '응답 중지'
 - extendedWaitUntil:
-    visible: '메시지 보내기'
+    visible: '검색을 중지했어요'
     timeout: 10000
-- longPressOn: '토너 패드 최저가 찾아줘'
-- assertVisible: '편집'
-- tapOn: '편집'
+- assertVisible: '질문 수정'
+- assertVisible: '다시 검색'
+- tapOn: '다시 검색'
+- extendedWaitUntil:
+    visible: '응답 중지'
+    timeout: 30000
+- tapOn: '응답 중지'
+- extendedWaitUntil:
+    visible: '검색을 중지했어요'
+    timeout: 10000
+- tapOn: '질문 수정'
 - assertVisible: '토너 패드 최저가 찾아줘'
 - assertNotVisible:
     id: 'chat-quick-actions'

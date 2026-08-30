@@ -57,6 +57,8 @@ export type RenameConversationInput = {
   title: string;
 };
 
+export type StockAvailability = 'IN_STOCK' | 'OUT_OF_STOCK' | 'UNKNOWN';
+
 /** The state of an AI tool call. */
 export type ToolStatus = 'COMPLETED' | 'FAILED' | 'STARTED';
 
@@ -133,6 +135,7 @@ export type ProductCardFragment = {
     __typename: 'Offer';
     id: string;
     isInStock: boolean;
+    availability: StockAvailability;
     deliveryExpectedAt: string | null;
     observedAt: string;
     outboundUrl: string;
@@ -509,6 +512,7 @@ export const ProductCardFragmentDoc = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
@@ -790,7 +794,7 @@ export const DeleteAssetDocument = {
   ],
 } as unknown as DocumentNode<DeleteAssetMutation, DeleteAssetMutationVariables>;
 export const SavedProductsDocument = {
-  __meta__: { hash: 'bf57c797b4648170197cfea2a3603e97894cf05bc6e06e0102ed2ef420d41b32' },
+  __meta__: { hash: '6f579feeac6d8fbb4f8929a4c14a68e9f1730894c65de6c111a76973224b0602' },
   kind: 'Document',
   definitions: [
     {
@@ -915,6 +919,7 @@ export const SavedProductsDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
@@ -963,7 +968,7 @@ export const SavedProductsDocument = {
   ],
 } as unknown as DocumentNode<SavedProductsQuery, SavedProductsQueryVariables>;
 export const SaveProductDocument = {
-  __meta__: { hash: 'c4dbff567b493b3f63e298e3e6ba0109707689eed4e0c9c5ff2850dc4b1f42bc' },
+  __meta__: { hash: 'd2526488736193d7686c47840a5524381f4f1c3a044352ca46de64a2d70ee51a' },
   kind: 'Document',
   definitions: [
     {
@@ -1068,6 +1073,7 @@ export const SaveProductDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
@@ -1116,7 +1122,7 @@ export const SaveProductDocument = {
   ],
 } as unknown as DocumentNode<SaveProductMutation, SaveProductMutationVariables>;
 export const UnsaveProductDocument = {
-  __meta__: { hash: '940b259c57100b1d07a93b02817ffcc88d60671d93078e40d153596767ef7809' },
+  __meta__: { hash: '5ee9fbe483ee95ffafcc0535bef5aad07e945ef462d926014ed103701464f660' },
   kind: 'Document',
   definitions: [
     {
@@ -1221,6 +1227,7 @@ export const UnsaveProductDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
@@ -1370,7 +1377,7 @@ export const ConversationsDocument = {
   ],
 } as unknown as DocumentNode<ConversationsQuery, ConversationsQueryVariables>;
 export const ConversationDocument = {
-  __meta__: { hash: '1fc08b88d65d3ad04a05b55a2e13f1e9f6c8bf25ce8f5b37f3cf3c9913a04cb3' },
+  __meta__: { hash: '802688fb4cce9f94e53c61abfe51b3ab6881423717ef366b1429c7763ca27aaa' },
   kind: 'Document',
   definitions: [
     {
@@ -1673,6 +1680,7 @@ export const ConversationDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },
@@ -1721,7 +1729,7 @@ export const ConversationDocument = {
   ],
 } as unknown as DocumentNode<ConversationQuery, ConversationQueryVariables>;
 export const FoundProductsDocument = {
-  __meta__: { hash: '7bd85e54691c850fb533b3078a9ec21c60545e61d3a0a2db6090915afdf68162' },
+  __meta__: { hash: '8caa6a0ab7bb3505ed2c0f7d16dab9fa82e25b4d85f0351f18233c95c811221f' },
   kind: 'Document',
   definitions: [
     {
@@ -1931,6 +1939,7 @@ export const FoundProductsDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: '__typename' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isInStock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availability' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'deliveryExpectedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'observedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outboundUrl' } },

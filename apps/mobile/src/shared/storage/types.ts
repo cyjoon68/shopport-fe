@@ -1,5 +1,7 @@
 import type { ChatPersistedState } from '@tanstack/ai-client';
 
+export type StockAvailability = 'IN_STOCK' | 'OUT_OF_STOCK' | 'UNKNOWN';
+
 export type CachedProduct = Readonly<{
   id: string;
   title: string;
@@ -12,6 +14,7 @@ export type CachedProduct = Readonly<{
   currency: string;
   isAffiliate: boolean;
   isInStock: boolean;
+  availability?: StockAvailability;
   outboundUrl: string;
   deliveryExpectedAt: string | null;
   observedAt: string;

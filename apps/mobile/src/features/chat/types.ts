@@ -39,6 +39,13 @@ export type AssetProcessingResult = 'READY' | 'REJECTED' | 'TIMEOUT';
 
 export type AssetRemoteStatus = 'PENDING_UPLOAD' | 'PROCESSING' | 'READY' | 'REJECTED';
 
+export type ChatRunContext = Readonly<{
+  assetId: string | null;
+  conversationId: string;
+  providerIds: ReadonlyArray<RetailerId> | undefined;
+  runId: string;
+}>;
+
 export type PollOptions = Readonly<{
   intervalMs?: number;
   maxWaitMs?: number;
@@ -49,11 +56,15 @@ export type PollOptions = Readonly<{
 
 export type ChatRunOptions = Readonly<{
   assetId: MutableRefObject<string | null>;
+  cancelledRunIdsRef?: MutableRefObject<Set<string>>;
   conversationId: string;
   online: boolean;
-  onFinish: () => void;
+  onFinish: (runId: string | null) => void;
+  onRunStart?: (runId: string) => void;
+  onResumeContext?: (context: ChatRunContext) => void;
   providerIds: MutableRefObject<ReadonlyArray<RetailerId> | undefined>;
   remoteWorkRef: MutableRefObject<boolean>;
+  runContextRef?: MutableRefObject<ChatRunContext | null>;
 }>;
 
 export type UploadedImage = Readonly<{
@@ -64,7 +75,7 @@ export type UploadedImage = Readonly<{
 export type ChatComposerProps = Readonly<{
   allowFreeText?: boolean;
   conversationId: string;
-  draftReplacement?: Readonly<{ text: string }> | null;
+  draftReplacement?: Readonly<{ focus?: number; text: string }> | null;
   loading: boolean;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
   providerIds?: ReadonlyArray<RetailerId> | undefined;
@@ -80,6 +91,7 @@ export type ChatComposerViewProps = Readonly<{
   asset: Attachment | null;
   attach: () => Promise<void>;
   draftReady: boolean;
+  focusInput?: number | undefined;
   loading: boolean;
   online: boolean;
   onProviderToggle?: ((providerId: RetailerId) => void) | undefined;
@@ -131,6 +143,7 @@ export type PromptGroupId = 'lowest' | 'recommend' | 'alternative';
 export type NewChatFooterProps = Readonly<{
   attachDisabled: boolean;
   fill?: boolean;
+  focusInput?: number | undefined;
   inputEditable: boolean;
   loading: boolean;
   onAttach: () => Promise<void>;
@@ -202,6 +215,16 @@ export type MessageListProps = Readonly<{
   onAskUserPress?: (() => void) | undefined;
   onEditMessage?: ((text: string) => Promise<void>) | undefined;
   onProductSelect?: ((product: CachedProduct) => void) | undefined;
+  recovery?: ChatRecovery | undefined;
+}>;
+
+export type ChatRecovery = Readonly<{
+  message: string;
+  onEdit: () => void;
+  onRetry: () => void;
+  question: string;
+  reason: 'cancelled' | 'failed';
+  retrying?: boolean;
 }>;
 
 export type MessageListItemProps = Readonly<{
