@@ -42,12 +42,6 @@ EAS workflow는 CNG fingerprint가 같으면 OTA update를, 다르면 새 native
 
 첫 화면 헤더에서 대화 기록과 설정으로 이동하며, 앱 루트·대화·상품 화면은 native Stack을 사용합니다.
 
-## API와 로컬 데이터 계약
-
-GraphQL Message.id와 live/SQLite UIMessage.id는 같은 canonical UUID를 사용합니다. 새 사용자 메시지는 클라이언트 UUID를 보내고, 서버는 client/stream UUID를 DB와 replay에 보존합니다. 앱은 canonical UUID만 server/live merge 키로 사용하며 legacy 로컬 ID는 source별로 격리합니다.
-
-access token은 메모리에만, rotating refresh token은 SecureStore에만 저장합니다. SQLite에는 최근 대화 50개, 상품 100개, 찜과 초안만 제한 저장하고, 로그아웃·계정 삭제 시 Apollo·SQLite·SecureStore의 사용자 상태를 제거합니다. 오프라인 전송 큐는 없으며 캐시 조회와 초안 저장만 허용합니다. prompt, 이미지, access token, 구매 URL query token은 Sentry에 보내지 않습니다.
-
 ## 검사
 
 ```bash
