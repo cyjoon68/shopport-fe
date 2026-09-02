@@ -3,7 +3,7 @@ import process, { loadEnvFile } from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 
 try {
-  loadEnvFile(fileURLToPath(new URL('../../../.env', import.meta.url)));
+  loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)));
 } catch (error) {
   if (
     !error ||

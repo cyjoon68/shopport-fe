@@ -6,7 +6,7 @@
       "module_name": "image-size",
       "severity": "high",
       "findings": [
-        { "version": "1.2.1", "paths": ["apps__mobile>dependency>metro>image-size"] }
+        { "version": "1.2.1", "paths": [".>dependency>metro>image-size"] }
       ]
     }
   },

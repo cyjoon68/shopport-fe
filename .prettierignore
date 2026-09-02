@@ -1,1 +1,6 @@
 DESIGN.md
+.expo
+dist
+ios
+android
+coverage

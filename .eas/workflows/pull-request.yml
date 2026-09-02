@@ -17,7 +17,6 @@ jobs:
       - uses: eas/install_node_modules
       - name: Validate
         run: corepack pnpm check && corepack pnpm test && corepack pnpm codegen && git diff --exit-code
-        working_directory: ../..
 
   build_android:
     name: Android preview

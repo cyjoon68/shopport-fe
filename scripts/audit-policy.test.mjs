@@ -56,7 +56,7 @@ test('fails closed for an unknown high advisory', () => {
 
 test('fails closed for a reviewed advisory outside the Metro build path', () => {
   const audit = fixture('audit-known');
-  audit.advisories.first.findings[0].paths = ['apps__mobile>image-size'];
+  audit.advisories.first.findings[0].paths = ['.>image-size'];
   audit.metadata.vulnerabilities.high = 1;
   delete audit.advisories.second;
   const result = evaluateAudit(audit, policy);
