@@ -5,13 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: [
-      '**/.expo/**',
-      '**/coverage/**',
-      '**/dist/**',
-      '**/generated/**',
-      'apps/mobile/expo-env.d.ts',
-    ],
+    ignores: ['**/.expo/**', '**/coverage/**', '**/dist/**', '**/generated/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map((configuration) => ({

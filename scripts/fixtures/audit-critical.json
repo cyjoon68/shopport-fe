@@ -5,9 +5,7 @@
       "github_advisory_id": "GHSA-w3rx-r6r6-pgpr",
       "module_name": "image-size",
       "severity": "critical",
-      "findings": [
-        { "version": "1.2.1", "paths": [".>dependency>metro>image-size"] }
-      ]
+      "findings": [{ "version": "1.2.1", "paths": [".>dependency>metro>image-size"] }]
     }
   },
   "metadata": { "vulnerabilities": { "high": 0, "critical": 1 } }

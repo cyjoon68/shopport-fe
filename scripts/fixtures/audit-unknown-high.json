@@ -5,9 +5,7 @@
       "github_advisory_id": "GHSA-unknown-unknown-unknown",
       "module_name": "image-size",
       "severity": "high",
-      "findings": [
-        { "version": "1.2.1", "paths": [".>dependency>metro>image-size"] }
-      ]
+      "findings": [{ "version": "1.2.1", "paths": [".>dependency>metro>image-size"] }]
     }
   },
   "metadata": { "vulnerabilities": { "high": 1, "critical": 0 } }
