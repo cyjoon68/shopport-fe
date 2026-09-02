@@ -1,8 +1,38 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./apps/mobile" },
-    { "path": "./packages/tokens" },
-    { "path": "./packages/ui" }
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "allowJs": false,
+    "allowSyntheticDefaultImports": true,
+    "customConditions": ["react-native"],
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM"],
+    "module": "preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2024",
+    "types": ["jest", "node", "react-native"]
+  },
+  "include": [
+    "src",
+    "app.config.ts",
+    "codegen.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
   ]
 }

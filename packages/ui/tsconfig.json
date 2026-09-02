@@ -1,4 +1,0 @@
-{
-  "extends": "@shopport/typescript-config/react-native.json",
-  "include": ["src"]
-}

@@ -1,0 +1,56 @@
+name: Pull request preview
+
+on:
+  pull_request:
+    branches: [develop]
+
+defaults:
+  image: sdk-57
+  tools:
+    node: 22.13.0
+
+jobs:
+  checks:
+    name: Checks
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Validate
+        run: corepack pnpm check && corepack pnpm test && corepack pnpm codegen && git diff --exit-code
+
+  build_android:
+    name: Android preview
+    needs: [checks]
+    type: build
+    environment: preview
+    params:
+      platform: android
+      profile: preview-android-emulator
+
+  build_ios:
+    name: iOS preview
+    needs: [checks]
+    type: build
+    environment: preview
+    params:
+      platform: ios
+      profile: preview-ios-simulator
+
+  maestro_android:
+    name: Android Maestro
+    needs: [build_android]
+    type: maestro
+    runs_on: linux-medium-nested-virtualization
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+      flow_path: e2e
+      record_screen: true
+
+  maestro_ios:
+    name: iOS Maestro
+    needs: [build_ios]
+    type: maestro
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      flow_path: e2e
+      record_screen: true

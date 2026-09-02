@@ -37,7 +37,7 @@ jobs:
             exit "$audit_status"
           fi
       - run: pnpm run doctor
-      - run: pnpm --filter @shopport/mobile exec expo install --check
+      - run: pnpm exec expo install --check
 
   secret-scan:
     name: Full-history secret scan
