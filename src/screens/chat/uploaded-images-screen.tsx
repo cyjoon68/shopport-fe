@@ -1,5 +1,4 @@
 import { FlashList } from '@shopify/flash-list';
-import { EmptyState, Screen } from '@shopport/ui';
 import { Image } from 'expo-image';
 import { Redirect } from 'expo-router';
 import { Text, View } from 'react-native';
@@ -9,6 +8,7 @@ import { useSession } from '@/features/auth';
 import { useUploadedImages } from '@/features/chat/api/hooks';
 import type { UploadedImage } from '@/features/chat/types';
 import { useOnline } from '@/providers/network-provider';
+import { EmptyState, Screen } from '@/shared/components';
 const imageKey = ({ id }: UploadedImage): string => id;
 const renderImage = ({ item }: Readonly<{ item: UploadedImage }>) => (
   <View style={styles.imageCell}>

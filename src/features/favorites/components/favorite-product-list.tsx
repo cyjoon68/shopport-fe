@@ -1,11 +1,11 @@
 import { FlashList } from '@shopify/flash-list';
-import { EmptyState } from '@shopport/ui';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
 import { ProductCard } from '@/features/catalog';
 import { useOnline } from '@/providers/network-provider';
+import { EmptyState } from '@/shared/components';
 import type { CachedProduct } from '@/shared/storage/types';
 
 import { useSavedProducts } from '../api/hooks';

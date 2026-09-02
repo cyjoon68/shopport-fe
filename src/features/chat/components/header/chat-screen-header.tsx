@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+import { GlassButton, glassButtonIconSize } from '@/shared/components';
 
 import type { ChatScreenHeaderProps } from '../../types';
 import { ChatSegmentedControl } from './chat-segmented-control';

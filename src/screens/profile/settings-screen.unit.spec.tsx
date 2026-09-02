@@ -53,14 +53,11 @@ jest.mock('@/shared/config/environment', () => ({
   environment: { privacyPolicyUrl: 'https://example.com/privacy' },
 }));
 
-jest.mock('@shopport/ui', () => ({
+jest.mock('@/shared/components', () => ({
   Screen: ({ children, testID }: { children: ReactNode; testID?: string }) =>
     mockCreateElement(mockView, { testID }, children),
   SectionTitle: ({ children }: { children: ReactNode }) =>
     mockCreateElement(mockText, null, children),
-}));
-
-jest.mock('@/shared/ui/glass-button', () => ({
   GlassActionButton: (props: {
     children: ReactNode;
     disabled?: boolean;

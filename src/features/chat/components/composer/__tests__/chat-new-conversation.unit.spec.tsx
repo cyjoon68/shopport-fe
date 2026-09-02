@@ -6,7 +6,7 @@ import { retailerIds } from '../../../constants';
 import type { RetailerId } from '../../../types';
 import { ChatNewConversation } from '../chat-new-conversation';
 
-jest.mock('@/shared/ui/glass-button', () => ({
+jest.mock('@/shared/components', () => ({
   GlassButton: ({
     accessibilityLabel,
     children,

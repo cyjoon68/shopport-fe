@@ -5,7 +5,7 @@ import { Animated, Platform, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useReducedTransparency } from '@/shared/accessibility/hooks';
-import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
+import { GlassButton, glassButtonIconSize } from '@/shared/components';
 
 import { useKeyboardLift } from '../../hooks';
 import type { NewChatFooterProps } from '../../types';

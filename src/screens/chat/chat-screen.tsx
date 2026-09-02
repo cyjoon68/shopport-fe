@@ -1,4 +1,3 @@
-import { Screen } from '@shopport/ui';
 import * as Haptics from 'expo-haptics';
 import { Redirect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
@@ -21,6 +20,7 @@ import {
 } from '@/features/chat';
 import { useCreateConversation } from '@/features/chat/api/hooks';
 import { NetworkBoundary, useOnline } from '@/providers/network-provider';
+import { Screen } from '@/shared/components';
 import { saveDraft } from '@/shared/storage';
 import type { CachedProduct } from '@/shared/storage/types';
 

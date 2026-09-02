@@ -14,8 +14,8 @@ import {
   ConversationSummaryFragmentDoc,
 } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
+import { GlassButton, glassButtonIconSize } from '@/shared/components';
 import { readPinnedConversationIds } from '@/shared/storage';
-import { GlassButton, glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { conversationHref } from '../conversation-href';
 import type {

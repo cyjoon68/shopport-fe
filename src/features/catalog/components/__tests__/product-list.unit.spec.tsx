@@ -84,7 +84,7 @@ jest.mock('@/shared/storage', () => ({
   readCachedChatMessages: jest.fn(() => Promise.resolve([])),
 }));
 
-jest.mock('@shopport/ui', () => ({
+jest.mock('@/shared/components', () => ({
   EmptyState: () => null,
   Screen: ({ children }: { children: ReactNode }) => children,
 }));

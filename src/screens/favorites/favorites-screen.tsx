@@ -1,9 +1,9 @@
-import { Screen } from '@shopport/ui';
 import { Redirect } from 'expo-router';
 
 import { useSession } from '@/features/auth';
 import { FavoriteProductList } from '@/features/favorites';
 import { NetworkBoundary, useOnline } from '@/providers/network-provider';
+import { Screen } from '@/shared/components';
 
 export const FavoritesScreen = () => {
   const { status } = useSession();

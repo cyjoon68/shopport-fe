@@ -1,11 +1,11 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { EmptyState } from '@shopport/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
 import { useOnline } from '@/providers/network-provider';
+import { EmptyState } from '@/shared/components';
 import { readCachedChatMessages } from '@/shared/storage';
 
 import { useFoundProductRecommendations } from '../api/hooks';

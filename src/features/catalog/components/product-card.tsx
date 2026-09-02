@@ -6,8 +6,8 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/hooks';
+import { glassButtonIconSize } from '@/shared/components';
 import { cacheProducts } from '@/shared/storage';
-import { glassButtonIconSize } from '@/shared/ui/glass-button';
 
 import { useUpdateSavedProduct } from '../api/hooks';
 import { formatMoney } from '../domain/format-money';

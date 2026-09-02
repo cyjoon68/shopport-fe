@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Text, View } from 'react-native';
 
-import { GlassButton } from '@/shared/ui/glass-button';
+import { GlassButton } from '@/shared/components';
 
 import type { ChatComposerViewProps } from '../../types';
 import { NewChatFooter } from './new-chat-footer';

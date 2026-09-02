@@ -108,7 +108,7 @@ jest.mock('@/shared/storage', () => ({
   sqliteChatPersistence: { removeItem: jest.fn(() => Promise.resolve()) },
 }));
 
-jest.mock('@/shared/ui/glass-button', () => ({
+jest.mock('@/shared/components', () => ({
   GlassButton: ({
     accessibilityLabel,
     children,

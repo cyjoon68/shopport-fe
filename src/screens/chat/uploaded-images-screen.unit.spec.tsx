@@ -60,7 +60,7 @@ jest.mock('@shopify/flash-list', () => ({
   },
 }));
 
-jest.mock('@shopport/ui', () => ({
+jest.mock('@/shared/components', () => ({
   EmptyState: () => null,
   Screen: ({ children, testID }: { children: ReactNode; testID?: string }) =>
     mockCreateElement(mockView, { testID }, children),

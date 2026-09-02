@@ -1,4 +1,3 @@
-import { Screen, SectionTitle } from '@shopport/ui';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, TextInput, View } from 'react-native';
@@ -7,8 +6,8 @@ import { StyleSheet } from 'react-native-unistyles';
 import { kakaoAccountEmail, useSession } from '@/features/auth';
 import { useProfile } from '@/features/profile';
 import { useOnline } from '@/providers/network-provider';
+import { GlassActionButton, Screen, SectionTitle } from '@/shared/components';
 import { environment } from '@/shared/config/environment';
-import { GlassActionButton } from '@/shared/ui/glass-button';
 
 export const SettingsScreen = () => {
   const { status } = useSession();
