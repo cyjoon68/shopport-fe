@@ -1,11 +1,10 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { Animated, Platform, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useReducedTransparency } from '@/shared/accessibility/hooks';
-import { GlassButton, glassButtonIconSize } from '@/shared/components';
+import { GlassButton, glassButtonIconSize, PlatformIcon } from '@/shared/components';
 
 import { useKeyboardLift } from '../../hooks';
 import type { NewChatFooterProps } from '../../types';
@@ -54,12 +53,7 @@ export const NewChatFooter = ({
         onPress={() => void onAttach()}
         style={styles.composerButton}
       >
-        <Image
-          contentFit="contain"
-          source="sf:photo"
-          style={styles.composerSymbol}
-          tintColor={theme.colors.text}
-        />
+        <PlatformIcon color={theme.colors.text} name="photo" size={glassButtonIconSize} />
       </GlassButton>
       <TextInput
         accessibilityLabel="쇼핑 질문"
@@ -83,11 +77,10 @@ export const NewChatFooter = ({
         style={styles.composerButton}
         tintColor={sendDisabled ? theme.colors.surfaceMuted : theme.colors.background}
       >
-        <Image
-          contentFit="contain"
-          source={showStop ? 'sf:stop.fill' : 'sf:arrow.up'}
-          style={styles.composerSymbol}
-          tintColor={theme.colors.text}
+        <PlatformIcon
+          color={theme.colors.text}
+          name={showStop ? 'stop-filled' : 'arrow-up'}
+          size={glassButtonIconSize}
         />
       </GlassButton>
     </>
@@ -162,6 +155,5 @@ const styles = StyleSheet.create((theme) => ({
     width: theme.interaction.minTouchTarget,
   },
   composerButtonFallback: { backgroundColor: theme.colors.surfaceMuted },
-  composerSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },
   placeholder: { color: theme.colors.textMuted },
 }));

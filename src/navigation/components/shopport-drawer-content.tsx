@@ -1,9 +1,13 @@
 import { useQuery } from '@apollo/client/react';
-import { Image } from 'expo-image';
+import {
+  type MenuAction,
+  MenuView,
+  type NativeActionEvent,
+} from '@expo/ui/community/menu';
 import { Link, router } from 'expo-router';
 import { DrawerContentScrollView } from 'expo-router/drawer';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
@@ -14,7 +18,12 @@ import {
   ConversationSummaryFragmentDoc,
 } from '@/graphql/generated/graphql';
 import { useOnline } from '@/providers/network-provider';
-import { GlassButton, glassButtonIconSize } from '@/shared/components';
+import {
+  GlassButton,
+  glassButtonIconSize,
+  PlatformIcon,
+  platformIconSources,
+} from '@/shared/components';
 import { readPinnedConversationIds } from '@/shared/storage';
 
 import { conversationHref } from '../conversation-href';
@@ -35,12 +44,7 @@ const DrawerLink = ({ label, onPress, symbol }: DrawerLinkProps) => {
       onPress={onPress}
       style={({ pressed }) => [styles.link, pressed && styles.pressed]}
     >
-      <Image
-        contentFit="contain"
-        source={`sf:${symbol}`}
-        style={styles.linkSymbol}
-        tintColor={theme.colors.text}
-      />
+      <PlatformIcon color={theme.colors.text} name={symbol} size={20} />
       <Text allowFontScaling style={styles.linkLabel}>
         {label}
       </Text>
@@ -67,49 +71,76 @@ const ConversationLink = ({
     online,
     pinned,
   });
+  const trigger = (
+    <Pressable
+      accessible
+      accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
+      accessibilityLabel={conversation.title}
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={styles.conversation}
+    >
+      <View style={styles.conversationContent}>
+        <Text allowFontScaling numberOfLines={1} style={styles.conversationTitle}>
+          {conversation.title}
+        </Text>
+        {pinned ? (
+          <PlatformIcon color={theme.colors.textMuted} name="pin-filled" size={16} />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+  const androidActions: MenuAction[] = [
+    {
+      id: 'toggle-pin',
+      image: platformIconSources['pin-filled'],
+      title: pinned ? '고정 해제' : '고정',
+    },
+    { id: 'rename', image: platformIconSources.edit, title: '이름 바꾸기' },
+    {
+      attributes: { destructive: true },
+      id: 'delete',
+      image: platformIconSources.delete,
+      title: '삭제',
+    },
+  ];
+  const handleAndroidAction = ({ nativeEvent }: NativeActionEvent): void => {
+    if (nativeEvent.event === 'toggle-pin') void togglePin();
+    if (nativeEvent.event === 'rename') setRenameVisible(true);
+    if (nativeEvent.event === 'delete') void remove();
+  };
 
   return (
     <Fragment>
-      <Link asChild href={conversationHref(conversation.id)}>
-        <Link.Trigger>
-          <Pressable
-            accessible
-            accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
-            accessibilityLabel={conversation.title}
-            accessibilityRole="button"
-            onPress={onOpen}
-            style={styles.conversation}
-          >
-            <View style={styles.conversationContent}>
-              <Text allowFontScaling numberOfLines={1} style={styles.conversationTitle}>
-                {conversation.title}
-              </Text>
-              {pinned ? (
-                <Image
-                  contentFit="contain"
-                  source="sf:pin.fill"
-                  style={styles.pinSymbol}
-                  tintColor={theme.colors.textMuted}
-                />
-              ) : null}
-            </View>
-          </Pressable>
-        </Link.Trigger>
-        <Link.Preview />
-        <Link.Menu>
-          <Link.MenuAction
-            icon={pinned ? 'pin.slash' : 'pin.fill'}
-            onPress={togglePin}
-            title={pinned ? '고정 해제' : '고정'}
-          />
-          <Link.MenuAction
-            icon="pencil"
-            onPress={() => setRenameVisible(true)}
-            title="이름 바꾸기"
-          />
-          <Link.MenuAction destructive icon="trash" onPress={remove} title="삭제" />
-        </Link.Menu>
-      </Link>
+      {Platform.OS === 'ios' ? (
+        <Link asChild href={conversationHref(conversation.id)}>
+          <Link.Trigger>{trigger}</Link.Trigger>
+          <Link.Preview />
+          <Link.Menu>
+            <Link.MenuAction
+              icon={pinned ? 'pin.slash' : 'pin.fill'}
+              onPress={togglePin}
+              title={pinned ? '고정 해제' : '고정'}
+            />
+            <Link.MenuAction
+              icon="pencil"
+              onPress={() => setRenameVisible(true)}
+              title="이름 바꾸기"
+            />
+            <Link.MenuAction destructive icon="trash" onPress={remove} title="삭제" />
+          </Link.Menu>
+        </Link>
+      ) : (
+        <MenuView
+          actions={androidActions}
+          onPressAction={handleAndroidAction}
+          shouldOpenOnLongPress
+        >
+          <Link asChild href={conversationHref(conversation.id)}>
+            {trigger}
+          </Link>
+        </MenuView>
+      )}
       <RenameConversationDialog
         initialTitle={conversation.title}
         onDismiss={() => setRenameVisible(false)}
@@ -207,11 +238,10 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
           onPress={() => navigate('/settings')}
           style={styles.settingsButton}
         >
-          <Image
-            contentFit="contain"
-            source="sf:gearshape"
-            style={styles.settingsSymbol}
-            tintColor={theme.colors.text}
+          <PlatformIcon
+            color={theme.colors.text}
+            name="settings"
+            size={glassButtonIconSize}
           />
         </GlassButton>
       </View>
@@ -219,7 +249,7 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
         <DrawerLink
           label="새로운 대화 열기"
           onPress={openNewConversation}
-          symbol="square.and.pencil"
+          symbol="new-chat"
         />
         <DrawerLink
           label="상품 리스트 보기"
@@ -234,7 +264,7 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
         <DrawerLink
           label="업로드한 이미지 보기"
           onPress={() => navigate('/images')}
-          symbol="photo.on.rectangle"
+          symbol="photo-library"
         />
       </View>
       <View style={styles.recent}>
@@ -296,7 +326,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'center',
     width: 44,
   },
-  settingsSymbol: { height: glassButtonIconSize, width: glassButtonIconSize },
   links: { gap: theme.spacing.xs },
   link: {
     alignItems: 'center',
@@ -306,7 +335,6 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 48,
     paddingHorizontal: theme.spacing.sm,
   },
-  linkSymbol: { height: 20, width: 20 },
   linkLabel: { color: theme.colors.text, fontSize: 16, fontWeight: '700' },
   recent: {
     borderTopColor: theme.colors.border,
@@ -331,7 +359,6 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing.sm,
   },
   conversationTitle: { color: theme.colors.text, fontSize: 15, lineHeight: 21 },
-  pinSymbol: { height: 16, width: 16 },
   empty: { color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 },
   loadMore: {
     alignItems: 'center',

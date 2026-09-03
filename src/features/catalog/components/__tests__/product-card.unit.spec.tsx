@@ -55,6 +55,11 @@ jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('@expo/ui', () => ({
+  Icon: ({ testID }: { testID?: string }) =>
+    mockCreateElement(mockNativeText, { testID }, 'icon'),
+}));
+
 jest.mock('expo-image', () => ({
   Image: ({
     accessibilityLabel,
@@ -181,7 +186,9 @@ describe('product card links', () => {
 
     fireEvent.press(screen.getByLabelText('텀블러 찜'));
 
-    await waitFor(() => expect(screen.getByTestId('sf:bookmark.fill')).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(screen.getByTestId('product-card-bookmark-filled-icon')).toBeOnTheScreen(),
+    );
     expect(saveProduct).toHaveBeenCalledWith({
       variables: { input: { productId: 'product-1' } },
     });
@@ -206,7 +213,7 @@ describe('product card links', () => {
     await waitFor(() =>
       expect(alertSpy).toHaveBeenCalledWith('찜 변경 실패', '찜을 변경하지 못했습니다.'),
     );
-    expect(screen.getByTestId('sf:bookmark')).toBeOnTheScreen();
+    expect(screen.getByTestId('product-card-bookmark-icon')).toBeOnTheScreen();
     expect(jest.mocked(cacheProducts)).not.toHaveBeenCalled();
   });
 
@@ -215,7 +222,7 @@ describe('product card links', () => {
 
     screen.rerender(<ProductCard product={{ ...product, isSaved: true }} />);
 
-    expect(screen.getByTestId('sf:bookmark.fill')).toBeOnTheScreen();
+    expect(screen.getByTestId('product-card-bookmark-filled-icon')).toBeOnTheScreen();
     expect(screen.getByLabelText('텀블러 찜 해제')).toBeOnTheScreen();
   });
 
@@ -247,7 +254,7 @@ describe('product card links', () => {
   it('uses a bookmark icon instead of a text label', () => {
     const screen = render(<ProductCard product={product} />);
 
-    expect(screen.getByTestId('sf:bookmark')).toBeOnTheScreen();
+    expect(screen.getByTestId('product-card-bookmark-icon')).toBeOnTheScreen();
     expect(screen.queryByText('찜')).not.toBeOnTheScreen();
   });
 

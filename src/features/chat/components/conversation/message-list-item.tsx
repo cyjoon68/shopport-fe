@@ -18,6 +18,8 @@ import {
 } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { PlatformIcon, platformIconSources } from '@/shared/components';
+
 import type { MessageListItemProps } from '../../types';
 import { ChatProductRow } from './chat-product-row';
 
@@ -78,8 +80,8 @@ export const MessageListItem = ({
     ...(date && Platform.OS === 'android'
       ? [{ attributes: { disabled: true }, id: 'date', title: date }]
       : []),
-    { id: 'copy', image: 'doc.on.doc', title: '복사' },
-    { id: 'edit', image: 'pencil', title: '편집' },
+    { id: 'copy', image: platformIconSources.copy, title: '복사' },
+    { id: 'edit', image: platformIconSources.edit, title: '편집' },
   ];
   const handleUserMenuAction = ({ nativeEvent }: NativeActionEvent): void => {
     if (nativeEvent.event === 'copy') void Clipboard.setStringAsync(copyText);
@@ -181,12 +183,7 @@ export const MessageListItem = ({
             onPress={() => void Clipboard.setStringAsync(copyText)}
             style={styles.copyButton}
           >
-            <Image
-              contentFit="contain"
-              source="sf:doc.on.doc"
-              style={styles.copyIcon}
-              tintColor={styles.date.color}
-            />
+            <PlatformIcon color={styles.date.color} name="copy" size={18} />
           </Pressable>
         </View>
       ) : null}
@@ -289,7 +286,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'flex-start',
     width: theme.interaction.minTouchTarget,
   },
-  copyIcon: { height: 18, width: 18 },
   products: { marginHorizontal: -theme.spacing.lg, width: 'auto' },
   productsContent: {
     flexDirection: 'row',
