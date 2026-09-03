@@ -6,6 +6,7 @@ import Delete from '@expo/material-symbols/delete.xml';
 import Edit from '@expo/material-symbols/edit.xml';
 import NewChat from '@expo/material-symbols/edit_square.xml';
 import PinFilled from '@expo/material-symbols/keep.xml';
+import PinOff from '@expo/material-symbols/keep_off.xml';
 import Menu from '@expo/material-symbols/menu.xml';
 import Photo from '@expo/material-symbols/photo.xml';
 import PhotoLibrary from '@expo/material-symbols/photo_library.xml';
@@ -33,6 +34,7 @@ export const platformIconSources = {
   photo: Photo,
   'photo-library': PhotoLibrary,
   'pin-filled': PinFilled,
+  'pin-off': PinOff,
   settings: Settings,
   'stop-filled': StopFilled,
 } satisfies Record<PlatformIconName, PlatformIconSource>;

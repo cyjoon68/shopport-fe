@@ -1,13 +1,21 @@
 import { useQuery } from '@apollo/client/react';
 import {
   type MenuAction,
+  type MenuComponentRef,
   MenuView,
   type NativeActionEvent,
 } from '@expo/ui/community/menu';
 import { Link, router } from 'expo-router';
 import { DrawerContentScrollView } from 'expo-router/drawer';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import {
+  type AccessibilityActionEvent,
+  Alert,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useSession } from '@/features/auth';
@@ -34,6 +42,10 @@ import type {
   NavigationHref,
   ShopportDrawerContentProps,
 } from '../types';
+
+const conversationAccessibilityActions = [
+  { label: '대화 작업 열기', name: 'longpress' },
+] as const;
 
 const DrawerLink = ({ label, onPress, symbol }: DrawerLinkProps) => {
   const { theme } = useUnistyles();
@@ -63,6 +75,7 @@ const ConversationLink = ({
 }: ConversationLinkProps) => {
   const { theme } = useUnistyles();
   const [renameVisible, setRenameVisible] = useState(false);
+  const androidMenuRef = useRef<MenuComponentRef>(null);
   const { remove, rename, togglePin } = useConversationActions({
     conversation,
     onDeleted,
@@ -71,9 +84,22 @@ const ConversationLink = ({
     online,
     pinned,
   });
+  const showAndroidMenu = (): void => androidMenuRef.current?.show();
+  const handleAndroidAccessibilityAction = ({
+    nativeEvent,
+  }: AccessibilityActionEvent): void => {
+    if (nativeEvent.actionName === 'longpress') showAndroidMenu();
+  };
   const trigger = (
     <Pressable
       accessible
+      {...(Platform.OS === 'android'
+        ? {
+            accessibilityActions: conversationAccessibilityActions,
+            onAccessibilityAction: handleAndroidAccessibilityAction,
+            onLongPress: showAndroidMenu,
+          }
+        : {})}
       accessibilityHint="대화를 열고, 길게 누르면 메뉴를 엽니다"
       accessibilityLabel={conversation.title}
       accessibilityRole="button"
@@ -93,7 +119,7 @@ const ConversationLink = ({
   const androidActions: MenuAction[] = [
     {
       id: 'toggle-pin',
-      image: platformIconSources['pin-filled'],
+      image: platformIconSources[pinned ? 'pin-off' : 'pin-filled'],
       title: pinned ? '고정 해제' : '고정',
     },
     { id: 'rename', image: platformIconSources.edit, title: '이름 바꾸기' },
@@ -134,6 +160,7 @@ const ConversationLink = ({
         <MenuView
           actions={androidActions}
           onPressAction={handleAndroidAction}
+          ref={androidMenuRef}
           shouldOpenOnLongPress
         >
           <Link asChild href={conversationHref(conversation.id)}>

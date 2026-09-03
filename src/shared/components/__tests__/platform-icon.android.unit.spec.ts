@@ -5,5 +5,6 @@ describe('android platform icons', () => {
     expect(platformIconSources.copy).toEqual(expect.any(Number));
     expect(platformIconSources.edit).toEqual(expect.any(Number));
     expect(platformIconSources.delete).toEqual(expect.any(Number));
+    expect(platformIconSources['pin-off']).toEqual(expect.any(Number));
   });
 });

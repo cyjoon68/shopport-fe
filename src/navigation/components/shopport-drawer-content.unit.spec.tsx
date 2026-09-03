@@ -8,7 +8,13 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
-import { createElement as mockCreateElement, type ReactNode } from 'react';
+import {
+  createElement as mockCreateElement,
+  type ReactNode,
+  type Ref,
+  useImperativeHandle as mockUseImperativeHandle,
+  useState as mockUseState,
+} from 'react';
 import {
   Alert,
   Platform as mockPlatform,
@@ -86,30 +92,40 @@ jest.mock('@expo/ui/community/menu', () => ({
     actions,
     children,
     onPressAction,
+    ref,
   }: {
     actions: ReadonlyArray<Readonly<{ id: string; title: string }>>;
     children: ReactNode;
     onPressAction: (
       event: Readonly<{ nativeEvent: Readonly<{ event: string }> }>,
     ) => void;
-  }) =>
-    mockCreateElement(
+    ref?: Ref<Readonly<{ show: () => void }>>;
+  }) => {
+    const [open, setOpen] = mockUseState(false);
+    mockUseImperativeHandle(ref, () => ({ show: () => setOpen(true) }));
+    return mockCreateElement(
       mockView,
       null,
       children,
-      actions.map(({ id, title }) =>
-        mockCreateElement(
-          mockPressable,
-          {
-            accessibilityLabel: title,
-            accessibilityRole: 'button',
-            key: id,
-            onPress: () => onPressAction({ nativeEvent: { event: id } }),
-          },
-          title,
-        ),
-      ),
-    ),
+      open
+        ? actions.map(({ id, title }) =>
+            mockCreateElement(
+              mockPressable,
+              {
+                accessibilityLabel: title,
+                accessibilityRole: 'button',
+                key: id,
+                onPress: () => {
+                  setOpen(false);
+                  onPressAction({ nativeEvent: { event: id } });
+                },
+              },
+              title,
+            ),
+          )
+        : null,
+    );
+  },
 }));
 
 jest.mock('expo-router/drawer', () => ({ DrawerContentScrollView: 'View' }));
@@ -257,7 +273,7 @@ describe('shopport drawer content', () => {
     expect(Alert.prompt).not.toHaveBeenCalled();
   });
 
-  it('shows conversation actions on Android', async () => {
+  it('opens conversation actions from an Android long press', async () => {
     Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
     mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
     const user = userEvent.setup();
@@ -265,10 +281,49 @@ describe('shopport drawer content', () => {
     render(<ShopportDrawerContent {...drawerProps} />);
     await act(async () => Promise.resolve());
 
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+    await user.longPress(screen.getByRole('button', { name: conversationNode.title }));
+    expect(screen.getByRole('button', { name: '삭제' })).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: '이름 바꾸기' }));
 
     expect(screen.getByLabelText('대화 이름')).toHaveDisplayValue('기존 이름');
-    expect(screen.getByRole('button', { name: '삭제' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
+  });
+
+  it('keeps the normal Android conversation tap available', async () => {
+    Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
+    mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
+    const user = userEvent.setup();
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    await user.press(screen.getByRole('button', { name: conversationNode.title }));
+
+    expect(mockCloseDrawer).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+  });
+
+  it('reserves Android accessibility activation for navigation', async () => {
+    Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
+    mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    fireEvent(
+      screen.getByRole('button', { name: conversationNode.title }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+    fireEvent(
+      screen.getByRole('button', { name: conversationNode.title }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'longpress' } },
+    );
+
+    expect(screen.getByRole('button', { name: '이름 바꾸기' })).toBeOnTheScreen();
   });
 
   it('suppresses a duplicate next-page request for the active cursor', async () => {

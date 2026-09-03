@@ -15,6 +15,7 @@ export type PlatformIconName =
   | 'photo'
   | 'photo-library'
   | 'pin-filled'
+  | 'pin-off'
   | 'settings'
   | 'stop-filled';
 

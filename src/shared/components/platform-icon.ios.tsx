@@ -19,6 +19,7 @@ export const platformIconSources = {
   photo: 'photo',
   'photo-library': 'photo.on.rectangle',
   'pin-filled': 'pin.fill',
+  'pin-off': 'pin.slash',
   settings: 'gearshape',
   'stop-filled': 'stop.fill',
 } as const satisfies Record<PlatformIconName, PlatformIconSource>;
