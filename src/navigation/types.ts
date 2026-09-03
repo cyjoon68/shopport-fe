@@ -1,6 +1,8 @@
 import type { Href } from 'expo-router';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 
+import type { PlatformIconName } from '@/shared/components';
+
 export type DrawerConversation = Readonly<{
   id: string;
   title: string;
@@ -9,7 +11,7 @@ export type DrawerConversation = Readonly<{
 export type DrawerLinkProps = Readonly<{
   label: string;
   onPress: () => void;
-  symbol: string;
+  symbol: PlatformIconName;
 }>;
 
 export type ConversationLinkProps = Readonly<{

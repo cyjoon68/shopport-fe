@@ -8,8 +8,19 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
-import { createElement as mockCreateElement, type ReactNode } from 'react';
-import { Alert, Pressable as mockPressable, View as mockView } from 'react-native';
+import {
+  createElement as mockCreateElement,
+  type ReactNode,
+  type Ref,
+  useImperativeHandle as mockUseImperativeHandle,
+  useState as mockUseState,
+} from 'react';
+import {
+  Alert,
+  Platform as mockPlatform,
+  Pressable as mockPressable,
+  View as mockView,
+} from 'react-native';
 
 import {
   DeleteConversationDocument,
@@ -47,7 +58,9 @@ jest.mock('expo-router', () => {
       mockCreateElement(mockView, null, children),
     {
       Menu: ({ children }: { children: ReactNode }) =>
-        mockCreateElement(mockView, null, children),
+        mockPlatform.OS === 'android'
+          ? null
+          : mockCreateElement(mockView, null, children),
       MenuAction: ({ onPress, title }: { onPress: () => void; title: string }) =>
         mockCreateElement(
           mockPressable,
@@ -73,6 +86,47 @@ jest.mock('expo-router', () => {
     },
   };
 });
+
+jest.mock('@expo/ui/community/menu', () => ({
+  MenuView: ({
+    actions,
+    children,
+    onPressAction,
+    ref,
+  }: {
+    actions: ReadonlyArray<Readonly<{ id: string; title: string }>>;
+    children: ReactNode;
+    onPressAction: (
+      event: Readonly<{ nativeEvent: Readonly<{ event: string }> }>,
+    ) => void;
+    ref?: Ref<Readonly<{ show: () => void }>>;
+  }) => {
+    const [open, setOpen] = mockUseState(false);
+    mockUseImperativeHandle(ref, () => ({ show: () => setOpen(true) }));
+    return mockCreateElement(
+      mockView,
+      null,
+      children,
+      open
+        ? actions.map(({ id, title }) =>
+            mockCreateElement(
+              mockPressable,
+              {
+                accessibilityLabel: title,
+                accessibilityRole: 'button',
+                key: id,
+                onPress: () => {
+                  setOpen(false);
+                  onPressAction({ nativeEvent: { event: id } });
+                },
+              },
+              title,
+            ),
+          )
+        : null,
+    );
+  },
+}));
 
 jest.mock('expo-router/drawer', () => ({ DrawerContentScrollView: 'View' }));
 jest.mock('expo-image', () => ({ Image: () => null }));
@@ -119,6 +173,8 @@ jest.mock('@/shared/components', () => ({
     onPress: () => void;
   }) => mockCreateElement(mockPressable, { accessibilityLabel, onPress }, children),
   glassButtonIconSize: 16,
+  PlatformIcon: () => null,
+  platformIconSources: { delete: 1, edit: 2, 'pin-filled': 3 },
 }));
 
 const mockedUseMutation = jest.mocked(useMutation);
@@ -135,6 +191,8 @@ const conversationNode = {
   title: '기존 이름',
   updatedAt: '2026-08-26T00:00:00Z',
 };
+
+const originalOS = mockPlatform.OS;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -174,6 +232,10 @@ beforeEach(() => {
   );
 });
 
+afterEach(() =>
+  Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: originalOS }),
+);
+
 describe('shopport drawer content', () => {
   it('clears the active conversation before opening a new chat', async () => {
     render(<ShopportDrawerContent {...drawerProps} />);
@@ -209,6 +271,59 @@ describe('shopport drawer content', () => {
 
     expect(screen.getByLabelText('대화 이름')).toHaveDisplayValue('기존 이름');
     expect(Alert.prompt).not.toHaveBeenCalled();
+  });
+
+  it('opens conversation actions from an Android long press', async () => {
+    Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
+    mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
+    const user = userEvent.setup();
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+    await user.longPress(screen.getByRole('button', { name: conversationNode.title }));
+    expect(screen.getByRole('button', { name: '삭제' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: '이름 바꾸기' }));
+
+    expect(screen.getByLabelText('대화 이름')).toHaveDisplayValue('기존 이름');
+    expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
+  });
+
+  it('keeps the normal Android conversation tap available', async () => {
+    Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
+    mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
+    const user = userEvent.setup();
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    await user.press(screen.getByRole('button', { name: conversationNode.title }));
+
+    expect(mockCloseDrawer).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+  });
+
+  it('reserves Android accessibility activation for navigation', async () => {
+    Object.defineProperty(mockPlatform, 'OS', { configurable: true, value: 'android' });
+    mockConversationEdges = [{ cursor: 'edge-1', node: conversationNode }];
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    fireEvent(
+      screen.getByRole('button', { name: conversationNode.title }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    expect(screen.queryByRole('button', { name: '이름 바꾸기' })).toBeNull();
+    fireEvent(
+      screen.getByRole('button', { name: conversationNode.title }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'longpress' } },
+    );
+
+    expect(screen.getByRole('button', { name: '이름 바꾸기' })).toBeOnTheScreen();
   });
 
   it('suppresses a duplicate next-page request for the active cursor', async () => {

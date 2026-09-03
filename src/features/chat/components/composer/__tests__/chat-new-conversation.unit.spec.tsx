@@ -19,6 +19,8 @@ jest.mock('@/shared/components', () => ({
     onPress: () => void;
   }) =>
     mockCreateElement(mockPressable, { accessibilityLabel, disabled, onPress }, children),
+  glassButtonIconSize: 16,
+  PlatformIcon: () => null,
 }));
 
 describe('new conversation composer', () => {

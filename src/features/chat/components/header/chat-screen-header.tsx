@@ -1,8 +1,7 @@
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { GlassButton, glassButtonIconSize } from '@/shared/components';
+import { GlassButton, glassButtonIconSize, PlatformIcon } from '@/shared/components';
 
 import type { ChatScreenHeaderProps } from '../../types';
 import { ChatSegmentedControl } from './chat-segmented-control';
@@ -24,12 +23,7 @@ export const ChatScreenHeader = ({
         onPress={onOpenDrawer}
         style={styles.button}
       >
-        <Image
-          contentFit="contain"
-          source="sf:sidebar.left"
-          style={styles.symbol}
-          tintColor={theme.colors.text}
-        />
+        <PlatformIcon color={theme.colors.text} name="menu" size={glassButtonIconSize} />
       </GlassButton>
       <ChatSegmentedControl
         onValueChange={onValueChange}
@@ -43,11 +37,10 @@ export const ChatScreenHeader = ({
         onPress={onOpenFavorites}
         style={styles.button}
       >
-        <Image
-          contentFit="contain"
-          source="sf:bookmark"
-          style={styles.symbol}
-          tintColor={theme.colors.text}
+        <PlatformIcon
+          color={theme.colors.text}
+          name="bookmark"
+          size={glassButtonIconSize}
         />
       </GlassButton>
     </SafeAreaView>
@@ -68,5 +61,4 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'center',
     width: 44,
   },
-  symbol: { height: glassButtonIconSize, width: glassButtonIconSize },
 }));

@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@apollo/client": "4.2.11",
+    "@expo/material-symbols": "0.1.1",
     "@expo/ui": "~57.0.15",
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-kakao/core": "2.4.6",

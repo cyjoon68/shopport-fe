@@ -6,7 +6,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/hooks';
-import { glassButtonIconSize } from '@/shared/components';
+import { glassButtonIconSize, PlatformIcon } from '@/shared/components';
 import { cacheProducts } from '@/shared/storage';
 
 import { useUpdateSavedProduct } from '../api/hooks';
@@ -122,11 +122,13 @@ export const ProductCard = ({
       style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
     >
       <View style={styles.smallButtonSurface} testID="product-card-bookmark-surface">
-        <Image
-          contentFit="contain"
-          source={saved ? 'sf:bookmark.fill' : 'sf:bookmark'}
-          style={styles.smallButtonIcon}
-          tintColor={theme.colors.text}
+        <PlatformIcon
+          color={theme.colors.text}
+          name={saved ? 'bookmark-filled' : 'bookmark'}
+          size={glassButtonIconSize}
+          testID={
+            saved ? 'product-card-bookmark-filled-icon' : 'product-card-bookmark-icon'
+          }
         />
       </View>
     </Pressable>
@@ -294,5 +296,4 @@ const styles = StyleSheet.create((theme) => ({
     width: 36,
   },
   pressed: { opacity: 0.72 },
-  smallButtonIcon: { height: glassButtonIconSize, width: glassButtonIconSize },
 }));
