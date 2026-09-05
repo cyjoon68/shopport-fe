@@ -14,6 +14,7 @@ import Settings from '@expo/material-symbols/settings.xml';
 import Bag from '@expo/material-symbols/shopping_bag.xml';
 import StopFilled from '@expo/material-symbols/stop_circle.xml';
 import { Host, Icon } from '@expo/ui';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import type {
@@ -41,14 +42,16 @@ export const platformIconSources = {
 } satisfies Record<PlatformIconName, PlatformIconSource>;
 
 export const PlatformIcon = ({ color, name, size, testID }: PlatformIconProps) => (
-  <Host matchContents pointerEvents="none" style={styles.host(size)}>
-    <Icon
-      color={color}
-      name={platformIconSources[name]}
-      size={size}
-      {...(testID ? { testID } : {})}
-    />
-  </Host>
+  <View pointerEvents="none" style={styles.host(size)}>
+    <Host matchContents style={styles.host(size)}>
+      <Icon
+        color={color}
+        name={platformIconSources[name]}
+        size={size}
+        {...(testID ? { testID } : {})}
+      />
+    </Host>
+  </View>
 );
 
 const styles = StyleSheet.create({
