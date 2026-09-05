@@ -217,6 +217,43 @@ describe('useChatRun', () => {
     expect(initial.onRunError).toHaveBeenCalledWith(runError, 'resumed-run');
   });
 
+  it('bridges an expired replay to one correlated terminal error and flushes it', async () => {
+    joinRun.mockImplementation(async function* () {
+      yield await Promise.reject(new Error('XHR error! status: 410 Gone'));
+    });
+    const initial = { ...options(true), onRunError: jest.fn() };
+    renderHook(() => useChatRun(initial));
+    const connection = chatOptions?.connection;
+    if (!connection || !('joinRun' in connection) || !connection.joinRun)
+      throw new Error('resumable connection unavailable');
+
+    const chunks = [];
+    for await (const chunk of connection.joinRun('run-1')) {
+      chunks.push(chunk);
+      const error = new Error(
+        'message' in chunk && typeof chunk.message === 'string'
+          ? chunk.message
+          : 'missing error',
+      );
+      chatOptions?.onChunk?.(chunk);
+      chatOptions?.onError?.(error);
+    }
+    expect(chunks).toEqual([
+      expect.objectContaining({
+        message: 'Run replay expired',
+        runId: 'run-1',
+        threadId: 'conversation-1',
+        type: 'RUN_ERROR',
+      }),
+    ]);
+    expect(initial.onRunError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Run replay expired' }),
+      'run-1',
+    );
+    expect(initial.onRunError).toHaveBeenCalledTimes(1);
+    expect(mockedFlushChatPersistence).toHaveBeenCalledWith('conversation-1');
+  });
+
   it('keeps a late run A error correlated away from the active run B operation', async () => {
     const runAError = new Error('run A failed');
     let resolveRunA!: () => void;
@@ -269,7 +306,7 @@ describe('useChatRun', () => {
     await expect(sendingA).resolves.toEqual({ ok: true });
   });
 
-  it('drops a run A terminal already buffered by SDK normalization after run B starts', async () => {
+  it('drops run A content and terminal buffered by SDK normalization after run B starts', async () => {
     let releaseRunA!: () => void;
     const runABuffer = new Promise<void>((resolve) => {
       releaseRunA = resolve;
@@ -283,6 +320,7 @@ describe('useChatRun', () => {
       if (runContext?.runId === 'run-a') {
         yield { type: 'TEXT_MESSAGE_START' } as never;
         await runABuffer;
+        yield { delta: 'stale run A', type: 'TEXT_MESSAGE_CONTENT' } as never;
         yield {
           message: 'run A failed',
           runId: 'run-a',
@@ -290,8 +328,10 @@ describe('useChatRun', () => {
         } as never;
         return;
       }
-      if (runContext?.runId === 'run-b')
+      if (runContext?.runId === 'run-b') {
+        yield { delta: 'run B', type: 'TEXT_MESSAGE_CONTENT' } as never;
         yield { runId: 'run-b', type: 'RUN_FINISHED' } as never;
+      }
     });
     renderHook(() => useChatRun(options(true)));
     const connection = chatOptions?.connection;
@@ -314,7 +354,10 @@ describe('useChatRun', () => {
 
     const second = await subscription.next();
     expect(second.done).toBe(false);
-    expect((second.value as { runId?: unknown })?.runId).toBe('run-b');
+    expect(second.value).toEqual({ delta: 'run B', type: 'TEXT_MESSAGE_CONTENT' });
+    const third = await subscription.next();
+    expect(third.done).toBe(false);
+    expect(third.value).toEqual({ runId: 'run-b', type: 'RUN_FINISHED' });
     await subscription.return?.();
   });
 

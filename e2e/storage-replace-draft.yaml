@@ -1,0 +1,10 @@
+appId: com.cyjoon68.shopport
+---
+- extendedWaitUntil:
+    visible: '쇼핑 질문'
+    timeout: 30000
+- tapOn: '쇼핑 질문'
+- eraseText: 100
+- inputText: '${DRAFT_TEXT}'
+- hideKeyboard
+- assertVisible: '${DRAFT_TEXT}'

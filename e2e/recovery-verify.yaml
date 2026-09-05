@@ -1,0 +1,33 @@
+appId: com.cyjoon68.shopport
+---
+- extendedWaitUntil:
+    visible: '조건에 맞는 상품 다섯 개를 찾았어요.'
+    timeout: 30000
+- assertNotVisible: '응답 중지'
+- assertVisible: '통합 테스트 텀블러 1'
+- tapOn:
+    id: 'new-chat-segment-상품'
+- extendedWaitUntil:
+    visible: '통합 테스트 텀블러 1'
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: '통합 테스트 텀블러 2'
+    direction: DOWN
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: '통합 테스트 텀블러 3'
+    direction: DOWN
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: '통합 테스트 텀블러 4'
+    direction: DOWN
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: '통합 테스트 텀블러 5'
+    direction: DOWN
+    timeout: 10000
+- assertVisible: '통합 테스트 텀블러 5'

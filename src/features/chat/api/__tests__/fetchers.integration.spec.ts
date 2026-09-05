@@ -1,7 +1,10 @@
 import { cancelRunThenStop } from '../fetchers';
 
 describe('chat cancellation HTTP contract', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
 
   it.each(['cancelled', 'already_cancelled'] as const)(
     'returns the %s cancellation outcome and stops locally',
@@ -90,16 +93,14 @@ describe('chat cancellation HTTP contract', () => {
   });
 
   it('does not stop a newer run after the captured cancellation settles', async () => {
-    let release!: () => void;
-    const pending = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    jest.useFakeTimers();
     jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      await pending;
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
       return new Response(JSON.stringify({ outcome: 'cancelled' }), { status: 200 });
     });
     const stop = jest.fn();
     let currentRunId = 'run-1';
+    let settled = false;
 
     const cancellation = cancelRunThenStop(
       'thread-1',
@@ -107,10 +108,20 @@ describe('chat cancellation HTTP contract', () => {
       stop,
       () => currentRunId === 'run-1',
     );
+    void cancellation.then(() => {
+      settled = true;
+    });
     currentRunId = 'run-2';
-    release();
+
+    await jest.advanceTimersByTimeAsync(1_999);
+    expect(settled).toBe(false);
+    expect(stop).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
 
     await expect(cancellation).resolves.toBe('cancelled');
+    expect(settled).toBe(true);
+    expect(currentRunId).toBe('run-2');
     expect(stop).not.toHaveBeenCalled();
   });
 });
