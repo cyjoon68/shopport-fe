@@ -1,6 +1,7 @@
 import { Host, Icon } from '@expo/ui';
 import { render, screen } from '@testing-library/react-native';
 import { createElement } from 'react';
+import { View } from 'react-native';
 
 import { PlatformIcon, platformIconSources } from '../platform-icon.android';
 
@@ -43,7 +44,6 @@ describe('android platform icons', () => {
     );
 
     expect(screen.UNSAFE_getByType(Host)).toHaveProp('matchContents', true);
-    expect(screen.UNSAFE_getByType(Host)).toHaveProp('pointerEvents', 'none');
     expect(screen.UNSAFE_getByType(Host)).toHaveStyle({ height: 20, width: 20 });
     expect(screen.UNSAFE_getByType(Icon)).toHaveProp(
       'name',
@@ -52,5 +52,19 @@ describe('android platform icons', () => {
     expect(screen.UNSAFE_getByType(Icon)).toHaveProp('color', '#112233');
     expect(screen.UNSAFE_getByType(Icon)).toHaveProp('size', 20);
     expect(screen.UNSAFE_getByType(Icon)).toHaveProp('testID', 'bookmark-icon');
+  });
+
+  it('keeps the native host out of parent touch handling', () => {
+    render(
+      createElement(PlatformIcon, {
+        color: '#112233',
+        name: 'menu',
+        size: 20,
+      }),
+    );
+
+    const touchShield = screen.UNSAFE_getByType(View);
+    expect(touchShield.props.pointerEvents).toBe('none');
+    expect(touchShield.findByType(Host)).toBe(screen.UNSAFE_getByType(Host));
   });
 });
