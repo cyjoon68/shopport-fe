@@ -24,5 +24,5 @@ appId: com.cyjoon68.shopport
 - tapOn: '프롬프트 선택: 토너 패드 최저가 찾아줘'
 - tapOn: '메시지 보내기'
 - extendedWaitUntil:
-    visible: '조건에 맞는'
+    visible: '조건에 맞는.*'
     timeout: 30000
