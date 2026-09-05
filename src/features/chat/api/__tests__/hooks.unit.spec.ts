@@ -306,7 +306,7 @@ describe('useChatRun', () => {
     await expect(sendingA).resolves.toEqual({ ok: true });
   });
 
-  it('drops a run A terminal already buffered by SDK normalization after run B starts', async () => {
+  it('drops run A content and terminal buffered by SDK normalization after run B starts', async () => {
     let releaseRunA!: () => void;
     const runABuffer = new Promise<void>((resolve) => {
       releaseRunA = resolve;
@@ -320,6 +320,7 @@ describe('useChatRun', () => {
       if (runContext?.runId === 'run-a') {
         yield { type: 'TEXT_MESSAGE_START' } as never;
         await runABuffer;
+        yield { delta: 'stale run A', type: 'TEXT_MESSAGE_CONTENT' } as never;
         yield {
           message: 'run A failed',
           runId: 'run-a',
@@ -327,8 +328,10 @@ describe('useChatRun', () => {
         } as never;
         return;
       }
-      if (runContext?.runId === 'run-b')
+      if (runContext?.runId === 'run-b') {
+        yield { delta: 'run B', type: 'TEXT_MESSAGE_CONTENT' } as never;
         yield { runId: 'run-b', type: 'RUN_FINISHED' } as never;
+      }
     });
     renderHook(() => useChatRun(options(true)));
     const connection = chatOptions?.connection;
@@ -351,7 +354,10 @@ describe('useChatRun', () => {
 
     const second = await subscription.next();
     expect(second.done).toBe(false);
-    expect((second.value as { runId?: unknown })?.runId).toBe('run-b');
+    expect(second.value).toEqual({ delta: 'run B', type: 'TEXT_MESSAGE_CONTENT' });
+    const third = await subscription.next();
+    expect(third.done).toBe(false);
+    expect(third.value).toEqual({ runId: 'run-b', type: 'RUN_FINISHED' });
     await subscription.return?.();
   });
 
