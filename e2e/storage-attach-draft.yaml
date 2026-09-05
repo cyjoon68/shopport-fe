@@ -1,0 +1,24 @@
+appId: com.cyjoon68.shopport
+---
+- tapOn:
+    id: 'new-chat-segment-채팅'
+- tapOn: '이미지 첨부'
+- tapOn:
+    text: 'Allow all'
+    optional: true
+- tapOn:
+    text: '모두 허용'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Select.*photo.*'
+    timeout: 10000
+- tapOn:
+    point: '20%,25%'
+- extendedWaitUntil:
+    visible: '첨부한 상품 사진'
+    timeout: 30000
+- tapOn: '쇼핑 질문'
+- inputText: '${DRAFT_TEXT}'
+- hideKeyboard
+- assertVisible: '${DRAFT_TEXT}'
+- assertVisible: '첨부한 상품 사진'
