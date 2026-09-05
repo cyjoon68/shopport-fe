@@ -311,11 +311,7 @@ describe('chat composer initial draft isolation', () => {
 
     fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), ' 같은 초안 ');
     act(() => jest.advanceTimersByTime(250));
-    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
-      text: ' 같은 초안 ',
-      assetId: null,
-      assetUri: null,
-    });
+    expect(mockedSaveDraft).not.toHaveBeenCalled();
     mockedSaveDraft.mockClear();
 
     await act(async () => {

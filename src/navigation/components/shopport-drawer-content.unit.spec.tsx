@@ -237,6 +237,21 @@ afterEach(() =>
 );
 
 describe('shopport drawer content', () => {
+  it('keeps local drawer actions available for an offline session', async () => {
+    mockOnline = false;
+    mockSessionStatus = 'offline-authenticated';
+
+    render(<ShopportDrawerContent {...drawerProps} />);
+    await act(async () => Promise.resolve());
+
+    expect(screen.getByText('Shopport')).toBeOnTheScreen();
+    expect(screen.getByLabelText('새로운 대화 열기')).toBeOnTheScreen();
+    expect(mockedUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
   it('clears the active conversation before opening a new chat', async () => {
     render(<ShopportDrawerContent {...drawerProps} />);
     await act(async () => Promise.resolve());

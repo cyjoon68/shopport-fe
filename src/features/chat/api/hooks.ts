@@ -1,7 +1,7 @@
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import {
   type ChatClientPersistence,
-  type ConnectConnectionAdapter,
+  type SubscribeConnectionAdapter,
   useChat,
   xhrHttpStream,
 } from '@tanstack/ai-react';
@@ -20,11 +20,29 @@ import {
 import { environment } from '@/shared/config/environment';
 import { flushChatPersistence, sqliteChatPersistence } from '@/shared/storage';
 
-import type { ChatRunContext, ChatRunOptions, RetailerId, UploadedImage } from '../types';
+import type {
+  ChatRunContext,
+  ChatRunOptions,
+  ChatRunResult,
+  RetailerId,
+  UploadedImage,
+} from '../types';
 
 type PersistedChatState = Parameters<ChatClientPersistence['setItem']>[1];
 type PersistedChatStateWithRunContext = PersistedChatState &
   Readonly<{ shopportRunContext?: ChatRunContext }>;
+type ChatOperation = {
+  error: Error | null;
+  runId: string | null;
+};
+type ChatStreamChunk = Parameters<
+  NonNullable<Parameters<typeof useChat>[0]['onChunk']>
+>[0];
+type BufferedChatChunk = Readonly<{
+  chunk: ChatStreamChunk;
+  generation: number;
+  runId: string;
+}>;
 
 const resumeRunId = (state: PersistedChatState): string | null => {
   const runId = state.resume?.resumeState.runId;
@@ -109,6 +127,7 @@ export const useChatRun = ({
   conversationId,
   online,
   onFinish,
+  onRunError,
   onRunStart,
   onResumeContext,
   providerIds,
@@ -122,14 +141,23 @@ export const useChatRun = ({
   const connectionActiveRef = useRef(true);
   const finishedRunIdRef = useRef<string | null>(null);
   const onRunStartRef = useRef(onRunStart);
+  const onRunErrorRef = useRef(onRunError);
   const onResumeContextRef = useRef(onResumeContext);
   const localRunContextRef = useRef<ChatRunContext | null>(null);
   const runContext = runContextRef ?? localRunContextRef;
-  const streamRunIdRef = useRef<string | null>(null);
   const streamChunkRunIdsRef = useRef(new WeakMap<object, string>());
+  const transportGenerationRef = useRef(0);
+  const activeTransportRef = useRef<Readonly<{
+    generation: number;
+    runId: string;
+  }> | null>(null);
+  const currentOperationRef = useRef<ChatOperation | null>(null);
+  const operationsByRunIdRef = useRef(new Map<string, ChatOperation>());
+  const pendingRunErrorRef = useRef<Readonly<{ runId: string | null }> | null>(null);
   onRunStartRef.current = onRunStart;
+  onRunErrorRef.current = onRunError;
   onResumeContextRef.current = onResumeContext;
-  const [connection] = useState<ConnectConnectionAdapter>(() => {
+  const [connection] = useState<SubscribeConnectionAdapter>(() => {
     const transport = xhrHttpStream(`${environment.apiUrl}/v1/ai/chat`, () => {
       const token = getAccessToken();
       return {
@@ -143,23 +171,125 @@ export const useChatRun = ({
         reconnect: { delayMs: 300, maxAttempts: 5 },
       };
     });
+    let activeBuffer: Array<BufferedChatChunk> = [];
+    let activeWaiters: Array<(chunk: BufferedChatChunk | null) => void> = [];
+    const push = (chunk: BufferedChatChunk): void => {
+      const waiter = activeWaiters.shift();
+      if (waiter) waiter(chunk);
+      else activeBuffer.push(chunk);
+    };
+    const isCurrentTransport = (generation: number, runId: string): boolean => {
+      const active = activeTransportRef.current;
+      return active?.generation === generation && active.runId === runId;
+    };
+    const invalidateTransport = (generation: number, runId: string): void => {
+      if (isCurrentTransport(generation, runId)) activeTransportRef.current = null;
+    };
     return {
-      async *connect(messages, data, abortSignal, runContext) {
-        if (!remoteWorkRef.current || !connectionActiveRef.current) return;
-        const runId = runContext?.runId;
-        if (runId) {
-          finishedRunIdRef.current = null;
-          streamRunIdRef.current = runId;
-          onRunStartRef.current?.(runId);
+      subscribe(abortSignal) {
+        const buffer = activeBuffer.splice(0);
+        const waiters: Array<(chunk: BufferedChatChunk | null) => void> = [];
+        activeBuffer = buffer;
+        activeWaiters = waiters;
+        return (async function* () {
+          while (!abortSignal?.aborted) {
+            const buffered = buffer.shift();
+            const next =
+              buffered ??
+              (await new Promise<BufferedChatChunk | null>((resolve) => {
+                const onAbort = () => resolve(null);
+                waiters.push((chunk) => {
+                  abortSignal?.removeEventListener('abort', onAbort);
+                  resolve(chunk);
+                });
+                abortSignal?.addEventListener('abort', onAbort, { once: true });
+              }));
+            if (!next || abortSignal?.aborted) return;
+            if (!isCurrentTransport(next.generation, next.runId)) continue;
+            streamChunkRunIdsRef.current.set(next.chunk, next.runId);
+            yield next.chunk;
+          }
+        })();
+      },
+      async send(messages, data, abortSignal, requestContext) {
+        if (
+          !remoteWorkRef.current ||
+          !connectionActiveRef.current ||
+          abortSignal?.aborted
+        )
+          return;
+        const runId = requestContext?.runId;
+        if (!runId) throw new Error('Chat run ID is required.');
+        const transportGeneration = ++transportGenerationRef.current;
+        activeTransportRef.current = { generation: transportGeneration, runId };
+        abortSignal?.addEventListener(
+          'abort',
+          () => invalidateTransport(transportGeneration, runId),
+          { once: true },
+        );
+        const operation = currentOperationRef.current;
+        if (operation) {
+          operation.runId = runId;
+          operationsByRunIdRef.current.set(runId, operation);
         }
-        for await (const chunk of transport.connect(
-          messages,
-          data,
-          abortSignal,
-          runContext,
-        )) {
-          if (runId) streamChunkRunIdsRef.current.set(chunk, runId);
-          yield chunk;
+        finishedRunIdRef.current = null;
+        onRunStartRef.current?.(runId);
+        let hasTerminalEvent = false;
+        let upstreamRunId: string | undefined;
+        let upstreamThreadId: string | undefined;
+        try {
+          for await (const chunk of transport.connect(
+            messages,
+            data,
+            abortSignal,
+            requestContext,
+          )) {
+            if (abortSignal?.aborted || !isCurrentTransport(transportGeneration, runId))
+              return;
+            if ('runId' in chunk && typeof chunk.runId === 'string')
+              upstreamRunId = chunk.runId;
+            if ('threadId' in chunk && typeof chunk.threadId === 'string')
+              upstreamThreadId = chunk.threadId;
+            const chunkType = String(chunk.type);
+            if (chunkType === 'RUN_FINISHED' || chunkType === 'RUN_ERROR')
+              hasTerminalEvent = true;
+            push({ chunk, generation: transportGeneration, runId });
+          }
+          if (
+            abortSignal?.aborted ||
+            !isCurrentTransport(transportGeneration, runId) ||
+            hasTerminalEvent
+          )
+            return;
+          push({
+            chunk: {
+              finishReason: 'stop',
+              model: 'connect-wrapper',
+              runId: upstreamRunId ?? runId,
+              threadId: upstreamThreadId ?? requestContext?.threadId ?? conversationId,
+              timestamp: Date.now(),
+              type: 'RUN_FINISHED',
+            } as ChatStreamChunk,
+            generation: transportGeneration,
+            runId,
+          });
+        } catch (error) {
+          if (abortSignal?.aborted || !isCurrentTransport(transportGeneration, runId))
+            return;
+          if (!hasTerminalEvent)
+            push({
+              chunk: {
+                message:
+                  error instanceof Error ? error.message : 'Unknown error in connect()',
+                runId: upstreamRunId ?? runId,
+                threadId: upstreamThreadId ?? requestContext?.threadId ?? conversationId,
+                timestamp: Date.now(),
+                type: 'RUN_ERROR',
+              } as ChatStreamChunk,
+              generation: transportGeneration,
+              runId,
+            });
+          throw error;
         }
       },
       async *joinRun(runId, abortSignal) {
@@ -169,10 +299,13 @@ export const useChatRun = ({
           cancelledRunIds.current.has(runId)
         )
           return;
+        const transportGeneration = ++transportGenerationRef.current;
+        activeTransportRef.current = { generation: transportGeneration, runId };
         finishedRunIdRef.current = null;
-        streamRunIdRef.current = runId;
         onRunStartRef.current?.(runId);
         for await (const chunk of transport.joinRun(runId, abortSignal)) {
+          if (abortSignal?.aborted || !isCurrentTransport(transportGeneration, runId))
+            return;
           streamChunkRunIdsRef.current.set(chunk, runId);
           yield chunk;
         }
@@ -250,20 +383,72 @@ export const useChatRun = ({
       const runId =
         'runId' in chunk && typeof chunk.runId === 'string' ? chunk.runId : null;
       const chunkRunId = streamChunkRunIdsRef.current.get(chunk) ?? runId;
-      if (chunkType === 'RUN_STARTED' && chunkRunId) streamRunIdRef.current = chunkRunId;
-      if (chunkType === 'RUN_FINISHED')
-        finishedRunIdRef.current = chunkRunId ?? streamRunIdRef.current;
+      if (chunkType === 'RUN_FINISHED') finishedRunIdRef.current = chunkRunId;
+      if (chunkType === 'RUN_ERROR') {
+        const pendingError = { runId: chunkRunId };
+        pendingRunErrorRef.current = pendingError;
+        void Promise.resolve().then(() => {
+          if (pendingRunErrorRef.current === pendingError)
+            pendingRunErrorRef.current = null;
+        });
+      }
     },
     onFinish: () => {
-      onFinish(finishedRunIdRef.current ?? streamRunIdRef.current);
+      onFinish(finishedRunIdRef.current);
       void flushChatPersistence(conversationId).catch(() => undefined);
       if (remoteWorkRef.current)
         void client.refetchQueries({ include: [ConversationsDocument] });
+    },
+    onError: (error) => {
+      const pendingError = pendingRunErrorRef.current;
+      pendingRunErrorRef.current = null;
+      const currentOperation = currentOperationRef.current;
+      const activeRunId = activeTransportRef.current?.runId ?? null;
+      const failedRunId = pendingError
+        ? pendingError.runId
+        : (activeRunId ?? currentOperation?.runId ?? null);
+      const failedOperation = pendingError
+        ? failedRunId
+          ? operationsByRunIdRef.current.get(failedRunId)
+          : currentOperation
+        : ((activeRunId ? operationsByRunIdRef.current.get(activeRunId) : undefined) ??
+          currentOperation);
+      if (failedOperation) failedOperation.error = error;
+      onRunErrorRef.current?.(error, failedRunId);
     },
     persistence,
     queue: 'drop',
     threadId: conversationId,
   });
+  const runOperation = async (operation: () => Promise<void>): Promise<ChatRunResult> => {
+    const operationState: ChatOperation = { error: null, runId: null };
+    currentOperationRef.current = operationState;
+    try {
+      try {
+        await operation();
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error : new Error('다시 시도해 주세요.'),
+          ok: false,
+        };
+      }
+      return operationState.error
+        ? { error: operationState.error, ok: false }
+        : { ok: true };
+    } finally {
+      if (currentOperationRef.current === operationState)
+        currentOperationRef.current = null;
+      if (
+        operationState.runId &&
+        operationsByRunIdRef.current.get(operationState.runId) === operationState
+      )
+        operationsByRunIdRef.current.delete(operationState.runId);
+    }
+  };
+  const sendMessage = (
+    ...args: Parameters<typeof chat.sendMessage>
+  ): Promise<ChatRunResult> => runOperation(() => chat.sendMessage(...args));
+  const reload = (): Promise<ChatRunResult> => runOperation(chat.reload);
   useEffect(() => {
     if (previousOnlineRef.current && !online) chat.stop();
     previousOnlineRef.current = online;
@@ -279,9 +464,11 @@ export const useChatRun = ({
     connectionActiveRef.current = true;
     return () => {
       connectionActiveRef.current = false;
+      transportGenerationRef.current += 1;
+      activeTransportRef.current = null;
     };
   }, []);
-  return { ...chat, clearPersistedResume };
+  return { ...chat, clearPersistedResume, reload, sendMessage };
 };
 
 export const useUploadedImages = (enabled: boolean) => {

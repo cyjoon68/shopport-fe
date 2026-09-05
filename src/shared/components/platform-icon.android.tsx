@@ -13,7 +13,8 @@ import PhotoLibrary from '@expo/material-symbols/photo_library.xml';
 import Settings from '@expo/material-symbols/settings.xml';
 import Bag from '@expo/material-symbols/shopping_bag.xml';
 import StopFilled from '@expo/material-symbols/stop_circle.xml';
-import { Icon } from '@expo/ui';
+import { Host, Icon } from '@expo/ui';
+import { StyleSheet } from 'react-native-unistyles';
 
 import type {
   PlatformIconName,
@@ -40,10 +41,16 @@ export const platformIconSources = {
 } satisfies Record<PlatformIconName, PlatformIconSource>;
 
 export const PlatformIcon = ({ color, name, size, testID }: PlatformIconProps) => (
-  <Icon
-    color={color}
-    name={platformIconSources[name]}
-    size={size}
-    {...(testID ? { testID } : {})}
-  />
+  <Host matchContents pointerEvents="none" style={styles.host(size)}>
+    <Icon
+      color={color}
+      name={platformIconSources[name]}
+      size={size}
+      {...(testID ? { testID } : {})}
+    />
+  </Host>
 );
+
+const styles = StyleSheet.create({
+  host: (size: number) => ({ height: size, width: size }),
+});

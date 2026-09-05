@@ -1,9 +1,11 @@
 import { useQuery } from '@apollo/client/react';
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
 import {
   createElement as mockCreateElement,
+  forwardRef as mockForwardRef,
   Fragment as mockFragment,
   type ReactNode,
+  useImperativeHandle as mockUseImperativeHandle,
 } from 'react';
 
 import { FoundProductsDocument } from '@/graphql/generated/graphql';
@@ -19,9 +21,15 @@ type FlashListProps = Readonly<{
   renderItem?: (props: { item: RecommendedProduct }) => ReactNode;
 }>;
 
+type FlashListHandle = Readonly<{
+  scrollToIndex: (options: Readonly<{ animated: boolean; index: number }>) => void;
+}>;
+
 let mockFlashListProps: FlashListProps | null = null;
+const mockScrollToIndex = jest.fn();
 
 type ProductCardProps = Readonly<{
+  highlighted?: boolean;
   horizontal?: boolean;
   product: CachedProduct;
 }>;
@@ -56,8 +64,9 @@ jest.mock('@apollo/client/react', () => ({
 }));
 
 jest.mock('@shopify/flash-list', () => ({
-  FlashList: (props: FlashListProps) => {
+  FlashList: mockForwardRef<FlashListHandle, FlashListProps>((props, ref) => {
     mockFlashListProps = props;
+    mockUseImperativeHandle(ref, () => ({ scrollToIndex: mockScrollToIndex }));
     return mockCreateElement(
       mockFragment,
       null,
@@ -69,7 +78,7 @@ jest.mock('@shopify/flash-list', () => ({
         ),
       ),
     );
-  },
+  }),
 }));
 
 jest.mock('@/features/auth', () => ({
@@ -105,8 +114,13 @@ describe('found products layout', () => {
   beforeEach(() => {
     mockFlashListProps = null;
     mockProductCardProps = null;
+    mockScrollToIndex.mockReset();
     mockedReadCachedChatMessages.mockReset();
     mockedReadCachedChatMessages.mockImplementation(() => new Promise(() => undefined));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('renders products in a one-column list', () => {
@@ -221,5 +235,80 @@ describe('found products layout', () => {
       expect.objectContaining({ horizontal: false, product }),
     );
     expect(screen.queryByText('AI 요약')).toBeNull();
+  });
+
+  it('scrolls again when the same product receives a new focus request', () => {
+    const screen = render(
+      <ProductList
+        conversationRecommendations={[{ product, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={1}
+        scope="conversation"
+      />,
+    );
+
+    expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+    expect(mockScrollToIndex).toHaveBeenLastCalledWith({ animated: true, index: 0 });
+
+    screen.rerender(
+      <ProductList
+        conversationRecommendations={[{ product, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={2}
+        scope="conversation"
+      />,
+    );
+
+    expect(mockScrollToIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not scroll again without a new focus request', () => {
+    const screen = render(
+      <ProductList
+        conversationRecommendations={[{ product, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={1}
+        scope="conversation"
+      />,
+    );
+
+    screen.rerender(
+      <ProductList
+        conversationRecommendations={[{ product: { ...product }, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={1}
+        scope="conversation"
+      />,
+    );
+
+    expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the focus highlight after the full display interval', () => {
+    jest.useFakeTimers();
+    const screen = render(
+      <ProductList
+        conversationRecommendations={[{ product, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={1}
+        scope="conversation"
+      />,
+    );
+
+    expect(firstProductCardProps().highlighted).toBe(true);
+
+    screen.rerender(
+      <ProductList
+        conversationRecommendations={[{ product: { ...product }, aiSummary: null }]}
+        focusProductId={product.id}
+        focusRequestId={1}
+        scope="conversation"
+      />,
+    );
+    act(() => jest.advanceTimersByTime(1_599));
+    expect(firstProductCardProps().highlighted).toBe(true);
+
+    act(() => jest.advanceTimersByTime(1));
+    expect(firstProductCardProps().highlighted).toBe(false);
   });
 });

@@ -41,8 +41,8 @@ const parseJson = (value: string): unknown => {
 
 export const cacheProducts = async (
   products: ReadonlyArray<CachedProduct>,
+  capturedGeneration = capturePrivateWriteGeneration(),
 ): Promise<void> => {
-  const capturedGeneration = capturePrivateWriteGeneration();
   await runPrivateWrite(capturedGeneration, async () => {
     const db = await database();
     const now = Date.now();

@@ -62,6 +62,7 @@ export const ChatQuickActions = ({
       <ScrollView
         contentContainerStyle={styles.actions}
         horizontal
+        keyboardShouldPersistTaps="handled"
         showsHorizontalScrollIndicator={false}
       >
         {retailerActions.map(({ id, label }) => {

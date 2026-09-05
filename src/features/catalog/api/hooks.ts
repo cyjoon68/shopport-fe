@@ -1,3 +1,4 @@
+import type { ApolloCache, Reference, StoreObject } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useRef } from 'react';
 
@@ -6,11 +7,60 @@ import {
   SaveProductDocument,
   UnsaveProductDocument,
 } from '@/graphql/generated/graphql';
+import { privateWriteGenerationContextKey } from '@/providers/apollo-client';
+import { cacheProducts, capturePrivateWriteGeneration } from '@/shared/storage';
 
-import { recommendedProductFromFragment } from '../domain/models';
+import { productFromFragment, recommendedProductFromFragment } from '../domain/models';
 import type { RecommendedProduct } from '../types';
 
 const pageSize = 20;
+
+type SavedProductEdge = Readonly<{
+  __typename?: string;
+  cursor: string;
+  node: Reference | StoreObject;
+}>;
+
+type SavedProductConnection = Readonly<{
+  edges: ReadonlyArray<SavedProductEdge>;
+}>;
+
+const updateSavedProductsConnection = (
+  cache: ApolloCache,
+  productId: string,
+  isSaved: boolean,
+): void => {
+  cache.modify({
+    fields: {
+      savedProducts: (
+        existing: Reference | SavedProductConnection,
+        { readField, toReference },
+      ) => {
+        if (!('edges' in existing)) return existing;
+        const otherEdges = existing.edges.filter(
+          ({ node }) => readField('id', node) !== productId,
+        );
+        if (!isSaved)
+          return otherEdges.length === existing.edges.length
+            ? existing
+            : { ...existing, edges: otherEdges };
+        const product = toReference({ __typename: 'Product', id: productId });
+        if (!product) return existing;
+        return {
+          ...existing,
+          edges: [
+            {
+              __typename: 'ProductEdge',
+              cursor: `local:${productId}`,
+              node: product,
+            },
+            ...otherEdges,
+          ],
+        };
+      },
+    },
+  });
+};
 
 export const useFoundProductRecommendations = (enabled: boolean) => {
   const enabledRef = useRef(enabled);
@@ -51,17 +101,48 @@ export const useUpdateSavedProduct = () => {
   const [unsaveProduct] = useMutation(UnsaveProductDocument);
 
   return async (productId: string, isSaved: boolean): Promise<string | null> => {
+    const capturedGeneration = capturePrivateWriteGeneration();
+    const context = {
+      [privateWriteGenerationContextKey]: capturedGeneration,
+    };
+    let payload;
     if (isSaved) {
-      const result = await unsaveProduct({ variables: { input: { productId } } });
-      const payload = result.data?.unsaveProduct;
-      if (!payload || payload.userErrors.length > 0)
-        return payload?.userErrors[0]?.message || '찜을 변경하지 못했습니다.';
-      return payload.product ? null : '찜을 변경하지 못했습니다.';
+      const result = await unsaveProduct({
+        context,
+        update: (cache, { data }) => {
+          const updated = data?.unsaveProduct;
+          if (updated?.product && updated.userErrors.length === 0)
+            updateSavedProductsConnection(
+              cache,
+              productFromFragment(updated.product).id,
+              false,
+            );
+        },
+        variables: { input: { productId } },
+      });
+      payload = result.data?.unsaveProduct;
+    } else {
+      const result = await saveProduct({
+        context,
+        update: (cache, { data }) => {
+          const updated = data?.saveProduct;
+          if (updated?.product && updated.userErrors.length === 0)
+            updateSavedProductsConnection(
+              cache,
+              productFromFragment(updated.product).id,
+              true,
+            );
+        },
+        variables: { input: { productId } },
+      });
+      payload = result.data?.saveProduct;
     }
-    const result = await saveProduct({ variables: { input: { productId } } });
-    const payload = result.data?.saveProduct;
     if (!payload || payload.userErrors.length > 0)
       return payload?.userErrors[0]?.message || '찜을 변경하지 못했습니다.';
-    return payload.product ? null : '찜을 변경하지 못했습니다.';
+    if (!payload.product) return '찜을 변경하지 못했습니다.';
+    await cacheProducts([productFromFragment(payload.product)], capturedGeneration).catch(
+      () => undefined,
+    );
+    return null;
   };
 };

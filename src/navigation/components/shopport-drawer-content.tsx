@@ -182,6 +182,8 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
   const { theme } = useUnistyles();
   const { status } = useSession();
   const online = useOnline();
+  const sessionAvailable =
+    status === 'authenticated' || status === 'offline-authenticated';
   const enabled = status === 'authenticated' && online;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
@@ -207,11 +209,11 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
     };
   }, []);
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (!sessionAvailable) return;
     void readPinnedConversationIds()
       .then((ids) => setPinnedIds(new Set(ids)))
       .catch(() => undefined);
-  }, [status]);
+  }, [sessionAvailable]);
 
   const navigate = (href: NavigationHref): void => {
     navigation.closeDrawer();
@@ -251,7 +253,7 @@ export const ShopportDrawerContent = ({ navigation }: ShopportDrawerContentProps
     }
   };
 
-  if (status !== 'authenticated') return null;
+  if (!sessionAvailable) return null;
 
   return (
     <DrawerContentScrollView contentContainerStyle={styles.content}>

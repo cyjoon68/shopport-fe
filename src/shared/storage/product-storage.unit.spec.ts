@@ -11,7 +11,12 @@ jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(() => Promise.resolve(mockDatabase)),
 }));
 
-import { readCachedProducts } from './product-storage';
+import {
+  capturePrivateWriteGeneration,
+  closePrivateStorage,
+  openPrivateStorage,
+} from './private-storage';
+import { cacheProducts, readCachedProducts } from './product-storage';
 
 const cachedProduct = {
   id: 'product-3',
@@ -25,7 +30,7 @@ const cachedProduct = {
   currency: 'KRW',
   isAffiliate: false,
   isInStock: true,
-  availability: 'IN_STOCK',
+  availability: 'IN_STOCK' as const,
   outboundUrl: 'https://example.com/product',
   deliveryExpectedAt: null,
   observedAt: '2026-08-16T00:00:00.000Z',
@@ -35,6 +40,21 @@ const cachedProduct = {
 describe('product storage', () => {
   beforeEach(() => {
     mockGetAllAsync.mockReset();
+    mockDatabase.runAsync.mockReset().mockResolvedValue(undefined);
+    mockDatabase.withTransactionAsync
+      .mockReset()
+      .mockImplementation((task: () => Promise<void>) => task());
+  });
+
+  it('rejects a product write captured by an earlier private session', async () => {
+    await closePrivateStorage();
+    await openPrivateStorage();
+    const capturedGeneration = capturePrivateWriteGeneration();
+    await closePrivateStorage();
+    await openPrivateStorage();
+    await cacheProducts([cachedProduct], capturedGeneration);
+
+    expect(mockDatabase.runAsync).not.toHaveBeenCalled();
   });
 
   it('ignores corrupted product cache rows', async () => {

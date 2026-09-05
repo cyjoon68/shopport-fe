@@ -33,7 +33,60 @@ const product = {
   isSaved: false,
 } satisfies CachedProduct;
 
+const otherProduct = {
+  ...product,
+  id: 'product-2',
+  title: '머그컵',
+} satisfies CachedProduct;
+
+const graphqlProduct = (value: CachedProduct, isSaved: boolean) => ({
+  __typename: 'Product' as const,
+  id: value.id,
+  title: value.title,
+  imageUrl: value.imageUrl,
+  isAffiliate: value.isAffiliate,
+  isSaved,
+  provider: {
+    __typename: 'Provider' as const,
+    providerId: value.providerId,
+    displayName: value.providerName,
+  },
+  offer: {
+    __typename: 'Offer' as const,
+    id: `${value.id}-offer`,
+    isInStock: value.isInStock,
+    availability: value.availability,
+    deliveryExpectedAt: value.deliveryExpectedAt,
+    observedAt: value.observedAt,
+    outboundUrl: value.outboundUrl,
+    price: {
+      __typename: 'Money' as const,
+      amountMinor: value.amountMinor,
+      currency: value.currency,
+    },
+    shipping: {
+      __typename: 'Money' as const,
+      amountMinor: value.shippingMinor,
+      currency: value.currency,
+    },
+    total: {
+      __typename: 'Money' as const,
+      amountMinor: value.totalMinor,
+      currency: value.currency,
+    },
+  },
+});
+
+const deferred = <T,>() => {
+  let resolve = (_value: T): void => undefined;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
 let mockOnline = true;
+let mockGeneration: number | null = 1;
 
 jest.mock('@apollo/client/react', () => ({
   useMutation: jest.fn(() => [jest.fn(), {}]),
@@ -45,6 +98,7 @@ jest.mock('@/providers/network-provider', () => ({
 
 jest.mock('@/shared/storage', () => ({
   cacheProducts: jest.fn(() => Promise.resolve()),
+  capturePrivateWriteGeneration: jest.fn(() => mockGeneration),
 }));
 
 jest.mock('@/shared/accessibility/hooks', () => ({
@@ -56,6 +110,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('@expo/ui', () => ({
+  Host: 'Host',
   Icon: ({ testID }: { testID?: string }) =>
     mockCreateElement(mockNativeText, { testID }, 'icon'),
 }));
@@ -82,6 +137,7 @@ const mockedUseMutation = useMutation as jest.MockedFunction<typeof useMutation>
 describe('product card links', () => {
   beforeEach(() => {
     mockOnline = true;
+    mockGeneration = 1;
     jest.clearAllMocks();
     mockedUseMutation.mockReturnValue([
       jest.fn(),
@@ -170,7 +226,9 @@ describe('product card links', () => {
 
   it('saves a product and updates the action state', async () => {
     const saveProduct = jest.fn().mockResolvedValue({
-      data: { saveProduct: { product: { id: 'product-1' }, userErrors: [] } },
+      data: {
+        saveProduct: { product: graphqlProduct(product, true), userErrors: [] },
+      },
     });
     const mutationState = {
       called: false,
@@ -189,12 +247,16 @@ describe('product card links', () => {
     await waitFor(() =>
       expect(screen.getByTestId('product-card-bookmark-filled-icon')).toBeOnTheScreen(),
     );
-    expect(saveProduct).toHaveBeenCalledWith({
-      variables: { input: { productId: 'product-1' } },
-    });
-    expect(jest.mocked(cacheProducts)).toHaveBeenCalledWith([
-      { ...product, isSaved: true },
-    ]);
+    expect(saveProduct).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { privateWriteGeneration: 1 },
+        variables: { input: { productId: 'product-1' } },
+      }),
+    );
+    expect(jest.mocked(cacheProducts)).toHaveBeenCalledWith(
+      [{ ...product, isSaved: true }],
+      1,
+    );
   });
 
   it('keeps the saved state when the mutation returns no product or user error', async () => {
@@ -224,6 +286,57 @@ describe('product card links', () => {
 
     expect(screen.getByTestId('product-card-bookmark-filled-icon')).toBeOnTheScreen();
     expect(screen.getByLabelText('텀블러 찜 해제')).toBeOnTheScreen();
+  });
+
+  it('resets local saved state when a recycled card receives another product', async () => {
+    const saveProduct = jest.fn().mockResolvedValue({
+      data: {
+        saveProduct: { product: graphqlProduct(product, true), userErrors: [] },
+      },
+    });
+    mockedUseMutation.mockReturnValue([
+      saveProduct,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const screen = render(<ProductCard product={product} />);
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+    await waitFor(() =>
+      expect(screen.getByTestId('product-card-bookmark-filled-icon')).toBeOnTheScreen(),
+    );
+
+    screen.rerender(<ProductCard product={otherProduct} />);
+
+    expect(screen.getByTestId('product-card-bookmark-icon')).toBeOnTheScreen();
+    expect(screen.getByLabelText('머그컵 찜')).toBeOnTheScreen();
+  });
+
+  it('does not apply a late mutation result to a recycled product card', async () => {
+    const request = deferred<{
+      data: {
+        saveProduct: {
+          product: ReturnType<typeof graphqlProduct>;
+          userErrors: Array<never>;
+        };
+      };
+    }>();
+    const saveProduct = jest.fn(() => request.promise);
+    mockedUseMutation.mockReturnValue([
+      saveProduct,
+      { called: false, client: {}, loading: false, reset: jest.fn() },
+    ] as ReturnType<typeof useMutation>);
+    const screen = render(<ProductCard product={product} />);
+    fireEvent.press(screen.getByLabelText('텀블러 찜'));
+
+    screen.rerender(<ProductCard product={otherProduct} />);
+    request.resolve({
+      data: {
+        saveProduct: { product: graphqlProduct(product, true), userErrors: [] },
+      },
+    });
+
+    await waitFor(() => expect(saveProduct).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('product-card-bookmark-icon')).toBeOnTheScreen();
+    expect(screen.getByLabelText('머그컵 찜')).toBeOnTheScreen();
   });
 
   it('reports rejected save and outbound-link requests', async () => {
