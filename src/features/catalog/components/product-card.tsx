@@ -1,13 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { useOnline } from '@/providers/network-provider';
 import { useReducedMotion } from '@/shared/accessibility/hooks';
 import { glassButtonIconSize, PlatformIcon } from '@/shared/components';
-import { cacheProducts } from '@/shared/storage';
+import { capturePrivateWriteGeneration } from '@/shared/storage';
 
 import { useUpdateSavedProduct } from '../api/hooks';
 import { formatMoney } from '../domain/format-money';
@@ -20,7 +20,14 @@ export const ProductCard = ({
   horizontal = false,
   product,
 }: ProductCardProps) => {
-  const [saved, setSaved] = useState(product.isSaved);
+  const [savedState, setSavedState] = useState({
+    productId: product.id,
+    value: product.isSaved,
+  });
+  const saved = savedState.productId === product.id ? savedState.value : product.isSaved;
+  const productIdRef = useRef(product.id);
+  productIdRef.current = product.id;
+  const operationRef = useRef<symbol | null>(null);
   const updateSavedProduct = useUpdateSavedProduct();
   const { theme } = useUnistyles();
   const online = useOnline();
@@ -44,7 +51,10 @@ export const ProductCard = ({
   );
   styles.useVariants({ compact, highlighted, horizontal });
 
-  useEffect(() => setSaved(product.isSaved), [product.isSaved]);
+  useEffect(
+    () => setSavedState({ productId: product.id, value: product.isSaved }),
+    [product.id, product.isSaved],
+  );
 
   const toggleSaved = async (): Promise<void> => {
     if (!online) {
@@ -52,21 +62,28 @@ export const ProductCard = ({
       return;
     }
     const next = !saved;
+    const productId = product.id;
+    const capturedGeneration = capturePrivateWriteGeneration();
+    const operation = Symbol();
+    operationRef.current = operation;
+    const isCurrent = (): boolean =>
+      operationRef.current === operation &&
+      productIdRef.current === productId &&
+      capturePrivateWriteGeneration() === capturedGeneration;
     try {
-      const userError = await updateSavedProduct(product.id, saved);
+      const userError = await updateSavedProduct(productId, saved);
+      if (!isCurrent()) return;
       if (userError) {
         Alert.alert('찜 변경 실패', userError);
         return;
       }
     } catch {
+      if (!isCurrent()) return;
       Alert.alert('찜 변경 실패', '연결을 확인하고 다시 시도해 주세요.');
       return;
     }
-    setSaved(next);
-    await Promise.all([
-      cacheProducts([{ ...product, isSaved: next }]),
-      Haptics.selectionAsync(),
-    ]).catch(() => undefined);
+    setSavedState({ productId, value: next });
+    await Haptics.selectionAsync().catch(() => undefined);
   };
 
   const open = async (): Promise<void> => {

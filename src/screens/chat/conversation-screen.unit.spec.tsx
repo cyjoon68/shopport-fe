@@ -25,8 +25,9 @@ let mockAskUserSheetProps: ComponentProps<typeof AskUserSheet> | undefined;
 let mockMessageListProps: ComponentProps<typeof MessageList> | undefined;
 let mockConnectionOptions: (() => { body: Record<string, unknown> }) | undefined;
 let mockChatConnection: Parameters<typeof useChat>[0]['connection'] | undefined;
-let mockFinish: (() => void) | undefined;
+let mockFinish: ((runId?: string | null) => void) | undefined;
 let mockChunk: ((chunk: { runId?: string; type: string }) => void) | undefined;
+let mockStreamError: ((error: Error) => void) | undefined;
 let mockHistory: ReadonlyArray<unknown> = [];
 let mockHistoryLoading = false;
 let mockChatMessages: ReadonlyArray<unknown> = [];
@@ -128,6 +129,15 @@ const mockedCancelRunThenStop = jest.mocked(cancelRunThenStop);
 const mockedPersistence = jest.mocked(sqliteChatPersistence);
 const mockedAlert = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
 
+const startMockRun = async (runId: string): Promise<void> => {
+  const connection = mockChatConnection;
+  if (!connection || !('send' in connection)) throw new Error('send adapter unavailable');
+  await connection.send([], undefined, undefined, {
+    runId,
+    threadId: 'conversation-1',
+  });
+};
+
 describe('conversation screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -138,6 +148,7 @@ describe('conversation screen', () => {
     mockChatConnection = undefined;
     mockFinish = undefined;
     mockChunk = undefined;
+    mockStreamError = undefined;
     mockHistory = [];
     mockHistoryLoading = false;
     mockChatMessages = [];
@@ -172,8 +183,12 @@ describe('conversation screen', () => {
     );
     mockedUseChat.mockImplementation((options) => {
       mockChatConnection = options.connection;
-      mockFinish = () => options.onFinish?.({} as never);
+      mockFinish = (runId = mockRunId) => {
+        if (runId) options.onChunk?.({ runId, type: 'RUN_FINISHED' } as never);
+        options.onFinish?.({} as never);
+      };
       mockChunk = (chunk) => options.onChunk?.(chunk as never);
+      mockStreamError = (error) => options.onError?.(error);
       return {
         error: undefined,
         isLoading: mockIsLoading,
@@ -328,10 +343,10 @@ describe('conversation screen', () => {
   it('forwards an oliveyoung selection and resets it only after a completed reply', async () => {
     const onProviderReset = jest.fn();
     let body: Record<string, unknown> | undefined;
-    mockSendMessage.mockImplementation(() => {
+    mockSendMessage.mockImplementation(async () => {
       body = mockConnectionOptions?.().body;
-      mockFinish?.();
-      return Promise.resolve();
+      await startMockRun('run-1');
+      mockFinish?.('run-1');
     });
     render(
       <ConversationScreen
@@ -402,6 +417,7 @@ describe('conversation screen', () => {
       'conversation-1',
       'run-1',
       mockStopChat,
+      expect.any(Function),
     );
     expect(
       (
@@ -444,6 +460,123 @@ describe('conversation screen', () => {
 
     expect(mockReload).toHaveBeenCalledTimes(1);
     expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps retry recovery when reload resolves after reporting a stream error', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    mockReload.mockImplementation(() => {
+      mockStreamError?.(new Error('retry transport failed'));
+      return Promise.resolve();
+    });
+    render(<ConversationScreen conversationId="conversation-1" />);
+    await act(async () => {
+      await mockComposerProps?.onStop();
+    });
+    const recovery = mockMessageListProps?.recovery;
+
+    await act(async () => {
+      recovery?.onRetry();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockMessageListProps?.recovery?.question).toBe('립밤 찾아줘');
+    expect(mockMessageListProps?.recovery?.reason).toBe('failed');
+    expect(mockedAlert).toHaveBeenCalledWith('다시 검색 실패', '오류');
+  });
+
+  it('offers retry and edit recovery for a general stream error', () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-1',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '립밤 찾아줘',
+        tools: [],
+      },
+    ];
+    render(<ConversationScreen conversationId="conversation-1" />);
+
+    act(() => {
+      mockChunk?.({ runId: 'run-1', type: 'RUN_ERROR' });
+      mockStreamError?.(new Error('stream failed'));
+    });
+
+    expect(mockMessageListProps?.recovery).toEqual(
+      expect.objectContaining({
+        question: '립밤 찾아줘',
+        reason: 'failed',
+      }),
+    );
+    expect(mockMessageListProps?.recovery?.onEdit).toEqual(expect.any(Function));
+    expect(mockMessageListProps?.recovery?.onRetry).toEqual(expect.any(Function));
+  });
+
+  it('signals composer cleanup after a failed send retry succeeds', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-1';
+    mockSendMessage.mockImplementation(() => {
+      mockStreamError?.(new Error('stream failed'));
+      return Promise.resolve();
+    });
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+
+    await act(async () => {
+      await expect(mockComposerProps?.onSend('립밤 찾아줘', 'asset-1')).rejects.toThrow(
+        'stream failed',
+      );
+    });
+    const recovery = mockMessageListProps?.recovery;
+    expect(recovery?.reason).toBe('failed');
+
+    mockOnline = false;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+    mockOnline = true;
+    act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
+
+    await act(async () => {
+      mockMessageListProps?.recovery?.onRetry();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      (
+        mockComposerProps as
+          | (ComponentProps<typeof ChatComposer> & {
+              retryCleanup?: Readonly<{
+                assetId: string | null;
+                revision: number;
+                text: string;
+              }>;
+            })
+          | undefined
+      )?.retryCleanup,
+    ).toEqual({
+      assetId: 'asset-1',
+      revision: 1,
+      text: '립밤 찾아줘',
+    });
   });
 
   it('removes only a cancelled run resume while retaining its persisted messages', async () => {
@@ -692,7 +825,10 @@ describe('conversation screen', () => {
           });
         }
       }
-      mockFinish = () => options.onFinish?.({} as never);
+      mockFinish = (runId = 'run-1') => {
+        if (runId) options.onChunk?.({ runId, type: 'RUN_FINISHED' } as never);
+        options.onFinish?.({} as never);
+      };
       mockChunk = (chunk) => options.onChunk?.(chunk as never);
       return {
         error: undefined,
@@ -886,6 +1022,7 @@ describe('conversation screen', () => {
     });
 
     await act(async () => {
+      await startMockRun('run-1');
       await mockComposerProps?.onStop();
       await send;
     });
@@ -930,6 +1067,7 @@ describe('conversation screen', () => {
     );
     await act(async () => {
       await mockComposerProps?.onSend('립밤 찾아줘', 'asset-1');
+      await startMockRun('run-1');
       await mockComposerProps?.onStop();
     });
     const recovery = mockMessageListProps?.recovery;
@@ -1092,7 +1230,10 @@ describe('conversation screen', () => {
           void Promise.resolve(persistence.getItem('conversation-1'));
       }
       mockChatConnection = options.connection;
-      mockFinish = () => options.onFinish?.({} as never);
+      mockFinish = (runId = 'run-1') => {
+        if (runId) options.onChunk?.({ runId, type: 'RUN_FINISHED' } as never);
+        options.onFinish?.({} as never);
+      };
       mockChunk = (chunk) => options.onChunk?.(chunk as never);
       return {
         error: undefined,
@@ -1150,7 +1291,10 @@ describe('conversation screen', () => {
           void Promise.resolve(persistence.getItem('conversation-1'));
       }
       mockChatConnection = options.connection;
-      mockFinish = () => options.onFinish?.({} as never);
+      mockFinish = (runId = 'run-1') => {
+        if (runId) options.onChunk?.({ runId, type: 'RUN_FINISHED' } as never);
+        options.onFinish?.({} as never);
+      };
       mockChunk = (chunk) => options.onChunk?.(chunk as never);
       return {
         error: undefined,
@@ -1216,6 +1360,243 @@ describe('conversation screen', () => {
     expect(mockMessageListProps?.recovery).toBeUndefined();
   });
 
+  it('does not let an old cancellation stop a new send before its run starts', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '이전 질문',
+        tools: [],
+      },
+    ];
+    let finishCancellation!: () => void;
+    mockedCancelRunThenStop.mockImplementation(
+      (_threadId, _runId, stop, isCurrentRun) =>
+        new Promise<'cancelled'>((resolve) => {
+          finishCancellation = () => {
+            if (isCurrentRun?.()) stop();
+            resolve('cancelled');
+          };
+        }),
+    );
+    let finishSend!: () => void;
+    mockSendMessage.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSend = resolve;
+      }),
+    );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let cancellation!: Promise<void>;
+    let sending!: Promise<void>;
+
+    act(() => {
+      cancellation = mockComposerProps?.onStop() as Promise<void>;
+    });
+    act(() => {
+      sending = mockComposerProps?.onSend('새 질문', 'asset-b') as Promise<void>;
+    });
+    await act(async () => {
+      finishCancellation();
+      await cancellation;
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+    expect(mockStopChat).not.toHaveBeenCalled();
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+
+    await act(async () => {
+      finishSend();
+      await sending;
+    });
+  });
+
+  it('ignores run A finish after send B starts but before its run ID arrives', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '이전 질문',
+        tools: [],
+      },
+    ];
+    let finishSend!: () => void;
+    mockSendMessage.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSend = resolve;
+      }),
+    );
+    const onProviderReset = jest.fn();
+    render(
+      <ConversationScreen
+        conversationId="conversation-1"
+        onProviderReset={onProviderReset}
+      />,
+    );
+    let sending!: Promise<void>;
+
+    act(() => {
+      sending = mockComposerProps?.onSend('새 질문', null) as Promise<void>;
+    });
+    act(() => {
+      mockFinish?.('run-a');
+    });
+    await act(async () => {
+      finishSend();
+      await sending;
+    });
+
+    expect(onProviderReset).not.toHaveBeenCalled();
+  });
+
+  it('keeps a late run A error from failing send B after run B starts', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '이전 질문',
+        tools: [],
+      },
+    ];
+    let finishSend!: () => void;
+    mockSendMessage.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSend = resolve;
+      }),
+    );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let sending!: Promise<void>;
+
+    act(() => {
+      sending = mockComposerProps?.onSend('새 질문', null) as Promise<void>;
+    });
+    await act(async () => {
+      const connection = mockChatConnection;
+      if (!connection || !('send' in connection))
+        throw new Error('send adapter unavailable');
+      await connection.send([], undefined, undefined, {
+        runId: 'run-b',
+        threadId: 'conversation-1',
+      });
+    });
+    act(() => {
+      mockChunk?.({ runId: 'run-a', type: 'RUN_ERROR' });
+      mockStreamError?.(new Error('run A failed'));
+    });
+
+    expect(mockMessageListProps?.recovery).toBeUndefined();
+    const sendResult = expect(sending).resolves.toBeUndefined();
+    await act(async () => {
+      finishSend();
+      await sendResult;
+    });
+  });
+
+  it('does not stop or alert after an in-flight cancellation owner unmounts', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '이전 질문',
+        tools: [],
+      },
+    ];
+    let failCancellation!: () => void;
+    mockedCancelRunThenStop.mockImplementation(
+      (_threadId, _runId, stop, isCurrentRun) =>
+        new Promise<'cancelled'>((_resolve, reject) => {
+          failCancellation = () => {
+            if (isCurrentRun?.()) stop();
+            reject(new Error('late cancel failure'));
+          };
+        }),
+    );
+    const screen = render(<ConversationScreen conversationId="conversation-1" />);
+    let cancellation!: Promise<void>;
+
+    act(() => {
+      cancellation = mockComposerProps?.onStop() as Promise<void>;
+    });
+    screen.unmount();
+    await act(async () => {
+      failCancellation();
+      await cancellation;
+    });
+
+    expect(mockStopChat).not.toHaveBeenCalled();
+    expect(mockedAlert).not.toHaveBeenCalledWith('응답 중지 실패', 'late cancel failure');
+  });
+
+  it('stops the local client once when cancellation is double-tapped', async () => {
+    mockIsLoading = true;
+    mockRunId = 'run-a';
+    mockChatMessages = [
+      {
+        askUsers: [],
+        id: 'message-a',
+        images: [],
+        products: [],
+        recommendations: [],
+        role: 'user',
+        status: 'COMPLETED',
+        text: '이전 질문',
+        tools: [],
+      },
+    ];
+    let finishCancellation!: () => void;
+    const remoteCancellation = new Promise<'cancelled'>((resolve) => {
+      finishCancellation = () => resolve('cancelled');
+    });
+    mockedCancelRunThenStop.mockImplementation(
+      async (_threadId, _runId, stop, isCurrentRun) => {
+        const outcome = await remoteCancellation;
+        if (isCurrentRun?.()) stop();
+        return outcome;
+      },
+    );
+    render(<ConversationScreen conversationId="conversation-1" />);
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+
+    act(() => {
+      first = mockComposerProps?.onStop() as Promise<void>;
+      second = mockComposerProps?.onStop() as Promise<void>;
+    });
+    await act(async () => {
+      finishCancellation();
+      await Promise.all([first, second]);
+    });
+
+    expect(mockStopChat).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the active run ID through a null render before cancellation finishes', async () => {
     mockIsLoading = true;
     mockRunId = 'run-1';
@@ -1246,7 +1627,7 @@ describe('conversation screen', () => {
     });
     mockRunId = null;
     screen.rerender(<ConversationScreen conversationId="conversation-1" />);
-    act(() => mockFinish?.());
+    act(() => mockFinish?.('run-1'));
     await act(async () => {
       resolveCancellation();
       await cancel;
@@ -1309,11 +1690,11 @@ describe('conversation screen', () => {
     act(() => screen.rerender(<ConversationScreen conversationId="conversation-1" />));
     act(() => recovery?.onRetry());
     await act(async () => {
+      await startMockRun('run-b');
       await Promise.resolve();
     });
     act(() => {
-      mockChunk?.({ runId: 'run-a', type: 'RUN_FINISHED' });
-      mockFinish?.();
+      mockFinish?.('run-a');
     });
 
     await act(async () => {
@@ -1359,17 +1740,16 @@ describe('conversation screen', () => {
     const recovery = mockMessageListProps?.recovery;
     act(() => recovery?.onRetry());
     const connection = mockChatConnection;
-    if (!connection || !('connect' in connection))
+    if (!connection || !('send' in connection))
       throw new Error('chat connection unavailable');
     await act(async () => {
-      for await (const _chunk of connection.connect([], undefined, undefined, {
+      await connection.send([], undefined, undefined, {
         runId: 'run-b',
-      } as never))
-        void _chunk;
+        threadId: 'conversation-1',
+      });
     });
     act(() => {
-      mockChunk?.({ runId: 'run-a', type: 'RUN_FINISHED' });
-      mockFinish?.();
+      mockFinish?.('run-a');
     });
     await act(async () => {
       resolveReload();

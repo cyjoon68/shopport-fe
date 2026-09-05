@@ -30,6 +30,48 @@ import type {
   ConversationActionProps,
 } from './types';
 
+const draftOperationTails = new Map<string, Promise<void>>();
+
+const runDraftOperation = <T>(
+  conversationId: string,
+  operation: () => Promise<T>,
+): Promise<T> => {
+  const previous = draftOperationTails.get(conversationId);
+  let result: Promise<T>;
+  if (previous) result = previous.then(operation);
+  else {
+    try {
+      result = Promise.resolve(operation());
+    } catch (cause) {
+      result = Promise.reject(
+        cause instanceof Error ? cause : new Error('Draft operation failed.', { cause }),
+      );
+    }
+  }
+  const tail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  draftOperationTails.set(conversationId, tail);
+  void tail.then(() => {
+    if (draftOperationTails.get(conversationId) === tail)
+      draftOperationTails.delete(conversationId);
+  });
+  return result;
+};
+
+const deleteComposerDraft = (conversationId: string): Promise<void> =>
+  runDraftOperation(conversationId, () => deleteDraft(conversationId));
+
+const readComposerDraft = (conversationId: string) =>
+  runDraftOperation(conversationId, () => readDraft(conversationId));
+
+const saveComposerDraft = (
+  conversationId: string,
+  draft: Parameters<typeof saveDraft>[1],
+): Promise<void> =>
+  runDraftOperation(conversationId, () => saveDraft(conversationId, draft));
+
 export const useConversationActions = ({
   conversation,
   onDeleted,
@@ -133,7 +175,7 @@ export const useConversationActions = ({
               const cleanupResults = await Promise.allSettled([
                 sqliteChatPersistence.removeItem(conversation.id),
                 setConversationPinned(conversation.id, false),
-                deleteDraft(conversation.id),
+                deleteComposerDraft(conversation.id),
               ]);
               const cacheCleanupFailed = cleanupResults.some(
                 ({ status }) => status === 'rejected',
@@ -193,6 +235,12 @@ export const useComposerState = (
   const assetRef = useRef<Attachment | null>(null);
   const verificationRef = useRef<string | null>(null);
   const draftReadyRef = useRef<string | null>(null);
+  const pendingDraftRef = useRef<Readonly<{
+    conversationId: string;
+    draft: Readonly<{ assetId: string | null; assetUri: string | null; text: string }>;
+    generation: number;
+    version: number;
+  }> | null>(null);
   const lifecycleRef = useRef<ComposerLifecycle>({
     conversationId,
     generation: 0,
@@ -205,6 +253,22 @@ export const useComposerState = (
     generation = lifecycleRef.current.generation,
   ): boolean =>
     isCurrentComposerConversation(lifecycleRef.current, id, version, generation);
+  const flushPendingDraft = (expectedConversationId: string): void => {
+    const pending = pendingDraftRef.current;
+    if (
+      !pending ||
+      pending.conversationId !== expectedConversationId ||
+      !isCurrentComposerConversation(
+        lifecycleRef.current,
+        pending.conversationId,
+        pending.version,
+        pending.generation,
+      )
+    )
+      return;
+    pendingDraftRef.current = null;
+    void saveComposerDraft(pending.conversationId, pending.draft);
+  };
 
   useEffect(() => {
     lifecycleRef.current.mounted = true;
@@ -325,7 +389,7 @@ export const useComposerState = (
     setUploading(false);
     setDraftReadyFor(null);
     let active = true;
-    void readDraft(conversationId)
+    void readComposerDraft(conversationId)
       .then((draft) => {
         if (
           !active ||
@@ -373,6 +437,29 @@ export const useComposerState = (
     };
   }, [conversationId]);
 
+  useLayoutEffect(() => {
+    if (draftReadyFor !== conversationId || draftReadyRef.current !== conversationId)
+      return;
+    const lifecycle = lifecycleRef.current;
+    pendingDraftRef.current = {
+      conversationId,
+      draft: {
+        text,
+        assetId: asset?.id ?? null,
+        assetUri: asset?.uri ?? null,
+      },
+      generation: lifecycle.generation,
+      version: lifecycle.version,
+    };
+  }, [asset, conversationId, draftReadyFor, text]);
+
+  useLayoutEffect(
+    () => () => {
+      flushPendingDraft(conversationId);
+    },
+    [conversationId],
+  );
+
   useEffect(() => {
     if (draftReadyFor !== conversationId || draftReadyRef.current !== conversationId)
       return undefined;
@@ -390,11 +477,7 @@ export const useComposerState = (
         draftReadyRef.current !== conversationId
       )
         return;
-      void saveDraft(conversationId, {
-        text,
-        assetId: asset?.id ?? null,
-        assetUri: asset?.uri ?? null,
-      });
+      flushPendingDraft(conversationId);
     }, 250);
     return () => clearTimeout(timeout);
   }, [asset, conversationId, draftReadyFor, text]);
@@ -407,12 +490,16 @@ export const useComposerState = (
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'inactive' || status === 'background') {
+        flushPendingDraft(conversationId);
+        return;
+      }
       const current = assetRef.current;
       if (status === 'active' && online && current && current.state !== 'rejected')
         void verifyAsset(current);
     });
     return () => subscription.remove();
-  }, [online]);
+  }, [conversationId, online]);
 
   return {
     applyProcessingResult,
@@ -427,7 +514,7 @@ export const useComposerState = (
     text,
     uploading,
     verifyAsset,
-    deleteDraft,
+    deleteDraft: deleteComposerDraft,
   };
 };
 
@@ -544,7 +631,7 @@ export const useComposerActions = ({
           return true;
         }
         try {
-          await saveDraft(conversationId, {
+          await saveComposerDraft(conversationId, {
             text: current.text,
             assetId: current.asset?.id ?? null,
             assetUri: current.asset?.uri ?? null,
@@ -632,6 +719,24 @@ export const useComposerActions = ({
       state.setAsset(null);
     }
     return true;
+  };
+
+  const cleanupRetriedDraft = async (
+    draft: Readonly<{ assetId: string | null; text: string }>,
+  ): Promise<boolean> => {
+    const current = latestRef.current;
+    if (
+      current.conversationId !== conversationId ||
+      current.draftReadyFor !== conversationId ||
+      current.text.trim() !== draft.text ||
+      (current.asset?.id ?? null) !== draft.assetId
+    )
+      return false;
+    submittedDraftRef.current = {
+      conversationId,
+      revision: current.revision,
+    };
+    return cleanupSubmittedDraft(currentSnapshot(), current.revision);
   };
 
   const attach = async (): Promise<void> => {
@@ -775,7 +880,7 @@ export const useComposerActions = ({
     }
   };
 
-  return { attach, initialDraftRetiredRef, remove, send };
+  return { attach, cleanupRetriedDraft, initialDraftRetiredRef, remove, send };
 };
 
 export const useKeyboardLift = (): Animated.Value => {

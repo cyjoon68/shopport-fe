@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert, ScrollView, Text } from 'react-native';
 
 import { retailerIds } from '../../../constants';
 import type { RetailerId } from '../../../types';
@@ -29,6 +29,14 @@ const Fixture = () => {
 };
 
 describe('chat quick actions', () => {
+  it('keeps the first quick-action tap while the keyboard is open', () => {
+    const screen = render(<Fixture />);
+
+    expect(screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps).toBe(
+      'handled',
+    );
+  });
+
   it('warns for Olive Young and keeps Daiso available', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const screen = render(<Fixture />);

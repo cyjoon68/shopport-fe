@@ -67,6 +67,7 @@ const ChatContent = ({
   const [selectedTab, setSelectedTab] = useState<ChatTab>('채팅');
   const [messages, setMessages] = useState<ReadonlyArray<DisplayMessage>>([]);
   const [focusedProductId, setFocusedProductId] = useState<string | null>(null);
+  const [focusRequestId, setFocusRequestId] = useState(0);
   const [unread, setUnread] = useState<ChatScreenUnreadState>({
     chat: false,
     products: false,
@@ -110,6 +111,7 @@ const ChatContent = ({
     seenProductIds.current = null;
     setMessages([]);
     setFocusedProductId(null);
+    setFocusRequestId(0);
     setUnread({ chat: false, products: false });
   }, [conversationId]);
 
@@ -159,6 +161,7 @@ const ChatContent = ({
 
   const focusProduct = (product: CachedProduct): void => {
     setFocusedProductId(product.id);
+    setFocusRequestId((current) => current + 1);
     setSelectedTab('상품');
     setUnread((state) => ({ ...state, products: false }));
   };
@@ -284,6 +287,7 @@ const ChatContent = ({
                 ({ recommendations }) => recommendations,
               )}
               focusProductId={focusedProductId}
+              focusRequestId={focusRequestId}
               presentation="recommendations"
               scope="conversation"
             />

@@ -57,6 +57,8 @@ let mockConversationRemoteWorkRef: { current: boolean } | undefined;
 let mockFoundProductsRecommendations: DisplayMessage['recommendations'] | undefined;
 let mockFoundProductsPresentation: 'catalog' | 'recommendations' | undefined;
 let mockFoundProductsScope: 'all-conversations' | 'conversation' | undefined;
+let mockFoundProductsFocusProductId: string | null | undefined;
+let mockFoundProductsFocusRequestId: number | undefined;
 let mockFoundProductsRenderCount = 0;
 let mockSessionStatus: SessionStatus = 'authenticated';
 let mockOnline = true;
@@ -167,15 +169,21 @@ jest.mock('@/features/catalog', () => {
   return {
     ProductList: ({
       conversationRecommendations,
+      focusProductId,
+      focusRequestId,
       presentation,
       scope,
     }: {
       conversationRecommendations?: DisplayMessage['recommendations'];
+      focusProductId?: string | null;
+      focusRequestId?: number;
       presentation?: 'catalog' | 'recommendations';
       scope?: 'all-conversations' | 'conversation';
     }) => {
       mockFoundProductsRenderCount += 1;
       mockFoundProductsRecommendations = conversationRecommendations;
+      mockFoundProductsFocusProductId = focusProductId;
+      mockFoundProductsFocusRequestId = focusRequestId;
       mockFoundProductsPresentation = presentation;
       mockFoundProductsScope = scope;
       return mockCreateElement(
@@ -263,6 +271,8 @@ describe('chat screen', () => {
     mockFoundProductsRecommendations = undefined;
     mockFoundProductsPresentation = undefined;
     mockFoundProductsScope = undefined;
+    mockFoundProductsFocusProductId = undefined;
+    mockFoundProductsFocusRequestId = undefined;
     mockFoundProductsRenderCount = 0;
     mockSessionStatus = 'authenticated';
     mockOnline = true;
@@ -467,6 +477,35 @@ describe('chat screen', () => {
     act(() => mockTabChange?.('상품'));
 
     expect(screen.getByTestId('found-products-content')).toBeOnTheScreen();
+  });
+
+  it('emits a new focus request when the same product is selected again', () => {
+    mockSearchParams = { id: 'conversation-1' };
+    render(<ChatScreen />);
+    const selectedProduct = {
+      id: 'product-1',
+      title: '립밤',
+      imageUrl: 'https://example.com/lipbalm.jpg',
+      providerId: 'oliveyoung',
+      providerName: '올리브영',
+      amountMinor: '3000',
+      shippingMinor: '0',
+      totalMinor: '3000',
+      currency: 'KRW',
+      isAffiliate: false,
+      isInStock: true,
+      outboundUrl: 'https://example.com/product',
+      deliveryExpectedAt: null,
+      observedAt: '2026-08-26T00:00:00.000Z',
+      isSaved: false,
+    };
+
+    act(() => mockConversationOnProductSelect?.(selectedProduct));
+    expect(mockFoundProductsFocusProductId).toBe(selectedProduct.id);
+    expect(mockFoundProductsFocusRequestId).toBe(1);
+
+    act(() => mockConversationOnProductSelect?.(selectedProduct));
+    expect(mockFoundProductsFocusRequestId).toBe(2);
   });
 
   it('does not rerender the product tab for streamed text-only updates', () => {

@@ -4,6 +4,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -35,11 +36,17 @@ type ActiveRunContext = Readonly<
   Omit<ChatRunContext, 'runId'> & { runId: string | null }
 >;
 
+type SubmittedDraftIdentity = Readonly<{
+  assetId: string | null;
+  text: string;
+}>;
+
 type StoppedRecovery = Readonly<
   Omit<ActiveRunContext, 'runId'> & {
     message: string;
     question: string;
     reason: 'cancelled' | 'failed';
+    submittedDraft?: SubmittedDraftIdentity;
   }
 >;
 
@@ -149,8 +156,19 @@ const ConversationContent = ({
   const responseFinishedRef = useRef(false);
   const activeRunContextRef = useRef<ChatRunContext | null>(null);
   const activeRunIdRef = useRef<string | null>(null);
+  const activeRunGenerationRef = useRef(0);
+  const activeQuestionRef = useRef<string | null>(null);
+  const operationGenerationRef = useRef(0);
+  const pendingRunOperationRef = useRef<Readonly<{
+    generation: number;
+    submittedDraft?: SubmittedDraftIdentity;
+  }> | null>(null);
   const finishedRunIdRef = useRef<string | null>(null);
   const renderedRunIdRef = useRef<string | null>(null);
+  const isCurrentRunEvent = (eventRunId: string | null): boolean =>
+    activeRunGenerationRef.current === operationGenerationRef.current &&
+    eventRunId !== null &&
+    eventRunId === activeRunIdRef.current;
   const persistedActiveRunContext =
     activeRunContext?.conversationId === id ? activeRunContext : null;
   const {
@@ -173,12 +191,7 @@ const ConversationContent = ({
     conversationId: id,
     online,
     onFinish: (finishedRunId) => {
-      if (
-        finishedRunId &&
-        activeRunIdRef.current &&
-        finishedRunId !== activeRunIdRef.current
-      )
-        return;
+      if (!isCurrentRunEvent(finishedRunId)) return;
       responseFinishedRef.current = true;
       activeRunContextRef.current = null;
       assetId.current = null;
@@ -195,8 +208,47 @@ const ConversationContent = ({
       });
       setStoppedRecovery(null);
     },
+    onRunError: (_error, failedRunId) => {
+      const pendingOperation = pendingRunOperationRef.current;
+      const currentPendingOperation =
+        pendingOperation?.generation === operationGenerationRef.current
+          ? pendingOperation
+          : null;
+      if (
+        failedRunId
+          ? !isCurrentRunEvent(failedRunId)
+          : !currentPendingOperation && !isCurrentRunEvent(null)
+      )
+        return;
+      const question = activeQuestionRef.current;
+      if (!question) return;
+      const context = activeRunContextRef.current ?? {
+        assetId: assetId.current,
+        providerIds: providerIdsRef.current,
+      };
+      activeRunContextRef.current = null;
+      assetId.current = null;
+      providerIdsRef.current = undefined;
+      setActiveRunContext((current) =>
+        current?.conversationId === id &&
+        (!current.runId || current.runId === failedRunId)
+          ? null
+          : current,
+      );
+      setStoppedRecovery({
+        ...context,
+        conversationId: id,
+        message: '검색에 실패했어요',
+        question,
+        reason: 'failed',
+        ...(currentPendingOperation?.submittedDraft
+          ? { submittedDraft: currentPendingOperation.submittedDraft }
+          : {}),
+      });
+    },
     onRunStart: (startedRunId) => {
       activeRunIdRef.current = startedRunId;
+      activeRunGenerationRef.current = operationGenerationRef.current;
       finishedRunIdRef.current = null;
       if (activeRunContextRef.current?.conversationId === id)
         activeRunContextRef.current = {
@@ -211,6 +263,7 @@ const ConversationContent = ({
       if (context.conversationId !== id) return;
       activeRunContextRef.current = context;
       activeRunIdRef.current = context.runId;
+      activeRunGenerationRef.current = operationGenerationRef.current;
       assetId.current = context.assetId;
       providerIdsRef.current = context.providerIds;
       setActiveRunContext(context);
@@ -219,8 +272,12 @@ const ConversationContent = ({
     remoteWorkRef,
     runContextRef: activeRunContextRef,
   });
-  if (runId && (activeRunIdRef.current === null || runId !== renderedRunIdRef.current))
+  const pendingCurrentRun =
+    pendingRunOperationRef.current?.generation === operationGenerationRef.current;
+  if (runId && runId !== renderedRunIdRef.current && !pendingCurrentRun) {
     activeRunIdRef.current = runId;
+    activeRunGenerationRef.current = operationGenerationRef.current;
+  }
   if (runId) renderedRunIdRef.current = runId;
 
   const historicalMessages = data?.conversation?.messages;
@@ -230,6 +287,10 @@ const ConversationContent = ({
     historicalDisplayMessages,
     liveDisplayMessages,
   );
+  const latestQuestion = displayMessages
+    .findLast(({ role }) => role === 'user')
+    ?.text.trim();
+  if (latestQuestion) activeQuestionRef.current = latestQuestion;
   const activeAskUser = activeAskUserRequest(displayMessages);
   const [askSheetOpen, setAskSheetOpen] = useState(false);
   const [draftReplacement, setDraftReplacement] = useState<Readonly<{
@@ -237,6 +298,9 @@ const ConversationContent = ({
     text: string;
   }> | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [retryCleanup, setRetryCleanup] = useState<Readonly<
+    SubmittedDraftIdentity & { revision: number }
+  > | null>(null);
   const stoppedQuestionFocusRef = useRef(0);
   const editRequestIdRef = useRef(0);
   const retryInFlightRef = useRef(false);
@@ -244,6 +308,14 @@ const ConversationContent = ({
   const askSheetIdRef = useRef<string | null>(null);
   const skipAskUserRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
+
+  useLayoutEffect(
+    () => () => {
+      operationGenerationRef.current += 1;
+      pendingRunOperationRef.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (conversationIdRef.current !== id) {
@@ -275,6 +347,13 @@ const ConversationContent = ({
   }, [errorPresentation?.route]);
 
   const send = async (text: string, nextAssetId: string | null): Promise<void> => {
+    const operationGeneration = ++operationGenerationRef.current;
+    const content = text || '이 이미지와 관련된 상품을 찾아줘';
+    activeRunIdRef.current = null;
+    pendingRunOperationRef.current = {
+      generation: operationGeneration,
+      submittedDraft: { assetId: nextAssetId, text: content },
+    };
     const context = {
       assetId: nextAssetId,
       providerIds: activeAskUser ? undefined : providerIds,
@@ -286,13 +365,17 @@ const ConversationContent = ({
     assetId.current = context.assetId;
     providerIdsRef.current = context.providerIds;
     responseFinishedRef.current = false;
+    activeQuestionRef.current = content;
     try {
-      await sendMessage({
+      const result = await sendMessage({
         id: createStableChatMessageId(),
-        content: text || '이 이미지와 관련된 상품을 찾아줘',
+        content,
       });
+      if (!result.ok) throw result.error;
       if (responseFinishedRef.current) onProviderReset?.();
     } finally {
+      if (pendingRunOperationRef.current?.generation === operationGeneration)
+        pendingRunOperationRef.current = null;
       assetId.current = null;
       providerIdsRef.current = undefined;
     }
@@ -313,10 +396,11 @@ const ConversationContent = ({
     skipAskUserRef.current = true;
     setAskSheetOpen(false);
     try {
-      await sendMessage(
+      const result = await sendMessage(
         { id: createStableChatMessageId(), content: ASK_USER_SKIP_MESSAGE },
         { whenBusy: 'queue' },
       );
+      if (!result.ok) throw result.error;
     } catch (error) {
       skipAskUserRef.current = false;
       setAskSheetOpen(true);
@@ -334,6 +418,12 @@ const ConversationContent = ({
   };
 
   const stop = async (showRecovery = true): Promise<void> => {
+    const pendingOperation = pendingRunOperationRef.current;
+    const waitingForRunId =
+      pendingOperation?.generation === operationGenerationRef.current &&
+      activeRunGenerationRef.current !== operationGenerationRef.current;
+    const operationGeneration = ++operationGenerationRef.current;
+    pendingRunOperationRef.current = null;
     const question = displayMessages.findLast(({ role }) => role === 'user')?.text.trim();
     const context =
       activeRunContextRef.current ??
@@ -357,7 +447,12 @@ const ConversationContent = ({
             reason,
           }
         : null;
-    if (!runId) {
+    const stoppingRunId = waitingForRunId ? null : (activeRunIdRef.current ?? runId);
+    if (stoppingRunId) activeRunGenerationRef.current = operationGeneration;
+    const isCurrentStop = (): boolean =>
+      operationGenerationRef.current === operationGeneration &&
+      activeRunIdRef.current === stoppingRunId;
+    if (!stoppingRunId) {
       stopChat();
       settleRetryState();
       activeRunContextRef.current = null;
@@ -366,19 +461,22 @@ const ConversationContent = ({
       return;
     }
     try {
-      const outcome = await cancelRunThenStop(id, runId, stopChat);
+      const outcome = await cancelRunThenStop(id, stoppingRunId, stopChat, isCurrentStop);
+      if (!isCurrentStop()) return;
       if (outcome === 'completed') {
         settleRetryState();
         activeRunContextRef.current = null;
         setActiveRunContext((current) =>
-          current?.conversationId === id && (!current.runId || current.runId === runId)
+          current?.conversationId === id &&
+          (!current.runId || current.runId === stoppingRunId)
             ? null
             : current,
         );
-        void clearPersistedResume(runId).catch(() => undefined);
+        void clearPersistedResume(stoppingRunId).catch(() => undefined);
         try {
           await refetchHistory();
         } catch {
+          if (!isCurrentStop()) return;
           Alert.alert(
             '응답 상태 확인 실패',
             '완료된 응답을 확인하지 못했어요. 다시 시도해 주세요.',
@@ -390,16 +488,18 @@ const ConversationContent = ({
         settleRetryState();
         activeRunContextRef.current = null;
         setActiveRunContext((current) =>
-          current?.conversationId === id && (!current.runId || current.runId === runId)
+          current?.conversationId === id &&
+          (!current.runId || current.runId === stoppingRunId)
             ? null
             : current,
         );
-        void clearPersistedResume(runId).catch(() => undefined);
-        if (showRecovery && finishedRunIdRef.current !== runId)
+        void clearPersistedResume(stoppingRunId).catch(() => undefined);
+        if (showRecovery && finishedRunIdRef.current !== stoppingRunId)
           setStoppedRecovery(recovery('failed'));
         return;
       }
     } catch (error) {
+      if (!isCurrentStop()) return;
       Alert.alert(
         '응답 중지 실패',
         error instanceof Error ? error.message : '다시 시도해 주세요.',
@@ -407,14 +507,15 @@ const ConversationContent = ({
       return;
     }
     setActiveRunContext((current) =>
-      current?.conversationId === id && (!current.runId || current.runId === runId)
+      current?.conversationId === id &&
+      (!current.runId || current.runId === stoppingRunId)
         ? null
         : current,
     );
     settleRetryState();
     activeRunContextRef.current = null;
-    void clearPersistedResume(runId).catch(() => undefined);
-    if (showRecovery && finishedRunIdRef.current !== runId)
+    void clearPersistedResume(stoppingRunId).catch(() => undefined);
+    if (showRecovery && finishedRunIdRef.current !== stoppingRunId)
       setStoppedRecovery(recovery('cancelled'));
   };
 
@@ -439,7 +540,13 @@ const ConversationContent = ({
     if (!stoppedRecovery || retryInFlightRef.current) return;
     retryInFlightRef.current = true;
     const requestId = ++retryRequestIdRef.current;
+    const operationGeneration = ++operationGenerationRef.current;
     const recovery = stoppedRecovery;
+    activeRunIdRef.current = null;
+    pendingRunOperationRef.current = {
+      generation: operationGeneration,
+      ...(recovery.submittedDraft ? { submittedDraft: recovery.submittedDraft } : {}),
+    };
     setRetrying(true);
     activeRunContextRef.current = {
       assetId: recovery.assetId,
@@ -457,18 +564,39 @@ const ConversationContent = ({
     providerIdsRef.current = recovery.providerIds;
     finishedRunIdRef.current = null;
     responseFinishedRef.current = false;
+    activeQuestionRef.current = recovery.question;
     try {
-      await reload();
-      if (requestId !== retryRequestIdRef.current) return;
+      const result = await reload();
+      if (!result.ok) throw result.error;
+      if (
+        requestId !== retryRequestIdRef.current ||
+        operationGeneration !== operationGenerationRef.current
+      )
+        return;
       if (responseFinishedRef.current) onProviderReset?.();
+      const submittedDraft = recovery.submittedDraft;
+      if (submittedDraft)
+        setRetryCleanup((current) => ({
+          ...submittedDraft,
+          revision: (current?.revision ?? 0) + 1,
+        }));
       setStoppedRecovery((current) => (current === recovery ? null : current));
     } catch (error) {
-      if (requestId !== retryRequestIdRef.current) return;
+      if (
+        requestId !== retryRequestIdRef.current ||
+        operationGeneration !== operationGenerationRef.current
+      )
+        return;
       setActiveRunContext((current) => (current?.conversationId === id ? null : current));
       setStoppedRecovery((current) => (current === recovery ? recovery : current));
       Alert.alert('다시 검색 실패', chatErrorPresentation(error).message);
     } finally {
-      if (requestId === retryRequestIdRef.current) {
+      if (
+        requestId === retryRequestIdRef.current &&
+        operationGeneration === operationGenerationRef.current
+      ) {
+        if (pendingRunOperationRef.current?.generation === operationGeneration)
+          pendingRunOperationRef.current = null;
         assetId.current = null;
         providerIdsRef.current = undefined;
         retryInFlightRef.current = false;
@@ -535,6 +663,7 @@ const ConversationContent = ({
             !historyLoading && !activeAskUser && displayMessages.length === 0
           }
           remoteWorkRef={remoteWorkRef}
+          retryCleanup={retryCleanup}
           sendInitialDraft={initialSend}
         />
       </NetworkBoundary>

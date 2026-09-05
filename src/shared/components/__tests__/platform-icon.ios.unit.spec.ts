@@ -2,7 +2,7 @@ import { Host, Icon } from '@expo/ui';
 import { render, screen } from '@testing-library/react-native';
 import { createElement } from 'react';
 
-import { PlatformIcon, platformIconSources } from '../platform-icon.android';
+import { PlatformIcon, platformIconSources } from '../platform-icon.ios';
 
 jest.mock('@expo/ui', () => ({ Host: 'Host', Icon: 'Icon' }));
 
@@ -24,15 +24,15 @@ const iconNames = [
   'stop-filled',
 ];
 
-describe('android platform icons', () => {
-  it('provides a native source for every supported icon', () => {
+describe('ios platform icons', () => {
+  it('provides an SF Symbol for every supported icon', () => {
     expect(Object.keys(platformIconSources)).toEqual(iconNames);
     expect(
-      Object.values(platformIconSources).every((source) => typeof source === 'number'),
+      Object.values(platformIconSources).every((source) => typeof source === 'string'),
     ).toBe(true);
   });
 
-  it('hosts the material icon at its requested size and color', () => {
+  it('hosts the SF Symbol at its requested size and color', () => {
     render(
       createElement(PlatformIcon, {
         color: '#112233',

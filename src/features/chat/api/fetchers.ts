@@ -12,6 +12,7 @@ import type { AssetProcessingResult, AssetRemoteStatus, PollOptions } from '../t
 export type CancelRunOutcome = 'cancelled' | 'already_cancelled' | 'completed' | 'failed';
 
 const cancelOutcomes = ['cancelled', 'already_cancelled', 'completed', 'failed'] as const;
+const cancelRunFlights = new Map<string, Promise<CancelRunOutcome>>();
 
 const isCancelRunOutcome = (value: unknown): value is CancelRunOutcome =>
   typeof value === 'string' && (cancelOutcomes as ReadonlyArray<string>).includes(value);
@@ -112,10 +113,21 @@ export const cancelRunThenStop = async (
   threadId: string,
   runId: string,
   stop: () => void,
+  isCurrentRun: () => boolean = () => true,
 ): Promise<CancelRunOutcome> => {
+  const key = JSON.stringify([threadId, runId]);
+  let cancellation = cancelRunFlights.get(key);
+  if (!cancellation) {
+    cancellation = cancelChatRun(threadId, runId);
+    cancelRunFlights.set(key, cancellation);
+    const clearFlight = () => {
+      if (cancelRunFlights.get(key) === cancellation) cancelRunFlights.delete(key);
+    };
+    void cancellation.then(clearFlight, clearFlight);
+  }
   try {
-    return await cancelChatRun(threadId, runId);
+    return await cancellation;
   } finally {
-    stop();
+    if (isCurrentRun()) stop();
   }
 };

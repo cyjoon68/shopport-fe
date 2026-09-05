@@ -17,6 +17,7 @@ export const ChatComposer = ({
   providerIds,
   quickActionsEnabled = true,
   remoteWorkRef: parentRemoteWorkRef,
+  retryCleanup,
   sendInitialDraft = false,
 }: ChatComposerProps) => {
   const online = useOnline();
@@ -28,15 +29,27 @@ export const ChatComposer = ({
     if (!draftReplacement || state.draftReadyFor !== conversationId) return;
     state.setText(draftReplacement.text);
   }, [conversationId, draftReplacement, state.draftReadyFor, state.setText]);
-  const { attach, initialDraftRetiredRef, remove, send } = useComposerActions({
-    allowFreeText,
-    conversationId,
-    loading,
-    onSend,
-    online,
-    remoteWorkRef,
-    state,
-  });
+  const { attach, cleanupRetriedDraft, initialDraftRetiredRef, remove, send } =
+    useComposerActions({
+      allowFreeText,
+      conversationId,
+      loading,
+      onSend,
+      online,
+      remoteWorkRef,
+      state,
+    });
+  const handledRetryCleanupRevisionRef = useRef(0);
+  useEffect(() => {
+    if (
+      !retryCleanup ||
+      state.draftReadyFor !== conversationId ||
+      retryCleanup.revision <= handledRetryCleanupRevisionRef.current
+    )
+      return;
+    handledRetryCleanupRevisionRef.current = retryCleanup.revision;
+    void cleanupRetriedDraft(retryCleanup);
+  }, [cleanupRetriedDraft, conversationId, retryCleanup, state.draftReadyFor]);
   const initialDraftSendingRef = useRef(false);
   const initialDraftSentRef = useRef(false);
 

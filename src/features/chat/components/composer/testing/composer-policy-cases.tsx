@@ -1,5 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { ChatComposer } from '../chat-composer';
 import type { DraftValue } from './test-support';
@@ -9,6 +9,7 @@ import {
   deferred,
   flushPromises,
   inputValue,
+  mockedDeleteDraft,
   mockedImpactAsync,
   mockedPollAssetUntilSettled,
   mockedReadAssetStatus,
@@ -313,6 +314,126 @@ describe('chat composer policy isolation', () => {
     await act(flushPromises);
 
     expect(inputValue(screen)).toBe('다시 보낼 문장');
+  });
+
+  it('clears the failed submitted draft and attachment once after retry succeeds', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '다시 찾을 문장',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    const onSend = jest.fn(() => Promise.reject(new Error('연결 실패')));
+    const screen = render(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+      />,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    expect(inputValue(screen)).toBe('다시 찾을 문장');
+    expect(screen.getByText('이미지 제거')).toBeTruthy();
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        retryCleanup={{
+          assetId: 'asset-a',
+          revision: 1,
+          text: '다시 찾을 문장',
+        }}
+      />,
+    );
+    await act(flushPromises);
+
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+    expect(inputValue(screen)).toBe('');
+    expect(screen.queryByText('이미지 제거')).toBeNull();
+
+    screen.rerender(
+      <ChatComposer
+        conversationId="A"
+        loading={false}
+        onSend={onSend}
+        onStop={jest.fn(() => Promise.resolve())}
+        retryCleanup={{
+          assetId: 'asset-a',
+          revision: 1,
+          text: '다시 찾을 문장',
+        }}
+      />,
+    );
+    await act(flushPromises);
+
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('cleans a failed submitted draft after the composer remounts for reconnect', async () => {
+    mockedReadDraft.mockResolvedValue({
+      text: '재연결할 문장',
+      assetId: 'asset-a',
+      assetUri: 'file://a',
+    });
+    const onSend = jest.fn(() => Promise.reject(new Error('연결 실패')));
+    const screen = render(
+      <View>
+        <ChatComposer
+          conversationId="A"
+          key="online"
+          loading={false}
+          onSend={onSend}
+          onStop={jest.fn(() => Promise.resolve())}
+        />
+      </View>,
+    );
+
+    await act(flushPromises);
+    await act(flushPromises);
+    fireEvent.press(screen.getByLabelText('메시지 보내기'));
+    await act(flushPromises);
+
+    const pendingUnmountSave = deferred<void>();
+    mockedSaveDraft.mockReturnValueOnce(pendingUnmountSave.promise);
+
+    screen.rerender(
+      <View>
+        <ChatComposer
+          conversationId="A"
+          key="reconnected"
+          loading={false}
+          onSend={onSend}
+          onStop={jest.fn(() => Promise.resolve())}
+          retryCleanup={{
+            assetId: 'asset-a',
+            revision: 1,
+            text: '재연결할 문장',
+          }}
+        />
+      </View>,
+    );
+    await act(flushPromises);
+
+    expect(mockedDeleteDraft).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pendingUnmountSave.resolve();
+      await flushPromises();
+    });
+    await act(flushPromises);
+
+    expect(mockedDeleteDraft).toHaveBeenCalledTimes(1);
+    expect(inputValue(screen)).toBe('');
+    expect(screen.queryByText('이미지 제거')).toBeNull();
   });
 
   it('blocks direct input when a clarification requires an option', async () => {

@@ -18,6 +18,7 @@ const recommendationKey = ({ product }: RecommendedProduct): string => product.i
 export const ProductList = ({
   conversationRecommendations = [],
   focusProductId = null,
+  focusRequestId = 0,
   presentation = 'catalog',
   scope = 'all-conversations',
 }: ProductListProps = {}) => {
@@ -74,28 +75,44 @@ export const ProductList = ({
   });
   const recommendations = [...byProductId.values()];
   const listRef = useRef<FlashListRef<RecommendedProduct> | null>(null);
-  const appliedFocusProductIdRef = useRef<string | null>(null);
-  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const appliedFocusRequestRef = useRef<Readonly<{
+    productId: string;
+    requestId: number;
+  }> | null>(null);
+  const [highlightedRequestId, setHighlightedRequestId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!focusProductId) {
-      appliedFocusProductIdRef.current = null;
+      appliedFocusRequestRef.current = null;
       return;
     }
-    if (appliedFocusProductIdRef.current === focusProductId) return;
+    if (
+      appliedFocusRequestRef.current?.productId === focusProductId &&
+      appliedFocusRequestRef.current.requestId === focusRequestId
+    )
+      return;
     const index = recommendations.findIndex(
       ({ product }) => product.id === focusProductId,
     );
     if (index < 0) return;
-    appliedFocusProductIdRef.current = focusProductId;
+    appliedFocusRequestRef.current = {
+      productId: focusProductId,
+      requestId: focusRequestId,
+    };
     void listRef.current?.scrollToIndex({ index, animated: true });
-    setHighlightedProductId(focusProductId);
-    const timeout = setTimeout(() => setHighlightedProductId(null), 1_600);
+    setHighlightedRequestId(focusRequestId);
+  }, [focusProductId, focusRequestId, recommendations]);
+
+  useEffect(() => {
+    if (highlightedRequestId === null) return;
+    const timeout = setTimeout(() => setHighlightedRequestId(null), 1_600);
     return () => clearTimeout(timeout);
-  }, [focusProductId, recommendations]);
+  }, [highlightedRequestId]);
   const renderRecommendation = ({ item }: Readonly<{ item: RecommendedProduct }>) => (
     <ProductListItem
-      highlighted={item.product.id === highlightedProductId}
+      highlighted={
+        item.product.id === focusProductId && highlightedRequestId === focusRequestId
+      }
       item={item}
       presentation={presentation}
     />

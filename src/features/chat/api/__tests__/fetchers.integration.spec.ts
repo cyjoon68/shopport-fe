@@ -63,4 +63,54 @@ describe('chat cancellation HTTP contract', () => {
       expect(stop).toHaveBeenCalledTimes(1);
     },
   );
+
+  it('shares one HTTP cancellation flight while each caller finalizes its own client', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      await pending;
+      return new Response(JSON.stringify({ outcome: 'cancelled' }), { status: 200 });
+    });
+    const staleStop = jest.fn();
+    const currentStop = jest.fn();
+
+    const first = cancelRunThenStop('thread-1', 'run-1', staleStop, () => false);
+    const second = cancelRunThenStop('thread-1', 'run-1', currentStop, () => true);
+    release();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      'cancelled',
+      'cancelled',
+    ]);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(staleStop).not.toHaveBeenCalled();
+    expect(currentStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not stop a newer run after the captured cancellation settles', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      await pending;
+      return new Response(JSON.stringify({ outcome: 'cancelled' }), { status: 200 });
+    });
+    const stop = jest.fn();
+    let currentRunId = 'run-1';
+
+    const cancellation = cancelRunThenStop(
+      'thread-1',
+      'run-1',
+      stop,
+      () => currentRunId === 'run-1',
+    );
+    currentRunId = 'run-2';
+    release();
+
+    await expect(cancellation).resolves.toBe('cancelled');
+    expect(stop).not.toHaveBeenCalled();
+  });
 });

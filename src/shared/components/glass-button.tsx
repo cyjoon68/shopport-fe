@@ -38,6 +38,11 @@ type GlassActionButtonProps = Readonly<{
 
 export const glassButtonIconSize = 16;
 
+const useGlassAvailable = (): boolean => {
+  const reducedTransparency = useReducedTransparency();
+  return Platform.OS === 'ios' && !reducedTransparency && isGlassEffectAPIAvailable();
+};
+
 export const GlassButton = ({
   accessibilityHint,
   accessibilityLabel,
@@ -51,9 +56,7 @@ export const GlassButton = ({
   testID,
   tintColor,
 }: GlassButtonProps) => {
-  const reducedTransparency = useReducedTransparency();
-  const glassAvailable =
-    Platform.OS === 'ios' && !reducedTransparency && isGlassEffectAPIAvailable();
+  const glassAvailable = useGlassAvailable();
   const state = { ...accessibilityState, disabled };
   const glassTint = tintColor === undefined ? {} : { tintColor };
 
@@ -112,6 +115,7 @@ export const GlassActionButton = ({
   variant = 'primary',
 }: GlassActionButtonProps) => {
   const { theme } = useUnistyles();
+  const glassAvailable = useGlassAvailable();
   const unavailable = disabled || loading;
   const fallbackStyle =
     variant === 'secondary'
@@ -121,7 +125,15 @@ export const GlassActionButton = ({
         : variant === 'kakao'
           ? styles.kakaoFallback
           : styles.primaryFallback;
-  const labelStyle = variant === 'danger' ? styles.dangerLabel : styles.actionLabel;
+  const labelStyle = glassAvailable
+    ? variant === 'danger'
+      ? styles.dangerLabel
+      : styles.actionLabel
+    : variant === 'danger'
+      ? styles.fallbackLabel
+      : variant === 'kakao'
+        ? styles.kakaoLabel
+        : styles.actionLabel;
 
   return (
     <GlassButton
@@ -165,4 +177,6 @@ const styles = StyleSheet.create((theme) => ({
   dangerFallback: { backgroundColor: theme.colors.danger },
   actionLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
   dangerLabel: { color: theme.colors.danger, fontSize: 14, fontWeight: '600' },
+  fallbackLabel: { color: theme.colors.primaryText, fontSize: 14, fontWeight: '600' },
+  kakaoLabel: { color: '#191919', fontSize: 14, fontWeight: '600' },
 }));

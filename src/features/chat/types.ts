@@ -46,6 +46,10 @@ export type ChatRunContext = Readonly<{
   runId: string;
 }>;
 
+export type ChatRunResult =
+  | Readonly<{ ok: true }>
+  | Readonly<{ error: Error; ok: false }>;
+
 export type PollOptions = Readonly<{
   intervalMs?: number;
   maxWaitMs?: number;
@@ -60,6 +64,7 @@ export type ChatRunOptions = Readonly<{
   conversationId: string;
   online: boolean;
   onFinish: (runId: string | null) => void;
+  onRunError?: (error: Error, runId: string | null) => void;
   onRunStart?: (runId: string) => void;
   onResumeContext?: (context: ChatRunContext) => void;
   providerIds: MutableRefObject<ReadonlyArray<RetailerId> | undefined>;
@@ -83,6 +88,11 @@ export type ChatComposerProps = Readonly<{
   onSend: (text: string, assetId: string | null) => Promise<void>;
   onStop: () => Promise<void>;
   remoteWorkRef?: MutableRefObject<boolean> | undefined;
+  retryCleanup?: Readonly<{
+    assetId: string | null;
+    revision: number;
+    text: string;
+  }> | null;
   sendInitialDraft?: boolean;
 }>;
 

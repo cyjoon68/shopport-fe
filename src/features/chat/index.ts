@@ -33,6 +33,7 @@ export type {
   Attachment,
   ChatComposerProps,
   ChatRunContext,
+  ChatRunResult,
   ChatTab,
   ConversationActionProps,
   DisplayMessage,

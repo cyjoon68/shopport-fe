@@ -24,6 +24,7 @@ export type ProductCardProps = Readonly<{
 export type ProductListProps = Readonly<{
   conversationRecommendations?: ReadonlyArray<RecommendedProduct>;
   focusProductId?: string | null;
+  focusRequestId?: number;
   presentation?: ProductPresentation;
   scope?: ProductScope;
 }>;

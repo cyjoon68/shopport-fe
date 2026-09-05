@@ -1,8 +1,9 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Alert, TextInput } from 'react-native';
+import { Alert, AppState, TextInput } from 'react-native';
 
 import { ChatComposer } from '../chat-composer';
 import {
+  composer,
   deferred,
   flushPromises,
   inputValue,
@@ -17,6 +18,52 @@ import {
 describe('chat composer draft replacement isolation', () => {
   beforeEach(resetComposerMocks);
   afterEach(restoreComposerTimers);
+
+  it('flushes the latest debounced edit before unmount', async () => {
+    const screen = render(composer('A'));
+    await act(flushPromises);
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '떠나기 직전 초안');
+    screen.unmount();
+
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: '떠나기 직전 초안',
+      assetId: null,
+      assetUri: null,
+    });
+  });
+
+  it('flushes the prior conversation edit before switching conversations', async () => {
+    const screen = render(composer('A'));
+    await act(flushPromises);
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), 'A의 최신 초안');
+    screen.rerender(composer('B'));
+    await act(flushPromises);
+
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: 'A의 최신 초안',
+      assetId: null,
+      assetUri: null,
+    });
+  });
+
+  it('flushes the latest debounced edit when the app enters background', async () => {
+    const appStateSpy = jest.spyOn(AppState, 'addEventListener');
+    const screen = render(composer('A'));
+    await act(flushPromises);
+    const listener = appStateSpy.mock.calls.at(-1)?.[1];
+
+    fireEvent.changeText(screen.getByLabelText('쇼핑 질문'), '백그라운드 초안');
+    listener?.('background');
+
+    expect(mockedSaveDraft).toHaveBeenCalledWith('A', {
+      text: '백그라운드 초안',
+      assetId: null,
+      assetUri: null,
+    });
+    appStateSpy.mockClear();
+  });
 
   it('replaces the composer value without sending', async () => {
     mockedReadDraft.mockResolvedValue({
