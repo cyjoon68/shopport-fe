@@ -303,11 +303,31 @@ export const useChatRun = ({
         activeTransportRef.current = { generation: transportGeneration, runId };
         finishedRunIdRef.current = null;
         onRunStartRef.current?.(runId);
-        for await (const chunk of transport.joinRun(runId, abortSignal)) {
-          if (abortSignal?.aborted || !isCurrentTransport(transportGeneration, runId))
-            return;
+        try {
+          for await (const chunk of transport.joinRun(runId, abortSignal)) {
+            if (abortSignal?.aborted || !isCurrentTransport(transportGeneration, runId))
+              return;
+            streamChunkRunIdsRef.current.set(chunk, runId);
+            yield chunk;
+          }
+        } catch (error) {
+          if (
+            abortSignal?.aborted ||
+            !isCurrentTransport(transportGeneration, runId) ||
+            !(error instanceof Error) ||
+            !error.message.includes('status: 410')
+          )
+            throw error;
+          const chunk = {
+            message: 'Run replay expired',
+            runId,
+            threadId: conversationId,
+            timestamp: Date.now(),
+            type: 'RUN_ERROR',
+          } as ChatStreamChunk;
           streamChunkRunIdsRef.current.set(chunk, runId);
           yield chunk;
+          await flushChatPersistence(conversationId).catch(() => undefined);
         }
       },
     };

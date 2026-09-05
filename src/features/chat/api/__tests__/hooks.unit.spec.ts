@@ -217,6 +217,43 @@ describe('useChatRun', () => {
     expect(initial.onRunError).toHaveBeenCalledWith(runError, 'resumed-run');
   });
 
+  it('bridges an expired replay to one correlated terminal error and flushes it', async () => {
+    joinRun.mockImplementation(async function* () {
+      yield await Promise.reject(new Error('XHR error! status: 410 Gone'));
+    });
+    const initial = { ...options(true), onRunError: jest.fn() };
+    renderHook(() => useChatRun(initial));
+    const connection = chatOptions?.connection;
+    if (!connection || !('joinRun' in connection) || !connection.joinRun)
+      throw new Error('resumable connection unavailable');
+
+    const chunks = [];
+    for await (const chunk of connection.joinRun('run-1')) {
+      chunks.push(chunk);
+      const error = new Error(
+        'message' in chunk && typeof chunk.message === 'string'
+          ? chunk.message
+          : 'missing error',
+      );
+      chatOptions?.onChunk?.(chunk);
+      chatOptions?.onError?.(error);
+    }
+    expect(chunks).toEqual([
+      expect.objectContaining({
+        message: 'Run replay expired',
+        runId: 'run-1',
+        threadId: 'conversation-1',
+        type: 'RUN_ERROR',
+      }),
+    ]);
+    expect(initial.onRunError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Run replay expired' }),
+      'run-1',
+    );
+    expect(initial.onRunError).toHaveBeenCalledTimes(1);
+    expect(mockedFlushChatPersistence).toHaveBeenCalledWith('conversation-1');
+  });
+
   it('keeps a late run A error correlated away from the active run B operation', async () => {
     const runAError = new Error('run A failed');
     let resolveRunA!: () => void;
