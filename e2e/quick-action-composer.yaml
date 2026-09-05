@@ -5,7 +5,7 @@ appId: com.cyjoon68.shopport
     text: 'Continue'
     optional: true
 - tapOn:
-    id: 'xmark'
+    text: 'Close'
     optional: true
 - tapOn:
     text: '카카오로 시작하기'
