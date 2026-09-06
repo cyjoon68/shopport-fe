@@ -6,6 +6,7 @@ appId: com.cyjoon68.shopport
 - longPressOn: '쇼핑 질문'
 - tapOn:
     text: 'Select all'
+    optional: true
 - eraseText: 1
 - inputText: '${DRAFT_TEXT}'
 - assertVisible: '${DRAFT_TEXT}'
