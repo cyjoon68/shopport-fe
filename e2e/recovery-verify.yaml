@@ -8,11 +8,11 @@ appId: com.cyjoon68.shopport
 - tapOn:
     id: 'new-chat-segment-상품'
 - extendedWaitUntil:
-    visible: '통합 테스트 텀블러 1'
+    visible: '통합 테스트 텀블러 5'
     timeout: 10000
 - scrollUntilVisible:
     element:
-      text: '통합 테스트 텀블러 2'
+      text: '통합 테스트 텀블러 4'
     direction: DOWN
     timeout: 10000
 - scrollUntilVisible:
@@ -22,12 +22,12 @@ appId: com.cyjoon68.shopport
     timeout: 10000
 - scrollUntilVisible:
     element:
-      text: '통합 테스트 텀블러 4'
+      text: '통합 테스트 텀블러 2'
     direction: DOWN
     timeout: 10000
 - scrollUntilVisible:
     element:
-      text: '통합 테스트 텀블러 5'
+      text: '통합 테스트 텀블러 1'
     direction: DOWN
     timeout: 10000
-- assertVisible: '통합 테스트 텀블러 5'
+- assertVisible: '통합 테스트 텀블러 1'
