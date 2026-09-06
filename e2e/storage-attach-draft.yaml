@@ -10,10 +10,9 @@ appId: com.cyjoon68.shopport
     text: '모두 허용'
     optional: true
 - extendedWaitUntil:
-    visible: 'Select.*photo.*'
+    visible: 'Photo taken.*'
     timeout: 10000
-- tapOn:
-    point: '20%,25%'
+- tapOn: 'Photo taken.*'
 - extendedWaitUntil:
     visible: '첨부한 상품 사진'
     timeout: 30000
