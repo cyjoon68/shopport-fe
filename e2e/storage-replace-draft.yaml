@@ -8,5 +8,4 @@ appId: com.cyjoon68.shopport
     text: 'Select all'
 - eraseText: 1
 - inputText: '${DRAFT_TEXT}'
-- hideKeyboard
 - assertVisible: '${DRAFT_TEXT}'
