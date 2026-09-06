@@ -16,8 +16,10 @@ appId: com.cyjoon68.shopport
 - extendedWaitUntil:
     visible: '첨부한 상품 사진'
     timeout: 30000
-- tapOn: '쇼핑 질문'
-- eraseText: 100
+- longPressOn: '쇼핑 질문'
+- tapOn:
+    text: 'Select all'
+- eraseText: 1
 - inputText: '${DRAFT_TEXT}'
 - hideKeyboard
 - assertVisible: '${DRAFT_TEXT}'
