@@ -1,0 +1,6 @@
+appId: com.cyjoon68.shopport
+---
+- extendedWaitUntil:
+    visible: '${DRAFT_TEXT}'
+    timeout: 30000
+- assertVisible: '첨부한 상품 사진'
